@@ -1,0 +1,5 @@
+[[repositories]]
+path = "./"
+branch_name = "main"
+api_url = "https://api.example.com/generate-commit-message"
+watch_staged_only = false
