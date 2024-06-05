@@ -1,11 +1,11 @@
-use akton::prelude::*;
 use crate::actors::repository_actor::RepositoryActor;
 use crate::ginja_config::GinjaConfig;
 use crate::repository_config::RepositoryConfig;
+use akton::prelude::*;
 
 #[akton_actor]
 pub(crate) struct GinjaActor {
-    repository_actors: Vec<Context>
+    repository_actors: Vec<Context>,
 }
 
 impl GinjaActor {

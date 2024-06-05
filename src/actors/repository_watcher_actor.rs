@@ -1,5 +1,5 @@
-use akton::prelude::*;
 use crate::repository_config::RepositoryConfig;
+use akton::prelude::*;
 
 #[akton_actor]
 pub(crate) struct RepositoryWatcherActor {
@@ -7,7 +7,7 @@ pub(crate) struct RepositoryWatcherActor {
 }
 
 impl RepositoryWatcherActor {
-    pub(crate) async fn init(config: &RepositoryConfig) -> anyhow::Result<Context>{
+    pub(crate) async fn init(config: &RepositoryConfig) -> anyhow::Result<Context> {
         let actor = Akton::<RepositoryWatcherActor>::create_with_id(&config.id);
 
         let context = actor.activate(None).await?;

@@ -6,36 +6,35 @@ use std::sync::Once;
 
 use akton::prelude::*;
 use anyhow::{anyhow, Result};
-use async_openai::{
-    Client,
-    types::{
-        AssistantStreamEvent, CreateMessageRequest, CreateRunRequest,
-        CreateThreadRequest, MessageDeltaContent,
-        MessageRole,
-    },
-};
 use async_openai::types::CreateMessageRequestContent;
+use async_openai::{
+    types::{
+        AssistantStreamEvent, CreateMessageRequest, CreateRunRequest, CreateThreadRequest,
+        MessageDeltaContent, MessageRole,
+    },
+    Client,
+};
 use futures::StreamExt;
+use ginja_config::GinjaConfig;
 use git2::{DiffOptions, Repository};
 use notify::PollWatcher;
 use notify_debouncer_mini::Debouncer;
 use serde::{Deserialize, Serialize};
 use tokio::signal;
-use tracing::{error, instrument, Level, trace};
-use tracing_subscriber::{EnvFilter, FmtSubscriber};
+use tracing::{error, instrument, trace, Level};
 use tracing_subscriber::fmt::format::FmtSpan;
-use ginja_config::GinjaConfig;
+use tracing_subscriber::{EnvFilter, FmtSubscriber};
 
 use crate::actors::GinjaActor;
+use crate::actors::RepositoryWatcherActor;
 use crate::messages::LoadRepo;
 use crate::repository_config::RepositoryConfig;
-use crate::actors::{RepositoryWatcherActor};
 
-mod config_file;
-mod repository_config;
-mod messages;
-mod ginja_config;
 mod actors;
+mod config_file;
+mod ginja_config;
+mod messages;
+mod repository_config;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -97,7 +96,7 @@ async fn handle_changes(_repo_id: String, repo_path: String, staged_only: bool) 
     } else {
         repo.diff_index_to_workdir(None, Some(&mut DiffOptions::new()))
     }
-        .map_err(|e| anyhow!("Failed to get diff: {}", e))?;
+    .map_err(|e| anyhow!("Failed to get diff: {}", e))?;
 
     // Collect the diff as text
     let mut diff_text = Vec::new();
@@ -105,7 +104,7 @@ async fn handle_changes(_repo_id: String, repo_path: String, staged_only: bool) 
         diff_text.extend_from_slice(line.content());
         true
     })
-        .map_err(|e| anyhow!("Failed to print diff: {}", e))?;
+    .map_err(|e| anyhow!("Failed to print diff: {}", e))?;
 
     let changes = String::from_utf8(diff_text)
         .map_err(|e| anyhow!("Failed to convert diff to string: {}", e))?;
@@ -243,11 +242,11 @@ async fn handle_changes(_repo_id: String, repo_path: String, staged_only: bool) 
 
 #[cfg(test)]
 mod tests {
-    use std::fs;
     use crate::actors::GinjaActor;
     use crate::ginja_config::GinjaConfig;
     use crate::init_tracing;
     use crate::repository_config::RepositoryConfig;
+    use std::fs;
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn test_main() -> anyhow::Result<()> {
@@ -261,7 +260,6 @@ mod tests {
         ginga_actor.terminate().await?;
         Ok(())
     }
-
 
     #[test]
     fn test_finder() {
@@ -307,6 +305,9 @@ pub fn init_tracing() {
             .add_directive("akton_core::common::actor=off".parse().unwrap())
             .add_directive("akton_core::common::idle=off".parse().unwrap())
             .add_directive("akton_core::common::outbound_envelope=off".parse().unwrap())
+            .add_directive("repository_config::tests=off".parse().unwrap())
+            .add_directive("repository_actor::tests::test_notify_change=trace".parse().unwrap())
+            .add_directive("repository_actor::tests=off".parse().unwrap())
             .add_directive(Level::TRACE.into());
 
         // Set global log level to TRACE
