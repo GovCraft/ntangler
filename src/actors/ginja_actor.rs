@@ -2,7 +2,7 @@ use akton::prelude::*;
 use crate::ginja_config::GinjaConfig;
 use crate::repository_config::RepositoryConfig;
 
-#[derive(Default, Debug)]
+#[akton_actor]
 pub(crate) struct GinjaActor {}
 
 impl GinjaActor {
