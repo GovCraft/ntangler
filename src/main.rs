@@ -306,8 +306,9 @@ pub fn init_tracing() {
             .add_directive("akton_core::common::idle=off".parse().unwrap())
             .add_directive("akton_core::common::outbound_envelope=off".parse().unwrap())
             .add_directive("repository_config::tests=off".parse().unwrap())
-            .add_directive("repository_actor::tests::test_notify_change=trace".parse().unwrap())
-            .add_directive("repository_actor::tests=off".parse().unwrap())
+            .add_directive("ginja::actors::repository_actor=off".parse().unwrap())
+            .add_directive("hyper_util=off".parse().unwrap())
+            .add_directive("ginja::actors::ai_actor=info".parse().unwrap())
             .add_directive(Level::TRACE.into());
 
         // Set global log level to TRACE

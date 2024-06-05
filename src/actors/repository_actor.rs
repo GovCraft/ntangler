@@ -252,7 +252,6 @@ mod unit_tests {
                                 true
                             }).expect("Failed to print diff");
                             let changes = String::from_utf8(diff_text).expect("Failed to convert diff to string");
-                            trace!("Diff: {changes}");
                             let mut sender_guard = sender.lock().unwrap();
                             if let Some(sender) = sender_guard.take() { // Properly take the sender out of the Option
                                 sender.send(changes).expect("Couldn't send test diff");
@@ -294,7 +293,6 @@ mod unit_tests {
         context.emit_async(NotifyChange).await?;
 
         let result = receiver.await?;
-        trace!("Received diff: {}", &result);
 
 // Expected string formatted as a multiline string for clarity and accuracy
         let expected_diff = r#"diff --git a/test_file.txt b/test_file.txt
