@@ -1,5 +1,5 @@
 [[repositories]]
 path = "./mock-repo-working"
-branch_name = "main"
+branch_name = "some-feature"
 api_url = "https://api.example.com/generate-commit-message"
 watch_staged_only = false
