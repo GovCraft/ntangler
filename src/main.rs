@@ -243,8 +243,25 @@ async fn handle_changes(_repo_id: String, repo_path: String, staged_only: bool) 
 
 #[cfg(test)]
 mod tests {
+    use std::fs;
+    use crate::actors::GinjaActor;
     use crate::ginja_config::GinjaConfig;
+    use crate::init_tracing;
     use crate::repository_config::RepositoryConfig;
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn test_main() -> anyhow::Result<()> {
+        init_tracing();
+
+        // Read and parse the configuration file
+        let ginja_config: GinjaConfig = toml::from_str(&fs::read_to_string("./src/config.toml")?)?;
+
+        let ginga_actor = GinjaActor::init(ginja_config).await?;
+
+        ginga_actor.terminate().await?;
+        Ok(())
+    }
+
 
     #[test]
     fn test_finder() {

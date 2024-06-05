@@ -1,7 +1,9 @@
 use std::sync::{Arc, Mutex};
+
 use akton::prelude::*;
 use git2::{Error, Repository};
 use tracing::{error, trace};
+
 use crate::ginja_config::GinjaConfig;
 use crate::messages::CheckoutBranch;
 use crate::repository_config::RepositoryConfig;
@@ -27,35 +29,37 @@ impl RepositoryActor {
         actor.state.repository = Some(Arc::new(Mutex::new(repo)));
         actor.setup.act_on::<CheckoutBranch>(|actor, event| {
             trace!("Received CheckoutBranch message");
+
             // Check if the repository is available
             if let Some(repository) = &actor.state.repository {
                 // Lock the repository mutex
                 let repo = repository.lock().expect("Couldn't lock repository mutex");
 
                 // Find the branch reference
-                if let Ok(branch_ref) = repo.find_branch(&actor.state.config.branch_name, git2::BranchType::Local) {
-                    trace!("Found branch: {}",&actor.state.config.branch_name);
-                    // Set the HEAD to point to the branch reference
-                    if let Err(e) = repo.set_head(branch_ref.name().expect("Couldn't load branch name").unwrap()) {
-                        error!("Failed to set HEAD: {}", e);
-                    }
-                }
+                match repo.find_branch(&actor.state.config.branch_name, git2::BranchType::Local) {
+                    Ok(branch_ref) => {
+                        trace!("Found branch: {}", &actor.state.config.branch_name);
 
-                let checkout_result = repo.checkout_head(Some(git2::build::CheckoutBuilder::new().force()));
-                match checkout_result {
-                    Ok(_) => {
-                        trace!(
-                    "Checked out branch {} for repo {} at path {}",
-                    &actor.state.config.branch_name,
-                    &actor.state.config.id,
-                    &actor.state.config.path
-                )
-                    }
-                    Err(_) =>
-                        {
-                            error!("Repository not available");
+                        let checkout_result = repo.checkout_head(Some(git2::build::CheckoutBuilder::new().path(&actor.state.config.path)));
+                        match checkout_result {
+                            Ok(_) => {
+                                trace!(
+                                "Checked out branch {} for repo {} at path {}",
+                                &actor.state.config.branch_name,
+                                &actor.state.config.id,
+                                &actor.state.config.path
+                            );
+                            }
+                            Err(e) => {
+                                error!("Failed to checkout head: {}", e);
+                            }
                         }
-                }
+                    }
+                    Err(e) => {
+                        error!("Failed to find branch: {}. Logged error is: {}", &actor.state.config.branch_name, e);
+                        return;
+                    }
+                };
             } else {
                 error!("Failed to find repository: {}", &actor.state.config.path);
             }
@@ -115,12 +119,10 @@ impl RepositoryActor {
 #[cfg(test)]
 mod unit_tests {
     use crate::actors::repository_actor::RepositoryActor;
-    use crate::repository_config::RepositoryConfig;
-    use pretty_assertions::{assert_eq, assert_ne};
-    use tracing::trace;
     use crate::init_tracing;
+    use crate::repository_config::RepositoryConfig;
 
-    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn test_non_existing_branch() -> anyhow::Result<()> {
         init_tracing();
         let config = RepositoryConfig {
@@ -132,6 +134,25 @@ mod unit_tests {
         };
         let actor_context = RepositoryActor::init(&config).await;
         assert!(actor_context.is_some());
+        let context = actor_context.unwrap();
+        context.terminate().await?;
+        Ok(())
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn test_existing_branch() -> anyhow::Result<()> {
+        init_tracing();
+        let config = RepositoryConfig {
+            path: "./mock-repo-working".to_string(),
+            branch_name: "new_branch".to_string(),
+            api_url: "".to_string(),
+            watch_staged_only: false,
+            id: "any id".to_string(),
+        };
+        let actor_context = RepositoryActor::init(&config).await;
+        assert!(actor_context.is_some());
+        let context = actor_context.unwrap();
+        context.terminate().await?;
         Ok(())
     }
 }
