@@ -411,8 +411,9 @@ mod unit_tests {
             writeln!(file, "Modified content")?;
         }
 
+        let repo_id = config.id;
         trace!("Notifying actor of change");
-        context.emit_async(NotifyChange).await;
+        context.emit_async(NotifyChange{repo_id}).await;
 
         let result = receiver.await?;
 

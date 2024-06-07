@@ -1,12 +1,13 @@
 use std::any::TypeId;
-use crate::actors::repository_actor::RepositoryActor;
-use crate::tangler_config::TanglerConfig;
-use crate::repository_config::RepositoryConfig;
+
 use akton::prelude::*;
 use tracing::{debug, error, info, instrument, trace};
-use crate::actors::{BrokerActor, RepositoryWatcherActor};
-use crate::messages::{BrokerEmit, BrokerSubscribe, ErrorNotification};
 
+use crate::actors::{BrokerActor, RepositoryWatcherActor};
+use crate::actors::repository_actor::RepositoryActor;
+use crate::messages::{BrokerSubscribe, ErrorNotification, NotifyChange};
+use crate::repository_config::RepositoryConfig;
+use crate::tangler_config::TanglerConfig;
 
 /// TanglerActor manages repository actors and a broker.
 #[akton_actor]
@@ -41,10 +42,13 @@ impl TanglerActor {
         info!("Setting up the error notification handler.");
         actor.setup.act_on::<ErrorNotification>(|_, event| {
             debug!("broker message received: {:?}", &event.message);
-            debug!("Received message: {:?}", &event.message);
             let error_message = &event.message.error_message;
             error!("Displayed error: {:?}", &error_message);
             eprintln!("{}", error_message);
+        })
+            .act_on::<NotifyChange>(|_, event| {
+            let repo_id = &event.message.repo_id;
+            debug!("Change detected in repo: {:?}", &repo_id);
         });
 
         for repo in &tangler_config.repositories {
@@ -77,6 +81,12 @@ impl TanglerActor {
         };
         broker_context.emit_async(subscription).await;
 
+        let subscription = BrokerSubscribe {
+            message_type_id: TypeId::of::<NotifyChange>(),
+            subscriber_context: actor_context.clone(),
+        };
+        broker_context.emit_async(subscription).await;
+
         Ok((actor_context, broker_context))
     }
 }
@@ -84,13 +94,15 @@ impl TanglerActor {
 #[cfg(test)]
 mod tests {
     use std::any::TypeId;
+
     use akton::prelude::ActorContext;
     use lazy_static::lazy_static;
     use tracing::{debug, info, trace};
+
     use crate::actors::repository_actor::RepositoryActor;
     use crate::actors::TanglerActor;
     use crate::init_tracing;
-    use crate::messages::{BrokerEmit, ErrorNotification};
+    use crate::messages::ErrorNotification;
     use crate::repository_config::RepositoryConfig;
     use crate::tangler_config::TanglerConfig;
 
@@ -125,14 +137,12 @@ mod tests {
         let error_msg = ErrorNotification {
             error_message: "Hello world".to_string(),
         };
-        let message_type_id = TypeId::of::<ErrorNotification>();
-        let broker_emit_msg = BrokerEmit::Error(error_msg);
 
         // Event: Sending Message to Broker
         // Description: Sending the constructed message to the broker.
         // Context: Broker emit message details.
         info!("Sending the constructed message to the broker.");
-        broker.emit_async(broker_emit_msg).await;
+        broker.emit_async(error_msg).await;
 
         // Event: Terminating Broker
         // Description: Terminating the broker actor.

@@ -128,8 +128,8 @@ pub fn init_tracing() {
             .add_directive("akton_core::common::outbound_envelope=off".parse().unwrap())
             .add_directive("tangler::actors::repository_actor=off".parse().unwrap())
             .add_directive("tangler::actors::repository_watcher_actor=trace".parse().unwrap())
-            .add_directive("tangler::actors::tangler_actor=off".parse().unwrap())
-            .add_directive("tangler::actors::broker_actor=debug".parse().unwrap())
+            .add_directive("tangler::actors::tangler_actor=debug".parse().unwrap())
+            .add_directive("tangler::actors::broker_actor=off".parse().unwrap())
             .add_directive("tangler::actors::ai_actor=off".parse().unwrap())
             .add_directive("hyper_util=off".parse().unwrap())
             .add_directive(Level::TRACE.into());

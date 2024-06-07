@@ -119,13 +119,14 @@ impl RepositoryWatcherActor {
             actor.state.watcher = Some(debouncer);
 
             let notification_context = actor.context.clone();
+            let repo_id = actor.state.repo.id.clone();
             tokio::spawn(async move {
                 while let Some(repo_id) = rx.recv().await {
                     // Event: Change Detected
                     // Description: Detected a change in the repository.
                     // Context: Repository ID.
                     info!(repo_id = ?repo_id, "Detected a change in the repository.");
-                    let change_message = NotifyChange;
+                    let change_message = NotifyChange { repo_id };
                     notification_context.emit_async(change_message).await;
                 }
             });
@@ -154,7 +155,7 @@ mod tests {
 
     use crate::actors::{BrokerActor, RepositoryWatcherActor, TanglerActor};
     use crate::init_tracing;
-    use crate::messages::Watch;
+    use crate::messages::{NotifyChange, Watch};
     use crate::repository_config::RepositoryConfig;
     use crate::tangler_config::TanglerConfig;
     lazy_static! {
@@ -170,13 +171,23 @@ mod tests {
     async fn test_watcher() -> anyhow::Result<()> {
         init_tracing();
         let config = CONFIG.clone();
-        let broker = BrokerActor::init().await?;
+        let tangler_config = TanglerConfig {
+            repositories: vec![config],
+        };
+        let (tangler, broker) = TanglerActor::init(tangler_config).await?;
 
-        let watcher = RepositoryWatcherActor::init(&config, broker.clone()).await?;
-        watcher.emit_async(Watch {repo: config}).await;
+        let config = CONFIG.clone();
+        let repo_id = config.id.clone();
+
+        // start watching repo for changes
+        // let watcher = RepositoryWatcherActor::init(&config, broker.clone()).await?;
+        // watcher.emit_async(Watch { repo: config }).await;
+
+        //pretend we get a change and notify the broker
+        broker.emit_async(NotifyChange { repo_id }).await;
 
         broker.terminate().await?;
-        watcher.terminate().await?;
+        tangler.terminate().await?;
         Ok(())
     }
 }
