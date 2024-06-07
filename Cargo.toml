@@ -1,11 +1,11 @@
 [package]
-name = "ginja"
+name = "tangler"
 version = "0.1.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [[bin]]
-name = "ginja"
+name = "tangler"
 path = "src/main.rs"
 
 [dependencies]
@@ -31,5 +31,8 @@ async-openai = "0.23.0"
 futures = "0.3.30"
 pretty_assertions = "1.4.0"
 tokio-retry = "0.3.0"
+
+[dev-dependencies]
+lazy_static = "1.4.0"
 
 
