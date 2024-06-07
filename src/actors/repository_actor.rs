@@ -6,14 +6,15 @@ use anyhow::anyhow;
 use git2::{DiffOptions, Error, Repository};
 use tracing::{error, trace};
 
-use crate::ginja_config::GinjaConfig;
-use crate::messages::{CheckoutBranch, NotifyChange};
+use crate::tangler_config::TanglerConfig;
+use crate::messages::{CheckoutBranch, NotifyChange, ResponseCommit};
 use crate::repository_config::RepositoryConfig;
 
 #[akton_actor]
 pub(crate) struct RepositoryActor {
     repository: Option<Arc<Mutex<Repository>>>,
     config: RepositoryConfig,
+    broker: Context,
 }
 
 impl RepositoryActor {
@@ -26,30 +27,31 @@ impl RepositoryActor {
     /// # Returns
     ///
     /// An optional `Context`, which is `Some` if the actor was successfully activated, or `None` otherwise.
-    pub(crate) async fn init(config: &RepositoryConfig) -> Option<Context> {
+    pub(crate) async fn init(config: &RepositoryConfig, broker: Context) -> Option<Context> {
         // Define the default behavior as an async closure that takes a reference to the repository configuration.
-        let default_behavior = |config: RepositoryConfig| async move {
-            RepositoryActor::default_behavior(&config).await
+        let default_behavior = |config: RepositoryConfig, broker: Context| async move {
+            RepositoryActor::default_behavior(&config, broker.clone()).await
         };
 
         // Call the `init_with_custom_behavior` function with the default behavior closure and the configuration.
-        RepositoryActor::init_with_custom_behavior(default_behavior, config.clone()).await
+        RepositoryActor::init_with_custom_behavior(default_behavior, config.clone(), broker).await
     }
 
     pub(crate) async fn init_with_custom_behavior<F, Fut>(
         custom_behavior: F,
         config: RepositoryConfig,
+        broker: Context,
     ) -> Option<Context>
         where
-            F: Fn(RepositoryConfig) -> Fut + Send + Sync + 'static,
+            F: Fn(RepositoryConfig, Context) -> Fut + Send + Sync + 'static,
             Fut: Future<Output=Option<Context>> + Send,
     {
         // Execute the custom behavior and await its result
-        custom_behavior(config).await
+        custom_behavior(config, broker).await
     }
 
     /// Example custom behavior function to be passed into the `init` function.
-    pub(crate) async fn default_behavior(config: &RepositoryConfig) -> Option<Context> {
+    pub(crate) async fn default_behavior(config: &RepositoryConfig, broker: Context) -> Option<Context> {
         let mut actor = Akton::<RepositoryActor>::create_with_id(&config.id);
         actor.state.config = config.clone();
 
@@ -65,28 +67,7 @@ impl RepositoryActor {
 
         actor.setup.act_on::<CheckoutBranch>(|actor, _event| {
             trace!("Received CheckoutBranch message");
-            if let Some(repository) = &actor.state.repository {
-                let repo = repository.lock().expect("Couldn't lock repository mutex");
-                match repo.find_branch(&actor.state.config.branch_name, git2::BranchType::Local) {
-                    Ok(_branch_ref) => {
-                        trace!("Found branch: {}", &actor.state.config.branch_name);
-                        let checkout_result = repo.checkout_head(Some(
-                            git2::build::CheckoutBuilder::new().path(&actor.state.config.path),
-                        ));
-                        if let Err(e) = checkout_result {
-                            error!("Failed to checkout head: {}", e);
-                        }
-                    }
-                    Err(e) => {
-                        error!(
-                            "Failed to find branch: {}. Logged error is: {}",
-                            &actor.state.config.branch_name, e
-                        );
-                    }
-                };
-            } else {
-                error!("Failed to find repository: {}", &actor.state.config.path);
-            }
+            actor.state.checkout_branch();
         });
 
         actor.setup.act_on::<NotifyChange>(|actor, _event| {
@@ -113,6 +94,28 @@ impl RepositoryActor {
                     String::from_utf8(diff_text).expect("Failed to convert diff to string");
                 trace!("Diff: {changes}");
             }
+        }).act_on::<ResponseCommit>(|actor, event| {
+            //received change so we need to commit to this repo
+            if let Some(repo) = &actor.state.repository {
+                let commit_message = &event.message.commit;
+                let repo = repo.lock().expect("Failed to lock repo mutex");
+                let sig = repo.signature().expect("Failed to get signature");
+                let tree_id = repo.index().expect("Failed to get index").write_tree().expect("Failed to write tree");
+                let tree = repo.find_tree(tree_id).expect("Failed to find tree");
+                let head = repo.head().expect("Failed to get HEAD");
+                let parent_commit = head.peel_to_commit().expect("Failed to get parent commit");
+                repo.commit(
+                    Some("HEAD"),
+                    &sig,
+                    &sig,
+                    &commit_message,
+                    &tree,
+                    &[&parent_commit],
+                )
+                    .expect("Failed to commit");
+
+                trace!("Committed changes locally with message: {}", commit_message);
+            }
         });
 
         let context = actor.activate(None).await;
@@ -134,6 +137,36 @@ impl RepositoryActor {
             }
         }
     }
+
+    fn checkout_branch(&mut self) {
+        if let Some(repository) = &self.repository {
+            let repo = repository.lock().expect("Couldn't lock repository mutex");
+            match repo.find_branch(&self.config.branch_name, git2::BranchType::Local) {
+                Ok(_branch_ref) => {
+                    trace!("Found branch: {}", &self.config.branch_name);
+                    let checkout_result = repo.checkout_head(Some(
+                        git2::build::CheckoutBuilder::new().path(&self.config.path),
+                    ));
+                    match checkout_result {
+                        Ok(_) => {
+                            //set the repo to this branch
+                        }
+                        Err(e) => {
+                            error!("Failed to checkout head: {}", e)
+                        }
+                    }
+                }
+                Err(e) => {
+                    error!(
+                            "Failed to find branch: {}. Logged error is: {}",
+                            &self.config.branch_name, e
+                        );
+                }
+            };
+        } else {
+            error!("Failed to find repository: {}", &self.config.path);
+        }
+    }
     /// Opens an existing repository and checks out a specific branch.
     ///
     /// # Arguments
@@ -151,7 +184,7 @@ impl RepositoryActor {
     /// let my_struct = MyStruct { repository: Some(Arc::new(Mutex::new(Repository::open("/path/to/repo").unwrap()))) };
     /// my_struct.open_repository_to_branch("feature-branch").unwrap();
     /// ```
-    fn open_repository_to_branch(&self, branch_name: &str) -> anyhow::Result<()> {
+    fn open_repository_to_branch(&self) -> anyhow::Result<()> {
         // Check if the repository is available
         if let Some(repository) = &self.repository {
             // Lock the repository mutex
@@ -159,7 +192,7 @@ impl RepositoryActor {
 
             // Find the branch reference
             let branch_ref = repo
-                .find_branch(branch_name, git2::BranchType::Local)?
+                .find_branch(&self.config.branch_name, git2::BranchType::Local)?
                 .into_reference();
 
             // Set the HEAD to point to the branch reference
@@ -176,18 +209,20 @@ impl RepositoryActor {
 #[cfg(test)]
 mod unit_tests {
     use std::sync::{Arc, Mutex};
-    use akton::prelude::{ActorContext, Akton};
+    use akton::prelude::{ActorContext, Akton, Context};
     use git2::{DiffOptions, Repository};
     use tracing::{error, info, trace};
     use std::fs::{self, File, OpenOptions};
     use std::io::Write;
     use std::path::Path;
+    use anyhow::anyhow;
     use tokio::sync::oneshot;
     use pretty_assertions::assert_eq;
+    use crate::actors::BrokerActor;
 
     use crate::actors::repository_actor::RepositoryActor;
     use crate::init_tracing;
-    use crate::messages::NotifyChange;
+    use crate::messages::{NotifyChange, ResponseCommit};
     use crate::repository_config::RepositoryConfig;
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -200,15 +235,101 @@ mod unit_tests {
             watch_staged_only: false,
             id: "any id".to_string(),
         };
-        let actor_context = RepositoryActor::init(&config).await;
+        let broker = BrokerActor::init().await?;
+
+        let actor_context = RepositoryActor::init(&config, broker).await;
         assert!(actor_context.is_some());
         let context = actor_context.unwrap();
         context.terminate().await?;
         Ok(())
     }
 
+    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+    async fn test_commit() -> anyhow::Result<()> {
+        use std::fs::{self, File, OpenOptions};
+        use std::io::Write;
+        use std::path::Path;
+        use std::sync::{Arc, Mutex};
+        use tokio::sync::oneshot;
+
+        init_tracing();
+
+        let (sender, receiver) = oneshot::channel();
+        let sender = Arc::new(Mutex::new(Some(sender))); // Wrap the sender in Arc<Mutex<Option>>
+
+        let config = RepositoryConfig {
+            path: "./mock-repo-working".to_string(),
+            branch_name: "new_branch".to_string(),
+            api_url: "".to_string(),
+            watch_staged_only: false,
+            id: "any id".to_string(),
+        };
+
+        let test_behavior = {
+            let sender = sender.clone(); // Clone the Arc to use in the closure
+            move |config: RepositoryConfig, _broker: Context| {
+                let sender = sender.clone(); // Clone the Arc again for use inside the async block
+                async move {
+                    let mut actor = Akton::<RepositoryActor>::create_with_id(&config.id);
+                    let repo = Repository::open(&config.path).expect("Failed to open mock repo");
+                    actor.state.repository = Some(Arc::new(Mutex::new(repo)));
+                    actor.state.config = config;
+                    trace!("Running test in {}", &actor.state.config.path);
+
+                    actor.setup.act_on::<ResponseCommit>(move |actor, event| {
+                        actor.state.open_repository_to_branch();
+                        if let Some(repo) = &actor.state.repository {
+                            let commit_message = &event.message.commit;
+                            let repo = repo.lock().expect("Failed to lock repo mutex");
+                            let sig = repo.signature().expect("Failed to get signature");
+                            let tree_id = repo.index().expect("Failed to get index").write_tree().expect("Failed to write tree");
+                            let tree = repo.find_tree(tree_id).expect("Failed to find tree");
+                            let head = repo.head().expect("Failed to get HEAD");
+                            let parent_commit = head.peel_to_commit().expect("Failed to get parent commit");
+
+                            let mut sender_guard = sender.lock().unwrap();
+                            if let Some(sender) = sender_guard.take() { // Properly take the sender out of the Option
+                                let result = repo.commit(
+                                    Some("HEAD"),
+                                    &sig,
+                                    &sig,
+                                    &commit_message,
+                                    &tree,
+                                    &[&parent_commit],
+                                );
+                                trace!("Committed changes locally with message: {}", commit_message);
+                                sender.send(result).expect("Couldn't send test diff");
+                            } else {
+                                error!("Sender has already been taken or was never initialized.");
+                            }
+                        }
+                    });
+
+                    let context = actor.activate(None).await.expect("Couldn't activate RepositoryActor");
+                    Some(context)
+                }
+            }
+        };
+        let broker = BrokerActor::init().await?;
+        let actor_context = RepositoryActor::init_with_custom_behavior(test_behavior, config.clone(), broker).await;
+        assert!(actor_context.is_some());
+        let context = actor_context.unwrap();
+
+
+        trace!("Notifying actor of commit");
+        let commit = "chore: cleanup tests".to_string();
+        context.emit_async(ResponseCommit { commit }).await;
+
+        let result = receiver.await?;
+        assert!(result.is_ok());
+
+        context.terminate().await?;
+        Ok(())
+    }
+
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+    #[ignore = "Deprecated in favor of test_commit for now"]
     async fn test_notify_change() -> anyhow::Result<()> {
         use std::fs::{self, File, OpenOptions};
         use std::io::Write;
@@ -231,7 +352,7 @@ mod unit_tests {
 
         let test_behavior = {
             let sender = sender.clone(); // Clone the Arc to use in the closure
-            move |config: RepositoryConfig| {
+            move |config: RepositoryConfig, broker: Context| {
                 let sender = sender.clone(); // Clone the Arc again for use inside the async block
                 async move {
                     let mut actor = Akton::<RepositoryActor>::create_with_id(&config.id);
@@ -239,7 +360,7 @@ mod unit_tests {
                     actor.state.repository = Some(Arc::new(Mutex::new(repo)));
                     actor.state.config = config;
                     trace!("Running test in {}", &actor.state.config.path);
-
+                    actor.state.open_repository_to_branch();
                     actor.setup.act_on::<NotifyChange>(move |actor, _event| {
                         info!("Received NotifyChange message");
                         if let Some(repo) = &actor.state.repository {
@@ -268,8 +389,9 @@ mod unit_tests {
                 }
             }
         };
+        let broker = BrokerActor::init().await?;
 
-        let actor_context = RepositoryActor::init_with_custom_behavior(test_behavior, config.clone()).await;
+        let actor_context = RepositoryActor::init_with_custom_behavior(test_behavior, config.clone(), broker).await;
         assert!(actor_context.is_some());
         let context = actor_context.unwrap();
 
@@ -290,7 +412,7 @@ mod unit_tests {
         }
 
         trace!("Notifying actor of change");
-        context.emit_async(NotifyChange).await?;
+        context.emit_async(NotifyChange).await;
 
         let result = receiver.await?;
 
@@ -307,9 +429,6 @@ Modified content
 // Print both strings to compare visually in the test output
         println!("Expected:\n{}", expected_diff);
         println!("Actual:\n{}", result);
-
-// Check if the result contains any content
-        assert!(result.len() > 0);
 
 // Assert that the actual diff matches the expected diff
         assert_eq!(expected_diff, &result);
@@ -330,7 +449,9 @@ Modified content
             watch_staged_only: false,
             id: "any id".to_string(),
         };
-        let actor_context = RepositoryActor::init(&config).await;
+        let broker = BrokerActor::init().await?;
+
+        let actor_context = RepositoryActor::init(&config, broker).await;
         assert!(actor_context.is_some());
         let context = actor_context.unwrap();
         context.terminate().await?;

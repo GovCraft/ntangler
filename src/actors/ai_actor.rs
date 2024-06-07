@@ -1,5 +1,6 @@
 use std::sync::Arc;
 use std::thread;
+
 use akton::prelude::*;
 use async_openai::Client;
 use async_openai::config::OpenAIConfig;
@@ -8,10 +9,10 @@ use futures::StreamExt;
 use tokio::runtime::Runtime;
 use tokio::sync::mpsc;
 use tokio::task;
-use crate::messages::SubmitDiff;
 use tokio_retry::strategy::{ExponentialBackoff, jitter};
-use tokio_retry::Retry;
 use tracing::{error, info, trace, warn};
+
+use crate::messages::{ResponseCommit, SubmitDiff};
 
 #[akton_actor]
 pub(crate) struct AiActor {
@@ -27,11 +28,11 @@ impl AiActor {
         // Setting up an actor to handle the `SubmitDiff` event asynchronously.
         actor.setup.act_on_async::<SubmitDiff>(|actor, event| {
             let changes = event.message.diff.clone();
-
+            let return_address = event.return_address.clone();
             // Using Box::pin to handle the future.
             Box::pin(async move {
                 let (tx, mut rx) = mpsc::channel(32);
-
+                let return_address  = return_address.clone();
                 task::spawn_blocking(move || {
                     let rt = Runtime::new().unwrap();
                     rt.block_on(async move {
@@ -112,8 +113,11 @@ impl AiActor {
 
                 // Await the result from the thread
                 let result = rx.recv().await;
-                if let Some(commit_msg) = result {
-                    info!("Commit message: {}", commit_msg);
+                if let Some(commit) = result {
+                    info!("Commit message: {}", commit);
+                    let return_address = return_address;
+                    let commit = commit.clone();
+                    return_address.reply_async(ResponseCommit { commit }, None).await;
                 } else {
                     error!("No commit message received");
                 }
@@ -127,33 +131,26 @@ impl AiActor {
 
 #[cfg(test)]
 mod unit_tests {
-    use std::sync::{Arc, Mutex};
     use akton::prelude::{ActorContext, Akton};
-    use git2::{DiffOptions, Repository};
-    use tracing::{error, info, trace};
-    use std::fs::{self, File, OpenOptions};
-    use std::io::Write;
-    use std::path::Path;
-    use tokio::sync::oneshot;
-    use pretty_assertions::assert_eq;
-    use crate::actors::ai_actor::AiActor;
+    use lazy_static::lazy_static;
 
-    use crate::actors::repository_actor::RepositoryActor;
+    use crate::actors::ai_actor::AiActor;
+    use crate::actors::RepositoryWatcherActor;
     use crate::init_tracing;
-    use crate::messages::{NotifyChange, SubmitDiff};
+    use crate::messages::SubmitDiff;
     use crate::repository_config::RepositoryConfig;
 
-    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-    async fn test_commit_msg_retrieval() -> anyhow::Result<()> {
-        init_tracing();
-        let config = RepositoryConfig {
-            path: "./mock-repo-working".to_string(),
-            branch_name: "non_existing_branch".to_string(),
-            api_url: "".to_string(),
-            watch_staged_only: false,
-            id: "any id".to_string(),
-        };
-        let diff = r#"diff --git a/test_file.txt b/test_file.txt
+    lazy_static! {
+    static ref CONFIG: RepositoryConfig = RepositoryConfig {
+        path: "./mock-repo-working".to_string(),
+        branch_name: "new_branch".to_string(),
+        api_url: "".to_string(),
+        watch_staged_only: false,
+        id: "any id".to_string(),
+    };
+        }
+    lazy_static! {
+    static ref DIFF: String = r#"diff --git a/test_file.txt b/test_file.txt
 index 8430408..edc5728 100644
 --- a/test_file.txt
 +++ b/test_file.txt
@@ -161,10 +158,23 @@ index 8430408..edc5728 100644
 Initial content
 Modified content
 "#.to_string();
-        let actor_context = AiActor::init().await?;
-        actor_context.emit_async(SubmitDiff { diff }).await?;
+}
 
-        actor_context.terminate().await?;
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    #[ignore = "Makes live call"]
+    async fn test_commit_msg_retrieval() -> anyhow::Result<()> {
+        init_tracing();
+
+        let diff = DIFF.clone();
+        let config = CONFIG.clone();
+        let id = config.id.clone();
+
+        let watcher = RepositoryWatcherActor::init(&config);
+        let ai_context = AiActor::init().await?;
+
+        ai_context.emit_async(SubmitDiff { diff, id }).await;
+        ai_context.terminate().await?;
+
         Ok(())
     }
 }

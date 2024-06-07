@@ -1,5 +1,6 @@
 use crate::repository_config::RepositoryConfig;
 use akton::prelude::*;
+use crate::messages::NotifyChange;
 
 #[akton_actor]
 pub(crate) struct RepositoryWatcherActor {
@@ -13,4 +14,5 @@ impl RepositoryWatcherActor {
         let context = actor.activate(None).await?;
         Ok(context)
     }
+
 }
