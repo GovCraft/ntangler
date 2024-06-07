@@ -4,14 +4,15 @@ use crate::tangler_config::TanglerConfig;
 use crate::repository_config::RepositoryConfig;
 use akton::prelude::*;
 use tracing::{debug, error, info, instrument, trace};
-use crate::actors::BrokerActor;
+use crate::actors::{BrokerActor, RepositoryWatcherActor};
 use crate::messages::{BrokerEmit, BrokerSubscribe, ErrorNotification};
 
 
 /// TanglerActor manages repository actors and a broker.
 #[akton_actor]
 pub(crate) struct TanglerActor {
-    repository_actors: Vec<Context>,
+    git_repositories: Vec<Context>,
+    diff_watchers: Vec<Context>,
     broker: Context,
 }
 
@@ -42,6 +43,7 @@ impl TanglerActor {
             debug!("broker message received: {:?}", &event.message);
             debug!("Received message: {:?}", &event.message);
             let error_message = &event.message.error_message;
+            error!("Displayed error: {:?}", &error_message);
             eprintln!("{}", error_message);
         });
 
@@ -52,9 +54,11 @@ impl TanglerActor {
             // Description: Initializing a repository actor.
             // Context: Repository configuration details.
             info!(repo = ?repo, "Initializing a repository actor.");
-            if let Some(repo_actor) = RepositoryActor::init(repo, broker).await {
-                actor.state.repository_actors.push(repo_actor);
+            if let Some(repo_actor) = RepositoryActor::init(repo, broker.clone()).await {
+                actor.state.git_repositories.push(repo_actor);
             }
+            info!(repo = ?repo, "Initializing a diff watcher actor.");
+            actor.state.diff_watchers.push(RepositoryWatcherActor::init(repo, broker).await?);
         }
 
         // Event: Activating Tangler Actor
@@ -76,6 +80,7 @@ impl TanglerActor {
         Ok((actor_context, broker_context))
     }
 }
+
 #[cfg(test)]
 mod tests {
     use std::any::TypeId;
@@ -143,6 +148,7 @@ mod tests {
 
         Ok(())
     }
+
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn test_receives_error_notification() -> anyhow::Result<()> {
         init_tracing();

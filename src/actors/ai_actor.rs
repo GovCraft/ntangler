@@ -135,7 +135,7 @@ mod unit_tests {
     use lazy_static::lazy_static;
 
     use crate::actors::ai_actor::AiActor;
-    use crate::actors::RepositoryWatcherActor;
+    use crate::actors::{BrokerActor, RepositoryWatcherActor};
     use crate::init_tracing;
     use crate::messages::SubmitDiff;
     use crate::repository_config::RepositoryConfig;
@@ -168,8 +168,9 @@ Modified content
         let diff = DIFF.clone();
         let config = CONFIG.clone();
         let id = config.id.clone();
+        let broker = BrokerActor::init().await?;
 
-        let watcher = RepositoryWatcherActor::init(&config);
+        let watcher = RepositoryWatcherActor::init(&config, broker);
         let ai_context = AiActor::init().await?;
 
         ai_context.emit_async(SubmitDiff { diff, id }).await;

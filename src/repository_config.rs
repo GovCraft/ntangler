@@ -12,6 +12,7 @@ pub(crate) struct RepositoryConfig {
     pub(crate) watch_staged_only: bool,
     pub(crate) id: String,
 }
+
 impl fmt::Debug for RepositoryConfig {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("RepositoryConfig")
@@ -23,10 +24,11 @@ impl fmt::Debug for RepositoryConfig {
             .finish()
     }
 }
+
 impl<'de> Deserialize<'de> for RepositoryConfig {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
+        where
+            D: Deserializer<'de>,
     {
         #[derive(Deserialize)]
         struct RepositoryHelper {
