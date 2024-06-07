@@ -28,7 +28,7 @@ impl RepositoryWatcherActor {
     #[instrument(skip(config, broker))]
     pub(crate) async fn init(config: &RepositoryConfig, broker: Context) -> anyhow::Result<Context> {
         let mut actor = Akton::<RepositoryWatcherActor>::create_with_id(&config.id);
-
+        actor.state.repo = config.clone();
         // Event: Setting up Watch Handler
         // Description: Setting up the handler for Watch events.
         // Context: Repository configuration details.
@@ -37,11 +37,6 @@ impl RepositoryWatcherActor {
         actor.setup.act_on::<Watch>(|actor, event| {
             let (tx, mut rx) = tokio::sync::mpsc::channel(100);
             let message = event.message;
-            actor.state.repo.id = message.repo.id.clone();
-            actor.state.repo.path = message.repo.path.clone();
-            actor.state.repo.branch_name = message.repo.branch_name.clone();
-            actor.state.repo.api_url = message.repo.api_url.clone();
-            actor.state.repo.watch_staged_only = message.repo.watch_staged_only;
             let repository_id = actor.state.repo.id.clone();
             let notify_config = notify::Config::default()
                 .with_poll_interval(Duration::from_secs(1))
@@ -148,46 +143,52 @@ impl RepositoryWatcherActor {
 
 #[cfg(test)]
 mod tests {
-    use std::fs;
-    use akton::prelude::ActorContext;
     use lazy_static::lazy_static;
-    use tracing::trace;
+    use tokio::fs::File;
+    use tokio::io::AsyncWriteExt;
+    use tracing::debug;
 
-    use crate::actors::{BrokerActor, RepositoryWatcherActor, TanglerActor};
+    use crate::actors::TanglerActor;
     use crate::init_tracing;
-    use crate::messages::{NotifyChange, Watch};
-    use crate::repository_config::RepositoryConfig;
     use crate::tangler_config::TanglerConfig;
+
     lazy_static! {
-    static ref CONFIG: RepositoryConfig = RepositoryConfig {
-        path: "./mock-repo-working".to_string(),
-        branch_name: "new_branch".to_string(),
-        api_url: "".to_string(),
-        watch_staged_only: false,
-        id: "anyid".to_string(),
-    };
-        }
+        static ref TOML: String = r#"
+[[repositories]]
+path = "./mock-repo-working"
+branch_name = "new_branch"
+api_url = "https://api.example.com/generate-commit-message"
+watch_staged_only = false
+        "#.to_string();
+}
+
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn test_watcher() -> anyhow::Result<()> {
         init_tracing();
-        let config = CONFIG.clone();
-        let tangler_config = TanglerConfig {
-            repositories: vec![config],
-        };
-        let (tangler, broker) = TanglerActor::init(tangler_config).await?;
 
-        let config = CONFIG.clone();
+
+        let tangler_config: TanglerConfig = toml::from_str(&*TOML.clone()).unwrap();
+        let config = tangler_config.repositories.first().unwrap().clone();
+        let (tangler, broker) = TanglerActor::init(tangler_config).await?;
         let repo_id = config.id.clone();
 
-        // start watching repo for changes
-        // let watcher = RepositoryWatcherActor::init(&config, broker.clone()).await?;
-        // watcher.emit_async(Watch { repo: config }).await;
-
-        //pretend we get a change and notify the broker
-        broker.emit_async(NotifyChange { repo_id }).await;
+        // Create a test file in ./mock-repo-working
+        let test_file_path = "./mock-repo-working/test_file.txt";
+        {
+            let mut file = File::create(test_file_path).await?;
+            file.write_all("This is a test file.".as_ref()).await?;
+            debug!("Wrote test file");
+        }
+        // // Pretend we get a change and notify the broker
+        // broker.emit_async(NotifyChange { repo_id }).await;
 
         broker.terminate().await?;
         tangler.terminate().await?;
+
+        // Remove the test file after actors are terminated
+        // tokio::fs::remove_file(test_file_path).await?;
+        // debug!("Removed test file");
+
         Ok(())
     }
 }
