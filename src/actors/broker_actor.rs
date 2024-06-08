@@ -12,7 +12,7 @@ use futures::stream::FuturesUnordered;
 use futures::StreamExt;
 use tracing::{debug, debug_span, field, info, instrument, trace, trace_span};
 
-use crate::messages::{BrokerSubscribe, BrokerUnsubscribe, ErrorNotification, NotifyChange};
+use crate::messages::{BrokerSubscribe, BrokerUnsubscribe, ErrorNotification, NotifyChange, ResponseCommit, SubmitDiff};
 
 #[akton_actor]
 pub(crate) struct BrokerActor {
@@ -73,6 +73,14 @@ impl BrokerActor {
                 info!("Handling an error notification asynchronously.");
                 actor.state.load_subscriber_futures(event.message.clone())
             })
+            .act_on_async::<SubmitDiff>(|actor, event| {
+                debug!("Handling a submitted diff asynchronously.");
+                actor.state.load_subscriber_futures(event.message.clone())
+            })
+            .act_on_async::<ResponseCommit>(|actor, event| {
+                debug!("Handling a ResponseCommit message asynchronously.");
+                actor.state.load_subscriber_futures(event.message.clone())
+            })
             .act_on_async::<NotifyChange>(|actor, event| {
                 // Event: Notify Change
                 // Description: Handling a notify change event asynchronously.
@@ -111,10 +119,10 @@ impl BrokerActor {
                 // Event: Subscriber Found
                 // Description: A subscriber has been found for the message type.
                 // Context: Subscriber context and message type ID.
-                trace!(subscriber=&subscriber_context.key.value, message_type=?&type_id, "Subscriber found");
+                debug!(subscriber=&subscriber_context.key.value, message_type=?&type_id, "Subscriber found");
 
                 futures.push(async move {
-                    subscriber_context.emit_async(message).await;
+                    subscriber_context.emit_async(message, None).await;
                 });
             }
         }

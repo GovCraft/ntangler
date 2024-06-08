@@ -5,9 +5,9 @@ use akton::prelude::*;
 use futures::FutureExt;
 use tracing::{debug, error, info, instrument, trace, warn};
 
-use crate::actors::{BrokerActor, RepositoryWatcherActor};
+use crate::actors::{AiActor, BrokerActor, RepositoryWatcherActor};
 use crate::actors::repository_actor::RepositoryActor;
-use crate::messages::{BrokerSubscribe, Diff, ErrorNotification, NotifyChange, Watch};
+use crate::messages::{AcceptParentBroker, BrokerSubscribe, Diff, ErrorNotification, NotifyChange, SubmitDiff, Watch};
 use crate::repository_config::RepositoryConfig;
 use crate::tangler_config::TanglerConfig;
 
@@ -16,6 +16,7 @@ use crate::tangler_config::TanglerConfig;
 pub(crate) struct TanglerActor {
     git_repositories: Vec<Context>,
     diff_watchers: Vec<Context>,
+    llm_pool: Vec<Context>,
     broker: Context,
 }
 
@@ -42,11 +43,20 @@ impl TanglerActor {
         // Description: Setting up the error notification handler.
         // Context: None
         info!("Setting up the error notification handler.");
-        actor.setup.act_on::<ErrorNotification>(|_, event| {
-            let error_message = &event.message.error_message;
-            error!("Displayed error: {:?}", &error_message);
-            eprintln!("{}", error_message);
-        })
+        actor.setup
+            .act_on_async::<SubmitDiff>(|actor, event| {
+                let context = actor.context.clone();
+                let message = event.message.clone();
+                Box::pin(async move {
+                    info!("Diff submitted for LLM pool");
+                    context.emit_async(message,Some("llm_pool")).await
+                })
+            })
+            .act_on::<ErrorNotification>(|_, event| {
+                let error_message = &event.message.error_message;
+                error!("Displayed error: {:?}", &error_message);
+                eprintln!("{}", error_message);
+            })
             .act_on_async::<NotifyChange>(|actor, event| {
                 let repo_id = &event.message.repo_id;
 
@@ -64,9 +74,9 @@ impl TanglerActor {
                     // Event: Emitting Diff
                     // Description: Emitting a Diff message to the repository.
                     // Context: Repository ID.
-                    info!(repo_id = ?repo_id, "Emitting Diff message to the repository.");
+                    debug!(repo_id = ?repo_id, "Emitting Diff message to the repository.");
                     Box::pin(async move {
-                        repo.emit_async(Diff).await
+                        repo.emit_async(Diff, None).await
                     })
                 } else {
                     // Event: Repository Not Found
@@ -75,6 +85,12 @@ impl TanglerActor {
                     warn!(repo_id = ?repo_id, "No repository found matching the given ID.");
                     Box::pin(async move {})
                 }
+            })
+            .on_before_stop_async(|actor| {
+                let broker = actor.state.broker.clone();
+                Box::pin(async move {
+                    broker.suspend().await.expect("Failed shut down broker")
+                })
             });
 
         for repo in &tangler_config.repositories {
@@ -88,14 +104,25 @@ impl TanglerActor {
                 actor.state.git_repositories.push(repo_actor);
             }
             info!(repo = ?repo, "Initializing a diff watcher actor.");
-            actor.state.diff_watchers.push(RepositoryWatcherActor::init(repo, broker).await?);
+            let watcher = RepositoryWatcherActor::init(repo, broker).await?;
+            watcher.emit_async(Watch, None).await;
+            actor.state.diff_watchers.push(watcher);
         }
-
+        let pool_size = tangler_config.repositories.len() * 3;
+        let pool_builder = PoolBuilder::default().add_pool::<AiActor>("llm_pool", pool_size, LoadBalanceStrategy::RoundRobin);
+        let pool_broker = actor.state.broker.clone();
         // Event: Activating Tangler Actor
         // Description: Activating the Tangler actor.
         // Context: None
         info!("Activating the Tangler actor.");
-        let actor_context = actor.activate(None).await?;
+        let actor_context = actor.activate(Some(pool_builder)).await?;
+
+        //pass the broker to the internal pool actors
+        for _ in 0..pool_size {
+            debug!("Sending broker to LLM Pool.");
+            let broker = pool_broker.clone();
+            actor_context.emit_async( AcceptParentBroker { broker }, Some("llm_pool")).await;
+        }
 
         // Event: Broker Subscription
         // Description: Subscribing to broker for error notifications.
@@ -105,13 +132,21 @@ impl TanglerActor {
             message_type_id: TypeId::of::<ErrorNotification>(),
             subscriber_context: actor_context.clone(),
         };
-        broker_context.emit_async(subscription).await;
+        broker_context.emit_async(subscription, None).await;
 
+        info!("Subscribing to broker for change notifications.");
         let subscription = BrokerSubscribe {
             message_type_id: TypeId::of::<NotifyChange>(),
             subscriber_context: actor_context.clone(),
         };
-        broker_context.emit_async(subscription).await;
+        broker_context.emit_async(subscription, None).await;
+
+        info!("Subscribing to broker for submitted diffs notifications.");
+        let subscription = BrokerSubscribe {
+            message_type_id: TypeId::of::<SubmitDiff>(),
+            subscriber_context: actor_context.clone(),
+        };
+        broker_context.emit_async(subscription, None).await;
 
         Ok((actor_context, broker_context))
     }
@@ -168,19 +203,19 @@ mod tests {
         // Description: Sending the constructed message to the broker.
         // Context: Broker emit message details.
         info!("Sending the constructed message to the broker.");
-        broker.emit_async(error_msg).await;
+        broker.emit_async(error_msg, None).await;
 
         // Event: Terminating Broker
         // Description: Terminating the broker actor.
         // Context: None
         info!("Terminating the broker actor.");
-        broker.terminate().await?;
+        broker.suspend().await?;
 
         // Event: Terminating Tangler Actor
         // Description: Terminating the Tangler actor.
         // Context: None
         info!("Terminating the Tangler actor.");
-        tangler.terminate().await?;
+        tangler.suspend().await?;
 
         Ok(())
     }
@@ -203,10 +238,10 @@ mod tests {
         let error_msg = ErrorNotification { error_message: "Hello world".to_string() };
 
         // send the message to the broker
-        tangle.emit_async(error_msg).await;
+        tangle.emit_async(error_msg, None).await;
 
 
-        tangle.terminate().await?;
+        tangle.suspend().await?;
         Ok(())
     }
 }

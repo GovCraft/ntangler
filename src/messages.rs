@@ -8,6 +8,7 @@ mod broker_unsubscribe;
 mod error_notification;
 mod watch;
 mod diff;
+mod accept_parent_broker;
 
 pub(crate) use checkout_branch::CheckoutBranch;
 pub(crate) use load_repo::LoadRepo;
@@ -19,3 +20,4 @@ pub(crate) use broker_unsubscribe::BrokerUnsubscribe;
 pub(crate) use error_notification::ErrorNotification;
 pub(crate) use watch::Watch;
 pub(crate) use diff::Diff;
+pub(crate) use accept_parent_broker::AcceptParentBroker;

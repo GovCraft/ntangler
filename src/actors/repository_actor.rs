@@ -1,14 +1,15 @@
+use std::any::TypeId;
 use std::future::Future;
 use std::sync::{Arc, Mutex};
 
 use akton::prelude::*;
 use anyhow::anyhow;
 use git2::{DiffOptions, Error, Repository};
-use tracing::{error, trace};
+use tracing::{debug, error, info, trace};
 
-use crate::tangler_config::TanglerConfig;
-use crate::messages::{CheckoutBranch, NotifyChange, ResponseCommit};
+use crate::messages::{BrokerSubscribe, CheckoutBranch, Diff, NotifyChange, ResponseCommit, SubmitDiff};
 use crate::repository_config::RepositoryConfig;
+use crate::tangler_config::TanglerConfig;
 
 #[akton_actor]
 pub(crate) struct RepositoryActor {
@@ -54,6 +55,7 @@ impl RepositoryActor {
     pub(crate) async fn default_behavior(config: &RepositoryConfig, broker: Context) -> Option<Context> {
         let mut actor = Akton::<RepositoryActor>::create_with_id(&config.id);
         actor.state.config = config.clone();
+        actor.state.broker = broker;
 
         let repo = match Repository::open(&config.path) {
             Ok(repo) => repo,
@@ -65,67 +67,102 @@ impl RepositoryActor {
 
         actor.state.repository = Some(Arc::new(Mutex::new(repo)));
 
-        actor.setup.act_on::<CheckoutBranch>(|actor, _event| {
-            trace!("Received CheckoutBranch message");
-            actor.state.checkout_branch();
-        });
-
-        actor.setup.act_on::<NotifyChange>(|actor, _event| {
-            if let Some(repo) = &actor.state.repository {
-                let repo = repo.lock().expect("Couldn't lock repository mutex");
-                let diff = if actor.state.config.watch_staged_only {
-                    repo.diff_index_to_workdir(
-                        Some(&repo.index().expect("Failed to get index")),
-                        Some(&mut DiffOptions::new()),
-                    )
+        actor.setup
+            .act_on::<CheckoutBranch>(|actor, _event| {
+                trace!("Received CheckoutBranch message");
+                actor.state.checkout_branch();
+            })
+            .act_on_async::<Diff>(|actor, _event| {
+                let diff: String = if let Some(repo) = &actor.state.repository {
+                    let repo = repo.lock().expect("Couldn't lock repository mutex");
+                    // Event: Generating Diff
+                    // Description: Generating a diff for the repository.
+                    // Context: Watch staged only configuration.
+                    info!(watch_staged_only = actor.state.config.watch_staged_only, "Generating a diff for the repository.");
+                    let diff = if actor.state.config.watch_staged_only {
+                        repo.diff_index_to_workdir(
+                            Some(&repo.index().expect("Failed to get index")),
+                            Some(&mut DiffOptions::new()),
+                        )
+                    } else {
+                        repo.diff_index_to_workdir(None, Some(&mut DiffOptions::new()))
+                    }.expect("Failed to get diff");
+                    let mut diff_text = Vec::new();
+                    diff.print(git2::DiffFormat::Patch, |_, _, line| {
+                        diff_text.extend_from_slice(line.content());
+                        true
+                    }).expect("Failed to print diff");
+                    let changes = String::from_utf8(diff_text).expect("Failed to convert diff to string");
+                    // Event: Diff Generated
+                    // Description: The diff for the repository has been generated.
+                    // Context: Diff text.
+                    trace!(diff = changes, "Diff generated for the repository.");
+                    changes
                 } else {
-                    repo.diff_index_to_workdir(None, Some(&mut DiffOptions::new()))
-                }
-                    .expect("Failed to get diff");
-
-                let mut diff_text = Vec::new();
-                diff.print(git2::DiffFormat::Patch, |_, _, line| {
-                    diff_text.extend_from_slice(line.content());
-                    true
+                    String::new()
+                };
+                let id = actor.state.config.id.clone();
+                let broker = actor.state.broker.clone();
+                let diff = diff.clone();
+                Box::pin(async move {
+                    if !diff.is_empty() {
+                        let trace_id = id.clone();
+                        broker.emit_async(SubmitDiff { diff, id }, None).await;
+                        debug!(repo_id = trace_id, broker=?&broker, "Submitted retrieved Diff to broker.");
+                    } else {
+                        error!("Received request for Diff but no repo diffs found.");
+                    }
                 })
-                    .expect("Failed to print diff");
+            })
+            .act_on::<ResponseCommit>(|actor, event| {
+                // Event: Received Commit Response
+                // Description: Received a commit response and will commit changes to the repository.
+                // Context: Commit message details.
+                trace!(commit_message = ?event.message.commit, "Received commit response and will commit changes to the repository.");
 
-                let changes =
-                    String::from_utf8(diff_text).expect("Failed to convert diff to string");
-                trace!("Diff: {changes}");
-            }
-        }).act_on::<ResponseCommit>(|actor, event| {
-            //received change so we need to commit to this repo
-            if let Some(repo) = &actor.state.repository {
-                let commit_message = &event.message.commit;
-                let repo = repo.lock().expect("Failed to lock repo mutex");
-                let sig = repo.signature().expect("Failed to get signature");
-                let tree_id = repo.index().expect("Failed to get index").write_tree().expect("Failed to write tree");
-                let tree = repo.find_tree(tree_id).expect("Failed to find tree");
-                let head = repo.head().expect("Failed to get HEAD");
-                let parent_commit = head.peel_to_commit().expect("Failed to get parent commit");
-                repo.commit(
-                    Some("HEAD"),
-                    &sig,
-                    &sig,
-                    &commit_message,
-                    &tree,
-                    &[&parent_commit],
-                )
-                    .expect("Failed to commit");
+                // Received change, so we need to commit to this repo
+                if let Some(repo) = &actor.state.repository {
+                    let commit_message = &event.message.commit;
+                    let repo = repo.lock().expect("Failed to lock repo mutex");
+                    let sig = repo.signature().expect("Failed to get signature");
+                    let tree_id = repo.index().expect("Failed to get index").write_tree().expect("Failed to write tree");
+                    let tree = repo.find_tree(tree_id).expect("Failed to find tree");
+                    let head = repo.head().expect("Failed to get HEAD");
+                    let parent_commit = head.peel_to_commit().expect("Failed to get parent commit");
 
-                trace!("Committed changes locally with message: {}", commit_message);
-            }
-        });
+                    repo.commit(
+                        Some("HEAD"),
+                        &sig,
+                        &sig,
+                        commit_message,
+                        &tree,
+                        &[&parent_commit],
+                    ).expect("Failed to commit");
+
+                    // Event: Changes Committed
+                    // Description: Changes have been committed to the repository.
+                    // Context: Commit message details.
+                    trace!("Committed changes locally with message: {}", commit_message);
+                }
+            });
 
         let context = actor.activate(None).await;
+
+
         match context {
             Ok(context) => {
+                info!("Subscribing to broker for commit message response notifications.");
+                let subscription = BrokerSubscribe {
+                    message_type_id: TypeId::of::<ResponseCommit>(),
+                    subscriber_context: context.clone(),
+                };
+                context.emit_async(subscription, None).await;
+
                 trace!(
                     "Activated RepositoryActor, attempting to checkout branch {}",
                     &config.branch_name
                 );
-                context.emit_async(CheckoutBranch).await;
+                context.emit_async(CheckoutBranch, None).await;
                 Some(context)
             }
             Err(_) => {
@@ -208,18 +245,19 @@ impl RepositoryActor {
 
 #[cfg(test)]
 mod unit_tests {
-    use std::sync::{Arc, Mutex};
-    use akton::prelude::{ActorContext, Akton, Context};
-    use git2::{DiffOptions, Repository};
-    use tracing::{error, info, trace};
     use std::fs::{self, File, OpenOptions};
     use std::io::Write;
     use std::path::Path;
-    use anyhow::anyhow;
-    use tokio::sync::oneshot;
-    use pretty_assertions::assert_eq;
-    use crate::actors::BrokerActor;
+    use std::sync::{Arc, Mutex};
 
+    use akton::prelude::{ActorContext, Akton, Context};
+    use anyhow::anyhow;
+    use git2::{DiffOptions, Repository};
+    use pretty_assertions::assert_eq;
+    use tokio::sync::oneshot;
+    use tracing::{error, info, trace};
+
+    use crate::actors::BrokerActor;
     use crate::actors::repository_actor::RepositoryActor;
     use crate::init_tracing;
     use crate::messages::{NotifyChange, ResponseCommit};
@@ -240,7 +278,7 @@ mod unit_tests {
         let actor_context = RepositoryActor::init(&config, broker).await;
         assert!(actor_context.is_some());
         let context = actor_context.unwrap();
-        context.terminate().await?;
+        context.suspend().await?;
         Ok(())
     }
 
@@ -318,12 +356,12 @@ mod unit_tests {
 
         trace!("Notifying actor of commit");
         let commit = "chore: cleanup tests".to_string();
-        context.emit_async(ResponseCommit { commit }).await;
+        context.emit_async(ResponseCommit { commit }, None).await;
 
         let result = receiver.await?;
         assert!(result.is_ok());
 
-        context.terminate().await?;
+        context.suspend().await?;
         Ok(())
     }
 
@@ -413,7 +451,7 @@ mod unit_tests {
 
         let repo_id = config.id;
         trace!("Notifying actor of change");
-        context.emit_async(NotifyChange{repo_id}).await;
+        context.emit_async(NotifyChange { repo_id }, None).await;
 
         let result = receiver.await?;
 
@@ -436,7 +474,7 @@ Modified content
         trace!("Removing test file");
         fs::remove_file(&file_path)?;
 
-        context.terminate().await?;
+        context.suspend().await?;
         Ok(())
     }
 
@@ -455,7 +493,7 @@ Modified content
         let actor_context = RepositoryActor::init(&config, broker).await;
         assert!(actor_context.is_some());
         let context = actor_context.unwrap();
-        context.terminate().await?;
+        context.suspend().await?;
         Ok(())
     }
 }

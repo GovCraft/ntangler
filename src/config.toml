@@ -2,4 +2,4 @@
 path = "./mock-repo-working"
 branch_name = "new_branch"
 api_url = "https://api.example.com/generate-commit-message"
-watch_staged_only = true
+watch_staged_only = false

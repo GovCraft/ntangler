@@ -50,12 +50,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     match signal::ctrl_c().await {
         Ok(()) => {
             eprintln!("Shutting down");
-            tangler.terminate().await?;
+            tangler.suspend().await?;
         }
         Err(err) => {
             error!("Unable to listen for shutdown signal: {}", err);
             eprintln!("Unable to listen for shutdown signal: {}", err);
-            tangler.terminate().await?; // Shut down in case of error
+            tangler.suspend().await?; // Shut down in case of error
         }
     }
 
@@ -65,6 +65,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 #[cfg(test)]
 mod tests {
     use std::fs;
+    use akton::prelude::ActorContext;
 
     use crate::actors::TanglerActor;
     use crate::init_tracing;
@@ -80,7 +81,7 @@ mod tests {
 
         let (tangler_actor, _broker) = TanglerActor::init(tangler_config).await?;
 
-        tangler_actor.terminate().await?;
+        tangler_actor.suspend().await?;
         Ok(())
     }
 
@@ -116,22 +117,25 @@ pub fn init_tracing() {
                     .parse()
                     .unwrap(),
             )
-            .add_directive("akton_core::common::context=off".parse().unwrap())
+            .add_directive("akton_core::common::context=error".parse().unwrap())
+            .add_directive("akton_core::common::context[emit_pool]=error".parse().unwrap())
             .add_directive("akton_core::traits=off".parse().unwrap())
-            .add_directive("akton_core::common::awake=off".parse().unwrap())
-            .add_directive("akton_core::common::akton=off".parse().unwrap())
-            .add_directive("akton_core::common::pool_builder=off".parse().unwrap())
-            .add_directive("akton_core::common::system=off".parse().unwrap())
-            .add_directive("akton_core::common::supervisor=off".parse().unwrap())
-            .add_directive("akton_core::common::actor=off".parse().unwrap())
-            .add_directive("akton_core::common::idle=off".parse().unwrap())
-            .add_directive("akton_core::common::outbound_envelope=off".parse().unwrap())
+            .add_directive("akton_core::pool::builder=error".parse().unwrap())
+            .add_directive("akton_core::actors::awake=error".parse().unwrap())
+            .add_directive("akton_core::common::akton=error".parse().unwrap())
+            .add_directive("akton_core::common::pool_builder=error".parse().unwrap())
+            .add_directive("akton_core::common::system=error".parse().unwrap())
+            .add_directive("akton_core::common::supervisor=trace".parse().unwrap())
+            .add_directive("akton_core::actors::actor=error".parse().unwrap())
+            .add_directive("akton_core::actors::idle=error".parse().unwrap())
+            .add_directive("akton_core::message::outbound_envelope=error".parse().unwrap())
             .add_directive("tangler::actors::repository_actor=trace".parse().unwrap())
-            .add_directive("tangler::actors::repository_watcher_actor=debug".parse().unwrap())
+            .add_directive("tangler::actors::repository_watcher_actor=off".parse().unwrap())
             .add_directive("tangler::actors::tangler_actor=error".parse().unwrap())
-            .add_directive("tangler::actors::broker_actor=info".parse().unwrap())
-            .add_directive("tangler::actors::ai_actor=off".parse().unwrap())
+            .add_directive("tangler::actors::broker_actor=trace".parse().unwrap())
+            .add_directive("tangler::actors::ai_actor=trace".parse().unwrap())
             .add_directive("hyper_util=off".parse().unwrap())
+            .add_directive("async_openai=trace".parse().unwrap())
             .add_directive(Level::TRACE.into());
 
         // Set global log level to TRACE
