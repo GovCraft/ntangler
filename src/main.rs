@@ -26,7 +26,7 @@ use tracing_subscriber::fmt::format::FmtSpan;
 
 use tangler_config::TanglerConfig;
 
-use crate::actors::RepositoryWatcherActor;
+use crate::actors::GitSentinel;
 use crate::actors::TanglerActor;
 use crate::messages::LoadRepo;
 use crate::repository_config::RepositoryConfig;
@@ -135,7 +135,7 @@ pub fn init_tracing() {
             .add_directive("tangler::actors::repository_watcher_actor=debug".parse().unwrap())
             .add_directive("tangler::actors::tangler_actor=error".parse().unwrap())
             .add_directive("tangler::actors::broker_actor=error".parse().unwrap())
-            .add_directive("tangler::actors::ai_actor=debug".parse().unwrap())
+            .add_directive("tangler::actors::generators=error".parse().unwrap())
             .add_directive("hyper_util=off".parse().unwrap())
             .add_directive("async_openai=trace".parse().unwrap())
             .add_directive(Level::TRACE.into());
