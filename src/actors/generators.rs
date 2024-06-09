@@ -203,7 +203,7 @@ impl PooledActor for OpenAi {
         // Event: Activating OpenAi generator
         // Description: Activating the OpenAi generator.
         // Context: None
-        trace!(id=&actor.key.value, "Activated OpenAi generator:");
+        trace!(id=&context.key.value, "Activated OpenAi generator:");
         context
     }
 }
