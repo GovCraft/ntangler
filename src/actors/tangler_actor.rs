@@ -32,16 +32,10 @@ impl TanglerActor {
     pub(crate) async fn init(tangler_config: TanglerConfig) -> anyhow::Result<(Context, Context)> {
         let mut actor = Akton::<TanglerActor>::create_with_id("tangler");
 
-        // Event: Broker Initialization
-        // Description: Initializing the broker actor.
-        // Context: None
         info!("Initializing the broker actor.");
         actor.state.broker = BrokerActor::init().await?;
         let broker_context = actor.state.broker.clone();
 
-        // Event: Setup Error Notification Handler
-        // Description: Setting up the error notification handler.
-        // Context: None
         info!("Setting up the error notification handler.");
         actor.setup
             .act_on_async::<SubmitDiff>(|actor, event| {
@@ -49,7 +43,7 @@ impl TanglerActor {
                 let message = event.message.clone();
                 Box::pin(async move {
                     info!("Diff submitted for LLM pool");
-                    context.emit_async(message,Some("llm_pool")).await
+                    context.emit_async(message, Some("llm_pool")).await
                 })
             })
             .act_on::<ErrorNotification>(|_, event| {
@@ -60,9 +54,6 @@ impl TanglerActor {
             .act_on_async::<NotifyChange>(|actor, event| {
                 let repo_id = &event.message.repo_id;
 
-                // Event: Change Detected
-                // Description: A change has been detected in the repository.
-                // Context: Repository ID.
                 info!(repo_id = ?repo_id, "Change detected in repo: {:?}", repo_id);
 
                 let repo = actor.state.git_repositories
@@ -71,18 +62,12 @@ impl TanglerActor {
                     .cloned();
 
                 if let Some(repo) = repo {
-                    // Event: Emitting Diff
-                    // Description: Emitting a Diff message to the repository.
-                    // Context: Repository ID.
                     debug!(repo_id = ?repo_id, "Emitting Diff message to the repository.");
                     let path = event.message.path.clone();
                     Box::pin(async move {
-                        repo.emit_async(Diff{ path }, None).await
+                        repo.emit_async(Diff { path }, None).await
                     })
                 } else {
-                    // Event: Repository Not Found
-                    // Description: No repository found matching the given ID.
-                    // Context: Repository ID.
                     warn!(repo_id = ?repo_id, "No repository found matching the given ID.");
                     Box::pin(async move {})
                 }
@@ -97,9 +82,6 @@ impl TanglerActor {
         for repo in &tangler_config.repositories {
             let broker = actor.state.broker.clone();
 
-            // Event: Repository Actor Initialization
-            // Description: Initializing a repository actor.
-            // Context: Repository configuration details.
             info!(repo = ?repo, "Initializing a repository actor.");
             if let Some(repo_actor) = RepositoryActor::init(repo, broker.clone()).await {
                 actor.state.git_repositories.push(repo_actor);
@@ -112,9 +94,6 @@ impl TanglerActor {
         let pool_size = tangler_config.repositories.len() * 3;
         let pool_builder = PoolBuilder::default().add_pool::<AiActor>("llm_pool", pool_size, LoadBalanceStrategy::RoundRobin);
         let pool_broker = actor.state.broker.clone();
-        // Event: Activating Tangler Actor
-        // Description: Activating the Tangler actor.
-        // Context: None
         info!("Activating the Tangler actor.");
         let actor_context = actor.activate(Some(pool_builder)).await?;
 
@@ -122,12 +101,9 @@ impl TanglerActor {
         for _ in 0..pool_size {
             debug!("Sending broker to LLM Pool.");
             let broker = pool_broker.clone();
-            actor_context.emit_async( AcceptParentBroker { broker }, Some("llm_pool")).await;
+            actor_context.emit_async(AcceptParentBroker { broker }, Some("llm_pool")).await;
         }
 
-        // Event: Broker Subscription
-        // Description: Subscribing to broker for error notifications.
-        // Context: Subscription details.
         info!("Subscribing to broker for error notifications.");
         let subscription = BrokerSubscribe {
             message_type_id: TypeId::of::<ErrorNotification>(),
