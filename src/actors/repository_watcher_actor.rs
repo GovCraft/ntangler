@@ -32,6 +32,7 @@ impl RepositoryWatcherActor {
         let mut actor = Akton::<RepositoryWatcherActor>::create_with_id(&config.id);
         actor.state.repo = config.clone();
         actor.state.broker = broker.clone();
+
         // Event: Setting up Watch Handler
         // Description: Setting up the handler for Watch events.
         // Context: Repository configuration details.
@@ -59,8 +60,8 @@ impl RepositoryWatcherActor {
                         Ok(events) => {
                             let mut walker = WalkBuilder::new(&repository_path.clone())
                                 .standard_filters(true)
-                                .add_custom_ignore_filename(".gitignore")
                                 .add_custom_ignore_filename(".ignore")
+                                .add_custom_ignore_filename(".gitignore")
                                 .build();
                             for event in events {
                                 let repository_path = repository_path.clone();
@@ -86,9 +87,7 @@ impl RepositoryWatcherActor {
                             }
                         }
                         Err(e) => {
-                            // Event: Debounce Error
-                            // Description: Error occurred during the debounce process.
-                            // Context: Error details.
+
                             if e.to_string().contains("index.lock") {
                                 // Ignore the specific error for index.lock not found
                                 trace!("Ignoring index.lock not found error: {:?}", e);
