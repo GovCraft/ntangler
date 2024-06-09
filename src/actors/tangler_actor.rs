@@ -75,8 +75,9 @@ impl TanglerActor {
                     // Description: Emitting a Diff message to the repository.
                     // Context: Repository ID.
                     debug!(repo_id = ?repo_id, "Emitting Diff message to the repository.");
+                    let path = event.message.path.clone();
                     Box::pin(async move {
-                        repo.emit_async(Diff, None).await
+                        repo.emit_async(Diff{ path }, None).await
                     })
                 } else {
                     // Event: Repository Not Found

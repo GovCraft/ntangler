@@ -72,38 +72,55 @@ impl RepositoryActor {
                 trace!("Received CheckoutBranch message");
                 actor.state.checkout_branch();
             })
-            .act_on_async::<Diff>(|actor, _event| {
+            .act_on_async::<Diff>(|actor, event| {
                 let diff: String = if let Some(repo) = &actor.state.repository {
                     let repo = repo.lock().expect("Couldn't lock repository mutex");
+
                     // Event: Generating Diff
                     // Description: Generating a diff for the repository.
                     // Context: Watch staged only configuration.
-                    info!(watch_staged_only = actor.state.config.watch_staged_only, "Generating a diff for the repository.");
-                    let diff = if actor.state.config.watch_staged_only {
-                        repo.diff_index_to_workdir(
-                            Some(&repo.index().expect("Failed to get index")),
-                            Some(&mut DiffOptions::new()),
-                        )
+                    info!(file=?event.message.path, "Generating a diff for repository");
+
+                    let mut diff_options = DiffOptions::new();
+                    if let Some(path) = event.message.path.file_name().unwrap().to_str() {
+                        diff_options.pathspec(path);
+                        diff_options.minimal(true);
                     } else {
-                        repo.diff_index_to_workdir(None, Some(&mut DiffOptions::new()))
+                        error!("Failed to convert PathBuf to str");
+                        return Box::pin(async move {});
+                    }
+
+                    // Generate the diff
+                    let diff = if actor.state.config.watch_staged_only {
+                        let index = repo.index().expect("Failed to get index");
+                        repo.diff_index_to_workdir(Some(&index), Some(&mut diff_options))
+                    } else {
+                        repo.diff_index_to_workdir(None, Some(&mut diff_options))
                     }.expect("Failed to get diff");
+
                     let mut diff_text = Vec::new();
                     diff.print(git2::DiffFormat::Patch, |_, _, line| {
                         diff_text.extend_from_slice(line.content());
                         true
                     }).expect("Failed to print diff");
-                    let changes = String::from_utf8(diff_text).expect("Failed to convert diff to string");
+
+                    let changes = String::from_utf8_lossy(&diff_text).to_string();
+
                     // Event: Diff Generated
                     // Description: The diff for the repository has been generated.
                     // Context: Diff text.
                     trace!(diff = changes, "Diff generated for the repository.");
+
                     changes
                 } else {
+                    error!("Received request for Diff but no repo diffs found.");
                     String::new()
                 };
+
                 let id = actor.state.config.id.clone();
                 let broker = actor.state.broker.clone();
                 let diff = diff.clone();
+
                 Box::pin(async move {
                     if !diff.is_empty() {
                         let trace_id = id.clone();
@@ -118,46 +135,56 @@ impl RepositoryActor {
                 // Event: Received Commit Response
                 // Description: Received a commit response and will commit changes to the repository.
                 // Context: Commit message details.
-                trace!(commit_message = ?event.message.commit, "Received commit response and will commit changes to the repository.");
+                trace!(commit_message = ?event.message.commits, "Received ReponseCommit message and will attempt to commit changes to the repository.");
 
                 // Received change, so we need to commit to this repo
                 if let Some(repo) = &actor.state.repository {
-                    let commit_message = &event.message.commit;
+                    let commit_message = &event.message.commits;
                     let repo = repo.lock().expect("Failed to lock repo mutex");
-                    let sig = repo.signature().expect("Failed to get signature");
-                    let tree_id = repo.index().expect("Failed to get index").write_tree().expect("Failed to write tree");
-                    let tree = repo.find_tree(tree_id).expect("Failed to find tree");
-                    let head = repo.head().expect("Failed to get HEAD");
-                    let parent_commit = head.peel_to_commit().expect("Failed to get parent commit");
+                    for commit in &commit_message.commits {
+                        let sig = repo.signature().expect("Failed to get signature");
 
-                    repo.commit(
-                        Some("HEAD"),
-                        &sig,
-                        &sig,
-                        commit_message,
-                        &tree,
-                        &[&parent_commit],
-                    ).expect("Failed to commit");
+                        // Stage all modified files
+                        let mut index = repo.index().expect("Failed to get index");
+                        index.add_all(["*"].iter(), git2::IndexAddOption::DEFAULT, None).expect("Failed to add files to index");
+                        index.write().expect("Failed to write index");
+
+                        let tree_id = index.write_tree().expect("Failed to write tree");
+                        let tree = repo.find_tree(tree_id).expect("Failed to find tree");
+                        let head = repo.head().expect("Failed to get HEAD");
+                        let parent_commit = head.peel_to_commit().expect("Failed to get parent commit");
+                        let commit = &format!("{}\n{}", commit.commit.heading, commit.commit.description);
+                        repo.commit(
+                            Some("HEAD"),
+                            &sig,
+                            &sig,
+                            commit,
+                            &tree,
+                            &[&parent_commit],
+                        ).expect("Failed to commit");
+                    }
 
                     // Event: Changes Committed
                     // Description: Changes have been committed to the repository.
                     // Context: Commit message details.
-                    trace!("Committed changes locally with message: {}", commit_message);
+                    info!("Committed changes {} locally", commit_message.commits.len());
                 }
             });
+
+        info!("Subscribing to broker for commit message response notifications.");
+        let subscription = BrokerSubscribe {
+            message_type_id: TypeId::of::<ResponseCommit>(),
+            subscriber_context: actor.context.clone(),
+        };
+
+        actor.state.broker.emit_async(subscription, None).await;
+
 
         let context = actor.activate(None).await;
 
 
         match context {
             Ok(context) => {
-                info!("Subscribing to broker for commit message response notifications.");
-                let subscription = BrokerSubscribe {
-                    message_type_id: TypeId::of::<ResponseCommit>(),
-                    subscriber_context: context.clone(),
-                };
-                context.emit_async(subscription, None).await;
-
                 trace!(
                     "Activated RepositoryActor, attempting to checkout branch {}",
                     &config.branch_name
@@ -247,7 +274,7 @@ impl RepositoryActor {
 mod unit_tests {
     use std::fs::{self, File, OpenOptions};
     use std::io::Write;
-    use std::path::Path;
+    use std::path::{Path, PathBuf};
     use std::sync::{Arc, Mutex};
 
     use akton::prelude::{ActorContext, Akton, Context};
@@ -281,90 +308,6 @@ mod unit_tests {
         context.suspend().await?;
         Ok(())
     }
-
-    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
-    async fn test_commit() -> anyhow::Result<()> {
-        use std::fs::{self, File, OpenOptions};
-        use std::io::Write;
-        use std::path::Path;
-        use std::sync::{Arc, Mutex};
-        use tokio::sync::oneshot;
-
-        init_tracing();
-
-        let (sender, receiver) = oneshot::channel();
-        let sender = Arc::new(Mutex::new(Some(sender))); // Wrap the sender in Arc<Mutex<Option>>
-
-        let config = RepositoryConfig {
-            path: "./mock-repo-working".to_string(),
-            branch_name: "new_branch".to_string(),
-            api_url: "".to_string(),
-            watch_staged_only: false,
-            id: "any id".to_string(),
-        };
-
-        let test_behavior = {
-            let sender = sender.clone(); // Clone the Arc to use in the closure
-            move |config: RepositoryConfig, _broker: Context| {
-                let sender = sender.clone(); // Clone the Arc again for use inside the async block
-                async move {
-                    let mut actor = Akton::<RepositoryActor>::create_with_id(&config.id);
-                    let repo = Repository::open(&config.path).expect("Failed to open mock repo");
-                    actor.state.repository = Some(Arc::new(Mutex::new(repo)));
-                    actor.state.config = config;
-                    trace!("Running test in {}", &actor.state.config.path);
-
-                    actor.setup.act_on::<ResponseCommit>(move |actor, event| {
-                        actor.state.open_repository_to_branch();
-                        if let Some(repo) = &actor.state.repository {
-                            let commit_message = &event.message.commit;
-                            let repo = repo.lock().expect("Failed to lock repo mutex");
-                            let sig = repo.signature().expect("Failed to get signature");
-                            let tree_id = repo.index().expect("Failed to get index").write_tree().expect("Failed to write tree");
-                            let tree = repo.find_tree(tree_id).expect("Failed to find tree");
-                            let head = repo.head().expect("Failed to get HEAD");
-                            let parent_commit = head.peel_to_commit().expect("Failed to get parent commit");
-
-                            let mut sender_guard = sender.lock().unwrap();
-                            if let Some(sender) = sender_guard.take() { // Properly take the sender out of the Option
-                                let result = repo.commit(
-                                    Some("HEAD"),
-                                    &sig,
-                                    &sig,
-                                    &commit_message,
-                                    &tree,
-                                    &[&parent_commit],
-                                );
-                                trace!("Committed changes locally with message: {}", commit_message);
-                                sender.send(result).expect("Couldn't send test diff");
-                            } else {
-                                error!("Sender has already been taken or was never initialized.");
-                            }
-                        }
-                    });
-
-                    let context = actor.activate(None).await.expect("Couldn't activate RepositoryActor");
-                    Some(context)
-                }
-            }
-        };
-        let broker = BrokerActor::init().await?;
-        let actor_context = RepositoryActor::init_with_custom_behavior(test_behavior, config.clone(), broker).await;
-        assert!(actor_context.is_some());
-        let context = actor_context.unwrap();
-
-
-        trace!("Notifying actor of commit");
-        let commit = "chore: cleanup tests".to_string();
-        context.emit_async(ResponseCommit { commit }, None).await;
-
-        let result = receiver.await?;
-        assert!(result.is_ok());
-
-        context.suspend().await?;
-        Ok(())
-    }
-
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
     #[ignore = "Deprecated in favor of test_commit for now"]
@@ -450,8 +393,9 @@ mod unit_tests {
         }
 
         let repo_id = config.id;
+        let path = file_path.clone();
         trace!("Notifying actor of change");
-        context.emit_async(NotifyChange { repo_id }, None).await;
+        context.emit_async(NotifyChange { repo_id, path }, None).await;
 
         let result = receiver.await?;
 

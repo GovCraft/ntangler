@@ -7,7 +7,8 @@ use akton::prelude::async_trait::async_trait;
 use async_openai::Client;
 use async_openai::config::OpenAIConfig;
 use async_openai::error::OpenAIError;
-use async_openai::types::{AssistantStreamEvent, CreateMessageRequest, CreateMessageRequestContent, CreateRunRequest, CreateThreadRequest, MessageDeltaContent, MessageRole, ThreadObject};
+use async_openai::types::{AssistantsApiResponseFormat, AssistantsApiResponseFormatOption, AssistantStreamEvent, CreateMessageRequest, CreateMessageRequestContent, CreateRunRequest, CreateThreadRequest, MessageDeltaContent, MessageRole, ThreadObject};
+use async_openai::types::AssistantsApiResponseFormatType::JsonObject;
 use futures::StreamExt;
 use tokio::runtime::Runtime;
 use tokio::sync::mpsc;
@@ -15,6 +16,7 @@ use tokio::task;
 use tokio_retry::strategy::{ExponentialBackoff, jitter};
 use tracing::{debug, error, info, trace, warn};
 
+use crate::commits::Commits;
 use crate::messages::{AcceptParentBroker, BrokerSubscribe, ResponseCommit, SubmitDiff};
 
 #[akton_actor]
@@ -38,17 +40,10 @@ impl PooledActor for AiActor {
         actor.setup
             .act_on_async::<AcceptParentBroker>(|actor, event| {
                 actor.state.broker = event.message.broker.clone();
-                // trace!("Pool broker accepts supervisor broker");
-                // info!("Subscribing AiActor to broker for submitted diffs notifications.");
-                // let subscription = BrokerSubscribe {
-                //     message_type_id: TypeId::of::<SubmitDiff>(),
-                //     subscriber_context: actor.state.broker.clone(),
-                // };
                 let broker_context = actor.state.broker.clone();
                 Box::pin(async move {
                     // broker_context.emit_async(subscription).await;
                 })
-
             })
             .act_on_async::<SubmitDiff>(|actor, event| {
                 let changes = event.message.diff.clone();
@@ -93,17 +88,21 @@ impl PooledActor for AiActor {
                                 return;
                             }
 
+                            let format = AssistantsApiResponseFormat { r#type: JsonObject };
+
                             // Step 3: Initiate a run and handle the event stream.
                             trace!("Step 3a: Initiate a run and handle the event stream.");
                             let mut event_stream = match client.threads().runs(&thread.id).create_stream(CreateRunRequest {
                                 assistant_id: "asst_xiaBOCpksCenAMJSL2F0qqFL".to_string(),
                                 stream: Some(true),
                                 parallel_tool_calls: Some(true),
+                                response_format: Some(AssistantsApiResponseFormatOption::Format(format)),
                                 ..Default::default()
                             }).await {
                                 Ok(stream) => {
                                     debug!("Run stream created");
-                                    stream },
+                                    stream
+                                }
                                 Err(e) => {
                                     // Event: Failed to Create Run Stream
                                     // Description: Failed to initiate a run and handle the event stream.
@@ -112,7 +111,6 @@ impl PooledActor for AiActor {
                                     return;
                                 }
                             };
-
                             let mut commit_message = String::new();
                             trace!("Step 3b: Processing events from the event stream.");
 
@@ -175,9 +173,10 @@ impl PooledActor for AiActor {
                         // Event: Commit Message Received
                         // Description: A commit message has been received from the event stream.
                         // Context: Commit message details.
-                        if !commit.is_empty(){
-                            debug!(broker=?broker,"Sending commit message to broker");
-                            broker.emit_async(ResponseCommit { commit }, None).await;
+                        if !commit.is_empty() {
+                            debug!(commit=?commit);
+                            let commits: Commits = serde_json::from_str(&*commit).expect("JSON was not well-formatted");
+                            broker.emit_async(ResponseCommit { commits }, None).await;
                         } else {
                             error!("Commit message was empty. Check the logs.")
                         }
@@ -205,8 +204,8 @@ mod unit_tests {
     use akton::prelude::*;
     use lazy_static::lazy_static;
 
-    use crate::actors::ai_actor::AiActor;
     use crate::actors::{BrokerActor, RepositoryWatcherActor};
+    use crate::actors::ai_actor::AiActor;
     use crate::init_tracing;
     use crate::messages::SubmitDiff;
     use crate::repository_config::RepositoryConfig;

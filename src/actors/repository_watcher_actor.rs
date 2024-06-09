@@ -54,20 +54,12 @@ impl RepositoryWatcherActor {
                 move |debounce_result: DebounceEventResult| {
                     match debounce_result {
                         Ok(events) => {
-                            let mut walker = if watch_staged_only {
-                                WalkBuilder::new(&repository_path)
-                                    .add_custom_ignore_filename(".gitignore")
-                                    .add_custom_ignore_filename(".ignore")
-                                    .standard_filters(false)
-                                    .hidden(false)
-                                    .build()
-                            } else {
+                            let mut walker =
                                 WalkBuilder::new(&repository_path)
                                     .add_custom_ignore_filename(".gitignore")
                                     .add_custom_ignore_filename(".ignore")
                                     .standard_filters(true)
-                                    .build()
-                            };
+                                    .build();
                             for event in events {
                                 if let Ok(canonical_event_path) = PathBuf::from(event.path.clone()).canonicalize() {
                                     if walker.any(|entry| {
@@ -75,7 +67,12 @@ impl RepositoryWatcherActor {
                                             .map(|e| e.path().canonicalize().unwrap_or_default() == canonical_event_path)
                                             .unwrap_or(false)
                                     }) {
-                                        if let Err(e) = tx.blocking_send(repository_id.clone()) {
+                                        tracing::debug!(event=?event);
+                                        // We only care about files
+                                        if event.path.is_dir() {
+                                            continue;
+                                        }
+                                        if let Err(e) = tx.blocking_send((repository_id.clone(), canonical_event_path.clone())) {
                                             // Event: Failed to Send Change Notification
                                             // Description: Failed to send change notification through the channel.
                                             // Context: Error details.
@@ -106,34 +103,34 @@ impl RepositoryWatcherActor {
             // Context: Repository path details.
             info!("Setting up the watcher for the repository at path: {}", &actor.state.repo.path);
 
+            // if let Err(e) = debouncer.watcher().watch(
+            //     &Path::new(&actor.state.repo.path).join(".git/index"),
+            //     RecursiveMode::NonRecursive,
+            // ) {
+            //     trace!("Couldn't start watching git repo: {:?}", e);
+            //     return;
+            // }
+
+            // if !&actor.state.repo.watch_staged_only {
             if let Err(e) = debouncer.watcher().watch(
-                &Path::new(&actor.state.repo.path).join(".git/index"),
-                RecursiveMode::NonRecursive,
+                (&actor.state.repo.path).as_ref(),
+                RecursiveMode::Recursive,
             ) {
-                trace!("Couldn't start watching git repo: {:?}", e);
+                trace!("Couldn't start watching modified files: {:?}", e);
                 return;
             }
-
-            if !&actor.state.repo.watch_staged_only {
-                if let Err(e) = debouncer.watcher().watch(
-                    (&actor.state.repo.path).as_ref(),
-                    RecursiveMode::Recursive,
-                ) {
-                    trace!("Couldn't start watching modified files: {:?}", e);
-                    return;
-                }
-            }
+            // }
             actor.state.watcher = Some(debouncer);
 
             let notification_context = actor.state.broker.clone();
             let repo_id = actor.state.repo.id.clone();
             tokio::spawn(async move {
-                while let Some(repo_id) = rx.recv().await {
+                while let Some((repo_id, path)) = rx.recv().await {
                     // Event: Change Detected
                     // Description: Detected a change in the repository.
                     // Context: Repository ID.
                     info!(repo_id = ?repo_id, "Detected a change in the repository.");
-                    let change_message = NotifyChange { repo_id };
+                    let change_message = NotifyChange { repo_id, path };
                     notification_context.emit_async(change_message, None).await;
                 }
             });
@@ -155,31 +152,38 @@ impl RepositoryWatcherActor {
 
 #[cfg(test)]
 mod tests {
+    use std::path::PathBuf;
     use akton::prelude::*;
     use lazy_static::lazy_static;
     use tokio::fs::File;
     use tokio::io::AsyncWriteExt;
     use tracing::debug;
-
     use crate::actors::TanglerActor;
     use crate::init_tracing;
     use crate::messages::NotifyChange;
     use crate::tangler_config::TanglerConfig;
+    use git2::{Repository, StatusOptions, DiffOptions};
+    use rand::distributions::Alphanumeric;
+    use rand::thread_rng;
 
     lazy_static! {
         static ref TOML: String = r#"
-[[repositories]]
-path = "./mock-repo-working"
-branch_name = "new_branch"
-api_url = "https://api.example.com/generate-commit-message"
-watch_staged_only = true
+        [[repositories]]
+        path = "./mock-repo-working"
+        branch_name = "new_branch"
+        api_url = "https://api.example.com/generate-commit-message"
+        watch_staged_only = false
         "#.to_string();
-}
+    }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn test_watcher() -> anyhow::Result<()> {
-        init_tracing();
+        use rand::Rng;
+        use tokio::fs::File;
+        use tokio::io::AsyncWriteExt;
+        use std::path::PathBuf;
 
+        init_tracing();
 
         let tangler_config: TanglerConfig = toml::from_str(&*TOML.clone()).unwrap();
         let config = tangler_config.repositories.first().unwrap().clone();
@@ -187,20 +191,66 @@ watch_staged_only = true
         let repo_id = config.id.clone();
 
         // Create a test file in ./mock-repo-working
-        let test_file_path = "./mock-repo-working/test_file.txt";
+        // Create a test file in ./mock-repo-working
+        let test_file_path = "test_file.txt"; // Relative to the repository root
         {
-            let mut file = File::create(test_file_path).await?;
-            file.write_all("This is a test file.".as_ref()).await?;
-            debug!("Wrote test file");
+            let mut file = File::create(format!("./mock-repo-working/{}", test_file_path)).await?;
+            // Generate random string data
+            let random_string: String = thread_rng()
+                .sample_iter(&Alphanumeric)
+                .take(20)
+                .map(char::from)
+                .collect();
+            file.write_all(random_string.as_bytes()).await?;
+            debug!("Wrote test file with random string data: {}", random_string);
         }
-        // // Pretend we get a change and notify the broker
-        broker.emit_async(NotifyChange { repo_id }, None).await;
+        let path = PathBuf::from(test_file_path);
+
+        // Open the repository
+        let repo = Repository::open("./mock-repo-working")?;
+
+
+        // Remove any existing index.lock file
+        // let index_lock_path = "./mock-repo-working/.git/index.lock";
+        // if std::path::Path::new(index_lock_path).exists() {
+        //     std::fs::remove_file(index_lock_path)?;
+        // }
+
+        // // Add the file to the repository index and commit if necessary
+        // let mut index = repo.index()?;
+        // index.add_path(&path)?;
+        // index.write()?;
+        //
+        // // Check repository status
+        // let mut status_options = StatusOptions::new();
+        // status_options.include_untracked(true);
+        // let statuses = repo.statuses(Some(&mut status_options))?;
+        // for entry in statuses.iter() {
+        //     debug!("File: {:?}, Status: {:?}", entry.path(), entry.status());
+        // }
+
+
+        // let path = PathBuf::from("*.*");
+        // Pretend we get a change and notify the broker
+        broker.emit_async(NotifyChange { repo_id, path }, None).await;
+
+        // Additional debug information for diff generation
+        // let mut diff_options = DiffOptions::new();
+        // diff_options.pathspec("*.*");
+        // let diff = repo.diff_index_to_workdir(None, Some(&mut diff_options))?;
+        // let mut diff_text = Vec::new();
+        // diff.print(git2::DiffFormat::Patch, |_, _, line| {
+        //     diff_text.extend_from_slice(line.content());
+        //     true
+        // })?;
+        // let changes = String::from_utf8(diff_text)?;
+        // debug!("Generated diff: {}", changes);
 
         tangler.suspend().await?;
 
         // Remove the test file after actors are terminated
-        // tokio::fs::remove_file(test_file_path).await?;
-        // debug!("Removed test file");
+        tokio::fs::remove_file(format!("./mock-repo-working/{}", test_file_path)).await?;
+        debug!("Removed test file");
 
         Ok(())
     }

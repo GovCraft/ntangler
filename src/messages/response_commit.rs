@@ -1,7 +1,10 @@
 use akton::prelude::*;
+use crate::commits::Commits;
 
 #[akton_message]
 pub(crate) struct ResponseCommit {
-    pub(crate) commit: String
+    pub(crate) commits: Commits
 }
+
+
 
