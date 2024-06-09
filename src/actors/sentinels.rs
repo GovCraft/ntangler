@@ -19,7 +19,7 @@ pub(crate) struct GitSentinel {
 }
 
 impl GitSentinel {
-    /// Initializes the RepositoryWatcherActor with the given configuration and broker context.
+    /// Initializes the GitSentinel with the given configuration and broker context.
     ///
     /// # Parameters
     /// - `config`: Configuration for the repository.
@@ -139,10 +139,10 @@ impl GitSentinel {
             });
         });
 
-        // Event: Activating RepositoryWatcherActor
-        // Description: Activating the RepositoryWatcherActor.
+        // Event: Activating GitSentinel
+        // Description: Activating the GitSentinel.
         // Context: None
-        info!("Activating the RepositoryWatcherActor.");
+        info!("Activating the GitSentinel.");
         let context = actor.activate(None).await?;
         Ok(context)
     }
