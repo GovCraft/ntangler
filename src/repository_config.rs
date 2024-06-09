@@ -95,8 +95,8 @@ mod tests {
             repository: Vec<RepositoryConfig>,
         }
 
-        let _repositories: Repositories = toml::from_str(toml_str).unwrap();
-        let _expected_repositories = vec![
+        let repositories: Repositories = toml::from_str(toml_str).unwrap();
+        let expected_repositories = vec![
             RepositoryConfig {
                 path: "./repo1".to_string(),
                 branch_name: "main".to_string(),
@@ -113,8 +113,7 @@ mod tests {
             },
         ];
 
-        // TODO: revisit
-        // assert_eq!(repositories.repository, expected_repositories);
+        assert_eq!(repositories.repository, expected_repositories);
     }
 
     #[test]
@@ -141,7 +140,6 @@ mod tests {
             id: calculate_id("./repo1", "main"),
         }];
 
-        // TODO: revisit
         assert_eq!(repositories.repository, expected_repositories);
     }
 }
