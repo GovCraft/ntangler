@@ -178,7 +178,7 @@ impl RepositoryActor {
                         ).expect("Failed to commit");
                     }
 
-                    info!("Committed changes {} locally", commit_message.commits.len());
+                    info!(commits=commit_message.commits.len(),"Local");
                 }
             });
 
