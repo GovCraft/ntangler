@@ -5,7 +5,7 @@ use akton::prelude::*;
 use futures::FutureExt;
 use tracing::{debug, error, info, instrument, trace, warn};
 
-use crate::actors::{OpenAi, Broker, Sentinel};
+use crate::actors::{OpenAi, Broker, GitSentinel};
 use crate::actors::git_repository::RepositoryActor;
 use crate::messages::{AcceptParentBroker, BrokerSubscribe, Diff, ErrorNotification, NotifyChange, SubmitDiff, Watch};
 use crate::repository_config::RepositoryConfig;
@@ -87,7 +87,7 @@ impl TanglerActor {
                 actor.state.git_repositories.push(repo_actor);
             }
             info!(repo = ?repo, "Initializing a diff watcher actor.");
-            let watcher = Sentinel::init(repo, broker).await?;
+            let watcher = GitSentinel::init(repo, broker).await?;
             watcher.emit_async(Watch, None).await;
             actor.state.diff_watchers.push(watcher);
         }
