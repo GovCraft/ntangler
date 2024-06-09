@@ -66,6 +66,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 #[cfg(test)]
 mod tests {
     use std::fs;
+
     use akton::prelude::ActorContext;
 
     use crate::actors::TanglerActor;
@@ -130,11 +131,11 @@ pub fn init_tracing() {
             .add_directive("akton_core::actors::actor=error".parse().unwrap())
             .add_directive("akton_core::actors::idle=error".parse().unwrap())
             .add_directive("akton_core::message::outbound_envelope=error".parse().unwrap())
-            .add_directive("tangler::actors::repository_actor=trace".parse().unwrap())
+            .add_directive("tangler::actors::repository_actor=debug".parse().unwrap())
             .add_directive("tangler::actors::repository_watcher_actor=debug".parse().unwrap())
             .add_directive("tangler::actors::tangler_actor=error".parse().unwrap())
             .add_directive("tangler::actors::broker_actor=error".parse().unwrap())
-            .add_directive("tangler::actors::ai_actor=trace".parse().unwrap())
+            .add_directive("tangler::actors::ai_actor=debug".parse().unwrap())
             .add_directive("hyper_util=off".parse().unwrap())
             .add_directive("async_openai=trace".parse().unwrap())
             .add_directive(Level::TRACE.into());
