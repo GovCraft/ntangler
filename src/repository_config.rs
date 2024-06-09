@@ -61,8 +61,9 @@ fn calculate_id(path: &str, branch_name: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use toml;
+
+    use super::*;
 
     #[test]
     fn test_calculate_id() {
@@ -131,8 +132,8 @@ mod tests {
             repository: Vec<RepositoryConfig>,
         }
 
-        let _repositories: Repositories = toml::from_str(toml_str).unwrap();
-        let _expected_repositories = vec![RepositoryConfig {
+        let repositories: Repositories = toml::from_str(toml_str).unwrap();
+        let expected_repositories = vec![RepositoryConfig {
             path: "./repo1".to_string(),
             branch_name: "main".to_string(),
             api_url: "https://api.example.com/generate-commit-message".to_string(),
@@ -141,6 +142,6 @@ mod tests {
         }];
 
         // TODO: revisit
-        // assert_eq!(repositories.repository, expected_repositories);
+        assert_eq!(repositories.repository, expected_repositories);
     }
 }
