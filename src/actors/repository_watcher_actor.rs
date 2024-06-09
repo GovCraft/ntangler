@@ -38,9 +38,8 @@ impl RepositoryWatcherActor {
         // Context: Repository configuration details.
         info!(config = ?config, "Setting up the handler for Watch events.");
 
-        actor.setup.act_on::<Watch>(|actor, event| {
+        actor.setup.act_on::<Watch>(|actor, _event| {
             let (tx, mut rx) = tokio::sync::mpsc::channel(200); // Increased channel capacity
-            let message = &actor.state.repo;
             let repository_id = actor.state.repo.id.clone();
             let notify_config = notify::Config::default()
                 .with_poll_interval(Duration::from_secs(5))
@@ -48,23 +47,21 @@ impl RepositoryWatcherActor {
             let debouncer_config = Config::default()
                 .with_timeout(Duration::from_millis(2000)) // Increased debounce timeout
                 .with_notify_config(notify_config);
-            let repository_path = format!("{}", actor.state.repo.path.clone()).clone();
+            let repository_path = actor.state.repo.path.clone();
             let repository_path_trace = repository_path.clone();
             let watch_staged_only = actor.state.repo.watch_staged_only;
 
             let mut debouncer = match new_debouncer_opt::<_, PollWatcher>(
                 debouncer_config,
                 move |debounce_result: DebounceEventResult| {
-                    let repository_path = repository_path.clone();
                     match debounce_result {
                         Ok(events) => {
-                            let mut walker = WalkBuilder::new(&repository_path.clone())
+                            let mut walker = WalkBuilder::new(&repository_path)
                                 .standard_filters(true)
                                 .add_custom_ignore_filename(".ignore")
                                 .add_custom_ignore_filename(".gitignore")
                                 .build();
                             for event in events {
-                                let repository_path = repository_path.clone();
                                 if let Ok(canonical_event_path) = PathBuf::from(event.path.clone()).canonicalize() {
                                     if walker.any(|entry| {
                                         entry.as_ref()
@@ -87,7 +84,6 @@ impl RepositoryWatcherActor {
                             }
                         }
                         Err(e) => {
-
                             if e.to_string().contains("index.lock") {
                                 // Ignore the specific error for index.lock not found
                                 trace!("Ignoring index.lock not found error: {:?}", e);
@@ -108,7 +104,7 @@ impl RepositoryWatcherActor {
             // Event: Setting up Watcher
             // Description: Setting up the watcher for the repository.
             // Context: Repository path details.
-            info!("Setting up the watcher for the repository at path: {}", &repository_path_trace.clone());
+            info!("Setting up the watcher for the repository at path: {}", &repository_path_trace);
 
             if let Err(e) = debouncer.watcher().watch(
                 (&actor.state.repo.path).as_ref(),
