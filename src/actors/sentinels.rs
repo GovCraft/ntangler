@@ -233,7 +233,7 @@ mod tests {
 
         // Start polling for changes in the working repository
         let notification_context = broker.clone();
-        tokio::task::spawn_local(async move {
+        tokio::spawn(async move {
             if let Err(e) = poll_repository_for_changes(working_repo_path).await {
                 error!("Error polling repository: {}", e);
             }
