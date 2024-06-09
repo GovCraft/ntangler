@@ -8,7 +8,7 @@ use notify::{PollWatcher, RecursiveMode};
 use notify_debouncer_mini::{Config, DebounceEventResult, Debouncer, new_debouncer_opt};
 use tracing::{error, info, instrument, trace};
 
-use crate::messages::{NotifyChange, Observe};
+use crate::messages::{NotifyChange, Observe, Poll};
 use crate::repository_config::RepositoryConfig;
 
 #[akton_actor]
@@ -138,6 +138,7 @@ impl GitSentinel {
                     info!(file = ?path, "Change in");
                     let change_message = NotifyChange { repo_id, path };
                     notification_context.emit_async(change_message, None).await;
+                    notification_context.emit_async(Poll, None).await;
                 }
             });
         });
