@@ -296,7 +296,7 @@ mod unit_tests {
     use tracing::{error, info, trace};
 
     use crate::actors::Broker;
-    use crate::actors::repository::GitRepository;
+    use crate::actors::repositories::GitRepository;
     use crate::init_tracing;
     use crate::messages::{NotifyChange, ResponseCommit};
     use crate::repository_config::RepositoryConfig;
