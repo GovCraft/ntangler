@@ -82,21 +82,17 @@ impl RepositoryActor {
                     info!(file=?event.message.path, "Generating a diff for repository");
 
                     let mut diff_options = DiffOptions::new();
-                    if let Some(path) = event.message.path.file_name().unwrap().to_str() {
-                        diff_options.pathspec(path);
-                        diff_options.minimal(true);
-                    } else {
-                        error!("Failed to convert PathBuf to str");
-                        return Box::pin(async move {});
-                    }
+
+                    // if let Some(path) = event.message.path.file_name().unwrap().to_str() {
+                    //     diff_options.pathspec(path);
+                    //     // diff_options.minimal(true);
+                    // } else {
+                    //     error!("Failed to convert PathBuf to str");
+                    //     return Box::pin(async move {});
+                    // }
 
                     // Generate the diff
-                    let diff = if actor.state.config.watch_staged_only {
-                        let index = repo.index().expect("Failed to get index");
-                        repo.diff_index_to_workdir(Some(&index), Some(&mut diff_options))
-                    } else {
-                        repo.diff_index_to_workdir(None, Some(&mut diff_options))
-                    }.expect("Failed to get diff");
+                    let diff = repo.diff_index_to_workdir(None, Some(&mut diff_options)).expect("nope");
 
                     let mut diff_text = Vec::new();
                     diff.print(git2::DiffFormat::Patch, |_, _, line| {
@@ -104,6 +100,7 @@ impl RepositoryActor {
                         true
                     }).expect("Failed to print diff");
 
+                    trace!(raw_diff = ?diff_text, "Raw diff generated for the repository.");
                     let changes = String::from_utf8_lossy(&diff_text).to_string();
 
                     // Event: Diff Generated
@@ -113,7 +110,7 @@ impl RepositoryActor {
 
                     changes
                 } else {
-                    error!("Received request for Diff but no repo diffs found.");
+                    error!("Received request for Diff but the string was empty.");
                     String::new()
                 };
 

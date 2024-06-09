@@ -9,7 +9,7 @@ name = "tangler"
 path = "src/main.rs"
 
 [dependencies]
-notify = { version = "6.1.1" , features = ["serde", "crossbeam-channel"]}
+notify = { version = "6.1.1", features = ["serde", "crossbeam-channel"] }
 git2 = "0.18.3"
 reqwest = { version = "0.12.4", features = ["json"] }
 serde = { version = "1.0.203", features = ["derive"] }
@@ -18,7 +18,7 @@ tokio = { version = "1.38.0", features = ["full"] }
 toml = "0.8.13"
 tokio-macros = "2.3.0"
 anyhow = "1.0.86"
-akton = { git = "ssh://git@github.com/GovCraft/akton-framework.git", akton="quasar",  branch = "main" }
+akton = { git = "ssh://git@github.com/GovCraft/akton-framework.git", akton = "quasar", branch = "main" }
 dashmap = "5.5.3"
 sha2 = "0.11.0-pre.3"
 hex = "0.4.3"

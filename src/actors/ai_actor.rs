@@ -175,8 +175,15 @@ impl PooledActor for AiActor {
                         // Context: Commit message details.
                         if !commit.is_empty() {
                             debug!(commit=?commit);
-                            let commits: Commits = serde_json::from_str(&*commit).expect("JSON was not well-formatted");
-                            broker.emit_async(ResponseCommit { commits }, None).await;
+                            match serde_json::from_str(&*commit) {
+                                Ok(commits) => {
+                                    // let commits: Commits = serde_json::from_str(&*commit).expect("JSON was not well-formatted");
+                                    broker.emit_async(ResponseCommit { commits }, None).await;
+                                }
+                                Err(e) => {
+                                    error!(error=?e, "The json wasn't well formed");
+                                }
+                            };
                         } else {
                             error!("Commit message was empty. Check the logs.")
                         }
