@@ -41,7 +41,7 @@ impl GitSentinel {
         actor.setup.act_on::<Watch>(|actor, _event| {
             let (tx, mut rx) = tokio::sync::mpsc::channel(200); // Increased channel capacity
             let repository_id = actor.state.repo.id.clone();
-            
+
             let notify_config = notify::Config::default()
                 .with_poll_interval(Duration::from_secs(3))
                 .with_compare_contents(true);
