@@ -139,11 +139,11 @@ impl GitSentinel {
             });
         });
 
+        let context = actor.activate(None).await?;
         // Event: Activating GitSentinel
         // Description: Activating the GitSentinel.
         // Context: None
-        info!("Activating the GitSentinel.");
-        let context = actor.activate(None).await?;
+        info!(repository=&actor.state.repo.path,"GitSentinel activated for");
         Ok(context)
     }
 }
