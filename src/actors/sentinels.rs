@@ -138,12 +138,14 @@ impl GitSentinel {
                 }
             });
         });
-
+        let repo_name = actor.state.repo.path.clone();
         let context = actor.activate(None).await?;
+
         // Event: Activating GitSentinel
         // Description: Activating the GitSentinel.
         // Context: None
-        info!(repository=&actor.state.repo.path,"GitSentinel activated for");
+        info!(repository=repo_name,"GitSentinel activated for");
+
         Ok(context)
     }
 }
