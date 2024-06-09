@@ -4,8 +4,8 @@ use std::sync::{Arc, Mutex};
 
 use akton::prelude::*;
 use anyhow::anyhow;
-use git2::{DiffOptions, Error, Repository};
-use tracing::{debug, error, info, trace};
+use git2::{DiffOptions, Error, IndexAddOption, Repository};
+use tracing::{debug, error, info, trace, warn};
 
 use crate::messages::{BrokerSubscribe, CheckoutBranch, Diff, NotifyChange, ResponseCommit, SubmitDiff};
 use crate::repository_config::RepositoryConfig;
@@ -76,24 +76,31 @@ impl RepositoryActor {
                 let diff: String = if let Some(repo) = &actor.state.repository {
                     let repo = repo.lock().expect("Couldn't lock repository mutex");
 
-                    // Event: Generating Diff
-                    // Description: Generating a diff for the repository.
-                    // Context: Watch staged only configuration.
-                    info!(file=?event.message.path, "Generating a diff for repository");
+                    trace!(file=?event.message.path, "Generating a diff for repository");
 
                     let mut diff_options = DiffOptions::new();
 
-                    // if let Some(path) = event.message.path.file_name().unwrap().to_str() {
-                    //     diff_options.pathspec(path);
-                    //     // diff_options.minimal(true);
-                    // } else {
-                    //     error!("Failed to convert PathBuf to str");
-                    //     return Box::pin(async move {});
-                    // }
+                    // Get the repository root directory
+                    let repo_root = repo.workdir().unwrap();
+                    // Get the canonical path of the repository root
+                    let repo_root_canonical = repo_root.canonicalize().unwrap();
+                    // Canonicalize the event file path
+                    let path = event.message.path.canonicalize().unwrap();
+
+                    // Get the relative path by stripping the repository root prefix
+                    let relative_path = path.strip_prefix(&repo_root_canonical).unwrap();
+                    debug!(file_name=?relative_path, "Adding file to pathspec");
+
+                    // Set the pathspec to the relative path
+                    diff_options.pathspec(relative_path);
+                    diff_options.include_untracked(true);
+
+                    let mut index = repo.index().unwrap();
+                    trace!(path=?index.path().unwrap(), "Diffing against index:");
+                    debug!(working_dir=?repo.workdir().unwrap(), "...in");
 
                     // Generate the diff
                     let diff = repo.diff_index_to_workdir(None, Some(&mut diff_options)).expect("nope");
-
                     let mut diff_text = Vec::new();
                     diff.print(git2::DiffFormat::Patch, |_, _, line| {
                         diff_text.extend_from_slice(line.content());
@@ -102,12 +109,7 @@ impl RepositoryActor {
 
                     trace!(raw_diff = ?diff_text, "Raw diff generated for the repository.");
                     let changes = String::from_utf8_lossy(&diff_text).to_string();
-
-                    // Event: Diff Generated
-                    // Description: The diff for the repository has been generated.
-                    // Context: Diff text.
                     trace!(diff = changes, "Diff generated for the repository.");
-
                     changes
                 } else {
                     error!("Received request for Diff but the string was empty.");
@@ -117,14 +119,15 @@ impl RepositoryActor {
                 let id = actor.state.config.id.clone();
                 let broker = actor.state.broker.clone();
                 let diff = diff.clone();
+                let path = event.message.path.clone();
 
                 Box::pin(async move {
                     if !diff.is_empty() {
                         let trace_id = id.clone();
-                        broker.emit_async(SubmitDiff { diff, id }, None).await;
-                        debug!(repo_id = trace_id, broker=?&broker, "Submitted retrieved Diff to broker.");
+                        broker.emit_async(SubmitDiff { diff, id, path }, None).await;
+                        trace!(repo_id = trace_id, broker=?&broker, "Submitted retrieved Diff to broker.");
                     } else {
-                        error!("Received request for Diff but no repo diffs found.");
+                        warn!("Received request for Diff but no repo diffs found.");
                     }
                 })
             })
@@ -134,36 +137,47 @@ impl RepositoryActor {
                 // Context: Commit message details.
                 trace!(commit_message = ?event.message.commits, "Received ReponseCommit message and will attempt to commit changes to the repository.");
 
+                // Canonicalize the event file path
+                let target_file = event.message.path.canonicalize().expect("Failed to canonicalize path.");
+
                 // Received change, so we need to commit to this repo
                 if let Some(repo) = &actor.state.repository {
                     let commit_message = &event.message.commits;
                     let repo = repo.lock().expect("Failed to lock repo mutex");
+
+                    // Get the repository root directory
+                    let repo_root = repo.workdir().unwrap();
+                    // Get the canonical path of the repository root
+                    let repo_root_canonical = repo_root.canonicalize().unwrap();
+
+                    // Get the relative path by stripping the repository root prefix
+                    let relative_path = target_file.strip_prefix(&repo_root_canonical).unwrap();
+
                     for commit in &commit_message.commits {
                         let sig = repo.signature().expect("Failed to get signature");
 
                         // Stage all modified files
                         let mut index = repo.index().expect("Failed to get index");
-                        index.add_all(["*"].iter(), git2::IndexAddOption::DEFAULT, None).expect("Failed to add files to index");
+                        debug!(file=?relative_path, "Repo index add");
+                        index.add_path(relative_path).expect("Failed to add files to index");
                         index.write().expect("Failed to write index");
 
                         let tree_id = index.write_tree().expect("Failed to write tree");
                         let tree = repo.find_tree(tree_id).expect("Failed to find tree");
                         let head = repo.head().expect("Failed to get HEAD");
                         let parent_commit = head.peel_to_commit().expect("Failed to get parent commit");
-                        let commit = &format!("{}\n{}", commit.commit.heading, commit.commit.description);
+
+                        let commit_message = &format!("{}\n{}", commit.commit.heading, commit.commit.description);
                         repo.commit(
                             Some("HEAD"),
                             &sig,
                             &sig,
-                            commit,
+                            commit_message,
                             &tree,
                             &[&parent_commit],
                         ).expect("Failed to commit");
                     }
 
-                    // Event: Changes Committed
-                    // Description: Changes have been committed to the repository.
-                    // Context: Commit message details.
                     info!("Committed changes {} locally", commit_message.commits.len());
                 }
             });
