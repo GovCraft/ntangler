@@ -5,7 +5,7 @@ use akton::prelude::*;
 use futures::FutureExt;
 use tracing::{debug, error, info, instrument, trace, warn};
 
-use crate::actors::{AiActor, BrokerActor, Sentinel};
+use crate::actors::{AiActor, Broker, Sentinel};
 use crate::actors::git_repository::RepositoryActor;
 use crate::messages::{AcceptParentBroker, BrokerSubscribe, Diff, ErrorNotification, NotifyChange, SubmitDiff, Watch};
 use crate::repository_config::RepositoryConfig;
@@ -33,7 +33,7 @@ impl TanglerActor {
         let mut actor = Akton::<TanglerActor>::create_with_id("tangler");
 
         info!("Initializing the broker actor.");
-        actor.state.broker = BrokerActor::init().await?;
+        actor.state.broker = Broker::init().await?;
         let broker_context = actor.state.broker.clone();
 
         info!("Setting up the error notification handler.");
