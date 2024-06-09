@@ -158,6 +158,7 @@ impl GitSentinel {
 #[cfg(test)]
 mod tests {
     use std::path::PathBuf;
+    use std::sync::Arc;
     use std::time::Duration;
 
     use akton::prelude::*;
@@ -167,7 +168,7 @@ mod tests {
     use rand::thread_rng;
     use tokio::fs::File;
     use tokio::io::AsyncWriteExt;
-    use tokio::time;
+    use tokio::{task, time};
     use tracing::{debug, error};
 
     use crate::actors::Tangler;
@@ -185,86 +186,75 @@ mod tests {
         "#.to_string();
     }
 
-    async fn poll_repository_for_changes(repo_path: &str) -> Result<(), git2::Error> {
-        let repo = Repository::open(repo_path)?;
-
-        let mut status_options = StatusOptions::new();
-        status_options.include_untracked(true);
-        status_options.include_ignored(false);
-        status_options.recurse_untracked_dirs(true);
-
-        loop {
-            let statuses = repo.statuses(Some(&mut status_options))?;
-            for entry in statuses.iter() {
-                if entry.status().is_wt_modified() {
-                    println!("Modified but unstaged file: {:?}", entry.path());
-                    // Here you can handle the modified file as needed
-                }
-            }
-            time::sleep(Duration::from_secs(3)).await; // Poll every 3 seconds
-        }
-    }
-
-    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-    async fn test_poll_capability() -> anyhow::Result<()> {
-        use std::fs;
-        use std::path::PathBuf;
-        use rand::Rng;
-        use tokio::fs::File;
-        use tokio::io::AsyncWriteExt;
-        use git2::{Repository, RepositoryInitOptions};
+    #[tokio::test]
+    async fn test_poll_modified_unstaged_files() -> anyhow::Result<()> {
+        use git2::{Repository, Status, StatusOptions};
+        use std::fs::{File, OpenOptions};
+        use std::io::Write;
+        use std::path::Path;
         use tokio::time::{self, Duration};
+        use tracing::debug;
+        use rand::{thread_rng, Rng};
+        use rand::distributions::Alphanumeric;
 
+        // Initialize tracing for logging
         init_tracing();
 
-        // Step 1: Set up a bare repository
-        let bare_repo_path = "../mock-bare-repo";
-        let bare_repo = Repository::init_opts(bare_repo_path, RepositoryInitOptions::new().bare(true))?;
+        // Step 1: Initialize a new repository
+        let repo_path = "./mock-repo";
+        let _ = std::fs::remove_dir_all(repo_path); // Clean up any previous test runs
+        let repo = Repository::init(repo_path)?;
 
-        // Step 2: Clone the bare repository into a working repository
-        let working_repo_path = "../mock-repo-working";
-        let working_repo = Repository::clone(bare_repo_path, working_repo_path)?;
-
-        // Create Tangler config for the working repository
-        let tangler_config: TanglerConfig = toml::from_str(&*TOML.clone()).unwrap();
-        let config = tangler_config.repositories.first().unwrap().clone();
-        let (tangler, broker) = Tangler::init(tangler_config).await?;
-        let repo_id = config.id.clone();
-
-        // Start polling for changes in the working repository
-        let notification_context = broker.clone();
-        tokio::spawn(async move {
-            if let Err(e) = poll_repository_for_changes(working_repo_path).await {
-                error!("Error polling repository: {}", e);
-            }
-        });
-
-        // Step 3: Create and modify a test file in the working repository
-        let test_file_path = "test_file.txt"; // Relative to the repository root
+        // Step 2: Create a test file in the repository and commit it
+        let test_file_path = Path::new(repo_path).join("test_file.txt");
         {
-            let mut file = File::create(format!("{}/{}", working_repo_path, test_file_path)).await?;
-            // Generate random string data
+            let mut file = File::create(&test_file_path)?;
+            writeln!(file, "Initial content")?;
+        }
+
+        // Add and commit the file
+        let mut index = repo.index()?;
+        index.add_path(Path::new("test_file.txt"))?;
+        index.write()?;
+        let tree_id = index.write_tree()?;
+        let tree = repo.find_tree(tree_id)?;
+        let sig = repo.signature()?;
+        repo.commit(Some("HEAD"), &sig, &sig, "Initial commit", &tree, &[])?;
+
+        // Step 3: Modify the test file
+        {
+            let mut file = OpenOptions::new().write(true).append(true).open(&test_file_path)?;
             let random_string: String = thread_rng()
                 .sample_iter(&Alphanumeric)
                 .take(20)
                 .map(char::from)
                 .collect();
-            file.write_all(random_string.as_bytes()).await?;
-            debug!("Wrote test file with random string data: {}", random_string);
+            writeln!(file, "Modified content: {}", random_string)?;
+            debug!("Modified test file with random string data: {}", random_string);
         }
 
-        // Allow some time for the polling mechanism to detect the change
-        time::sleep(Duration::from_secs(5)).await;
+        // Step 4: Check for modified but unstaged files
+        let mut status_options = StatusOptions::new();
+        status_options.include_untracked(true);
 
-        // Verify that the change was detected
-        // (This part of the test depends on how you handle notifications in your actor system. You might check logs, messages, or some shared state.)
+        // Polling mechanism (for demonstration, we'll just check once)
+        time::sleep(Duration::from_secs(1)).await;
 
-        // Clean up: remove the test repositories
-        fs::remove_dir_all(bare_repo_path)?;
-        fs::remove_dir_all(working_repo_path)?;
+        let statuses = repo.statuses(Some(&mut status_options))?;
+        let modified_files: Vec<_> = statuses
+            .iter()
+            .filter(|entry| entry.status().contains(Status::WT_MODIFIED))
+            .map(|entry| entry.path().unwrap().to_string())
+            .collect();
+
+        debug!("Modified but unstaged files: {:?}", modified_files);
+
+        // Assert that our test file is detected as modified
+        assert!(modified_files.contains(&"test_file.txt".to_string()));
 
         Ok(())
     }
+
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn test_path() -> anyhow::Result<()> {
