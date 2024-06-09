@@ -451,4 +451,72 @@ Modified content
         context.suspend().await?;
         Ok(())
     }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+        use std::path::PathBuf;
+        use crate::commits::{Commit, CommitDetails, Commits};
+
+        #[test]
+        fn test_squash_commits() {
+            // Sample data for testing
+            let commit1 = Commit {
+                commit: CommitDetails {
+                    heading: String::from("Initial commit"),
+                    description: String::from("This is the initial commit."),
+                },
+            };
+            let commit2 = Commit {
+                commit: CommitDetails {
+                    heading: String::from("Added feature"),
+                    description: String::from("Implemented the new feature."),
+                },
+            };
+            let commit3 = Commit {
+                commit: CommitDetails {
+                    heading: String::from("Fixed bug"),
+                    description: String::from("Fixed a critical bug."),
+                },
+            };
+
+            let commits = Commits {
+                commits: vec![commit1, commit2, commit3],
+            };
+
+            let response_commit = ResponseCommit {
+                path: PathBuf::from("src/main.rs"),
+                commits,
+            };
+
+            // Function to squash commits
+            fn squash_commits(response_commit: &ResponseCommit) -> String {
+                let mut iter = response_commit.commits.commits.iter();
+                let first_commit = iter.next().unwrap();
+
+                let mut squashed_commit = format!(
+                    "{}\n\n{}",
+                    first_commit.commit.heading, first_commit.commit.description
+                );
+
+                for commit in iter {
+                    squashed_commit.push_str(&format!(
+                        "\n\n{}: {}",
+                        commit.commit.heading, commit.commit.description
+                    ));
+                }
+
+                squashed_commit
+            }
+
+            // Squash the commits
+            let squashed_commit = squash_commits(&response_commit);
+
+            // Expected result
+            let expected_commit = "Initial commit\n\nThis is the initial commit.\n\nAdded feature: Implemented the new feature.\n\nFixed bug: Fixed a critical bug.";
+
+            // Assert the result
+            assert_eq!(squashed_commit, expected_commit);
+        }
+    }
 }
