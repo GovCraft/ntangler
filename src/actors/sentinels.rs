@@ -42,7 +42,7 @@ impl GitSentinel {
             let (tx, mut rx) = tokio::sync::mpsc::channel(200); // Increased channel capacity
             let repository_id = actor.state.repo.id.clone();
             let notify_config = notify::Config::default()
-                .with_poll_interval(Duration::from_secs(5))
+                .with_poll_interval(Duration::from_secs(30))
                 .with_compare_contents(true);
             let debouncer_config = Config::default()
                 .with_timeout(Duration::from_millis(2000)) // Increased debounce timeout
@@ -163,7 +163,7 @@ mod tests {
     use tokio::io::AsyncWriteExt;
     use tracing::{debug, error};
 
-    use crate::actors::TanglerActor;
+    use crate::actors::Tangler;
     use crate::init_tracing;
     use crate::messages::NotifyChange;
     use crate::tangler_config::TanglerConfig;
@@ -189,7 +189,7 @@ mod tests {
 
         let tangler_config: TanglerConfig = toml::from_str(&*TOML.clone()).unwrap();
         let config = tangler_config.repositories.first().unwrap().clone();
-        let (tangler, broker) = TanglerActor::init(tangler_config).await?;
+        let (tangler, broker) = Tangler::init(tangler_config).await?;
         let repo_id = config.id.clone();
 
         // Create a test file in ./mock-repo-working
