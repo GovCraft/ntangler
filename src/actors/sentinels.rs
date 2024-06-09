@@ -132,7 +132,7 @@ impl GitSentinel {
                     // Event: Change Detected
                     // Description: Detected a change in the repository.
                     // Context: Repository ID.
-                    info!(file = ?path, "Repository change detected");
+                    info!(file = ?path, "Change in");
                     let change_message = NotifyChange { repo_id, path };
                     notification_context.emit_async(change_message, None).await;
                 }
