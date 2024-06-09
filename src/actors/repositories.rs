@@ -168,6 +168,8 @@ impl GitRepository {
                         let parent_commit = head.peel_to_commit().expect("Failed to get parent commit");
 
                         let commit_message = &format!("{}\n{}", commit.commit.heading, commit.commit.description);
+
+                        // TODO: optionally sign commits
                         repo.commit(
                             Some("HEAD"),
                             &sig,
