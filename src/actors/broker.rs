@@ -15,18 +15,18 @@ use tracing::{debug, debug_span, field, info, instrument, trace, trace_span};
 use crate::messages::{BrokerSubscribe, BrokerUnsubscribe, ErrorNotification, NotifyChange, ResponseCommit, SubmitDiff};
 
 #[akton_actor]
-pub(crate) struct BrokerActor {
+pub(crate) struct Broker {
     subscribers: DashMap<TypeId, HashSet<Context>>,
 }
 
-impl BrokerActor {
+impl Broker {
     /// Initializes the BrokerActor.
     ///
     /// # Returns
     /// - `anyhow::Result<Context>`: The context of the initialized actor.
     #[instrument]
     pub(crate) async fn init() -> anyhow::Result<Context> {
-        let mut actor = Akton::<BrokerActor>::create_with_id("tangler_broker");
+        let mut actor = Akton::<Broker>::create_with_id("tangler_broker");
 
         actor.setup
             .act_on::<BrokerSubscribe>(|actor, event| {
