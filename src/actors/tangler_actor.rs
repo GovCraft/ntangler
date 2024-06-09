@@ -6,7 +6,7 @@ use futures::FutureExt;
 use tracing::{debug, error, info, instrument, trace, warn};
 
 use crate::actors::{OpenAi, Broker, GitSentinel};
-use crate::actors::git_repository::RepositoryActor;
+use crate::actors::repositories::GitRepository;
 use crate::messages::{AcceptParentBroker, BrokerSubscribe, Diff, ErrorNotification, NotifyChange, SubmitDiff, Watch};
 use crate::repository_config::RepositoryConfig;
 use crate::tangler_config::TanglerConfig;
@@ -83,7 +83,7 @@ impl TanglerActor {
             let broker = actor.state.broker.clone();
 
             info!(repo = ?repo, "Initializing a repository actor.");
-            if let Some(repo_actor) = RepositoryActor::init(repo, broker.clone()).await {
+            if let Some(repo_actor) = GitRepository::init(repo, broker.clone()).await {
                 actor.state.git_repositories.push(repo_actor);
             }
             info!(repo = ?repo, "Initializing a diff watcher actor.");
@@ -137,7 +137,7 @@ mod tests {
     use lazy_static::lazy_static;
     use tracing::{debug, info, trace};
 
-    use crate::actors::git_repository::RepositoryActor;
+    use crate::actors::repositories::GitRepository;
     use crate::actors::TanglerActor;
     use crate::init_tracing;
     use crate::messages::ErrorNotification;
