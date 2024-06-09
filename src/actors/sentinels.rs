@@ -218,11 +218,11 @@ mod tests {
         init_tracing();
 
         // Step 1: Set up a bare repository
-        let bare_repo_path = "./mock-bare-repo";
+        let bare_repo_path = "../mock-bare-repo";
         let bare_repo = Repository::init_opts(bare_repo_path, RepositoryInitOptions::new().bare(true))?;
 
         // Step 2: Clone the bare repository into a working repository
-        let working_repo_path = "./mock-repo-working";
+        let working_repo_path = "../mock-repo-working";
         let working_repo = Repository::clone(bare_repo_path, working_repo_path)?;
 
         // Create Tangler config for the working repository
@@ -233,8 +233,8 @@ mod tests {
 
         // Start polling for changes in the working repository
         let notification_context = broker.clone();
-        tokio::spawn(async move {
-            if let Err(e) = poll_repository_for_changes(working_repo_path, repo_id.clone(), notification_context).await {
+        tokio::task::spawn_local(async move {
+            if let Err(e) = poll_repository_for_changes(working_repo_path).await {
                 error!("Error polling repository: {}", e);
             }
         });
