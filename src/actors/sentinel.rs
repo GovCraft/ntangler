@@ -12,13 +12,13 @@ use crate::messages::{NotifyChange, Watch};
 use crate::repository_config::RepositoryConfig;
 
 #[akton_actor]
-pub(crate) struct RepositoryWatcherActor {
+pub(crate) struct Sentinel {
     repo: RepositoryConfig,
     watcher: Option<Debouncer<PollWatcher>>,
     broker: Context,
 }
 
-impl RepositoryWatcherActor {
+impl Sentinel {
     /// Initializes the RepositoryWatcherActor with the given configuration and broker context.
     ///
     /// # Parameters
@@ -29,7 +29,7 @@ impl RepositoryWatcherActor {
     /// - `anyhow::Result<Context>`: The context of the initialized actor.
     #[instrument(skip(config, broker))]
     pub(crate) async fn init(config: &RepositoryConfig, broker: Context) -> anyhow::Result<Context> {
-        let mut actor = Akton::<RepositoryWatcherActor>::create_with_id(&config.id);
+        let mut actor = Akton::<Sentinel>::create_with_id(&config.id);
         actor.state.repo = config.clone();
         actor.state.broker = broker.clone();
 
