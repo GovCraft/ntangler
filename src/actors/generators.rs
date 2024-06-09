@@ -223,7 +223,7 @@ mod unit_tests {
         id: "any id".to_string(),
     };
         }
-    
+
     lazy_static! {
     static ref DIFF: String = r#"diff --git a/test_file.txt b/test_file.txt
 index 8430408..edc5728 100644
