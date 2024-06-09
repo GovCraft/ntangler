@@ -36,7 +36,7 @@ impl GitSentinel {
         // Event: Setting up Watch Handler
         // Description: Setting up the handler for Watch events.
         // Context: Repository configuration details.
-        info!(config = ?config, "Setting up the handler for Watch events.");
+        trace!(config = ?config, "Setting up the handler for Watch events.");
 
         actor.setup.act_on::<Watch>(|actor, _event| {
             let (tx, mut rx) = tokio::sync::mpsc::channel(200); // Increased channel capacity
@@ -68,7 +68,7 @@ impl GitSentinel {
                                             .map(|e| e.path().canonicalize().unwrap_or_default() == canonical_event_path)
                                             .unwrap_or(false)
                                     }) {
-                                        tracing::debug!(event=?event);
+                                        tracing::trace!(event=?event);
                                         // We only care about files
                                         if event.path.is_dir() {
                                             continue;
@@ -110,7 +110,7 @@ impl GitSentinel {
             // Event: Setting up Watcher
             // Description: Setting up the watcher for the repository.
             // Context: Repository path details.
-            info!("Setting up the watcher for the repository at path: {}", &repository_path_trace);
+            trace!("Setting up the watcher for the repository at path: {}", &repository_path_trace);
 
             if let Err(e) = debouncer.watcher().watch(
                 (&actor.state.repo.path).as_ref(),
@@ -132,7 +132,7 @@ impl GitSentinel {
                     // Event: Change Detected
                     // Description: Detected a change in the repository.
                     // Context: Repository ID.
-                    info!(repo_id = ?repo_id, "Detected a change in the repository.");
+                    info!(file = ?path, "Repository change detected");
                     let change_message = NotifyChange { repo_id, path };
                     notification_context.emit_async(change_message, None).await;
                 }
