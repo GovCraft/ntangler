@@ -5,8 +5,8 @@ use akton::prelude::*;
 use futures::FutureExt;
 use tracing::{debug, error, info, instrument, trace, warn};
 
-use crate::actors::{AiActor, BrokerActor, RepositoryWatcherActor};
-use crate::actors::repository_actor::RepositoryActor;
+use crate::actors::{AiActor, BrokerActor, Sentinel};
+use crate::actors::git_repository::RepositoryActor;
 use crate::messages::{AcceptParentBroker, BrokerSubscribe, Diff, ErrorNotification, NotifyChange, SubmitDiff, Watch};
 use crate::repository_config::RepositoryConfig;
 use crate::tangler_config::TanglerConfig;
@@ -87,7 +87,7 @@ impl TanglerActor {
                 actor.state.git_repositories.push(repo_actor);
             }
             info!(repo = ?repo, "Initializing a diff watcher actor.");
-            let watcher = RepositoryWatcherActor::init(repo, broker).await?;
+            let watcher = Sentinel::init(repo, broker).await?;
             watcher.emit_async(Watch, None).await;
             actor.state.diff_watchers.push(watcher);
         }
@@ -137,7 +137,7 @@ mod tests {
     use lazy_static::lazy_static;
     use tracing::{debug, info, trace};
 
-    use crate::actors::repository_actor::RepositoryActor;
+    use crate::actors::git_repository::RepositoryActor;
     use crate::actors::TanglerActor;
     use crate::init_tracing;
     use crate::messages::ErrorNotification;
