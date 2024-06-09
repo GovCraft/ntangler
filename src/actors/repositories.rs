@@ -72,12 +72,15 @@ impl GitRepository {
             .act_on::<CheckoutBranch>(|actor, _event| {
                 trace!("Received Poll message");
                 actor.state.checkout_branch();
+            })
+            .act_on::<Poll>(|actor, _event| {
+                trace!("Received Poll request");
                 if let Some(repo) = &actor.state.repository {
                     let repo = repo.lock().expect("Couldn't lock repository mutex");
                     let mut status_options = StatusOptions::new();
                     status_options.include_untracked(true);
 
-                    let statuses = repo.statuses(Some(&mut status_options))?;
+                    let statuses = repo.statuses(Some(&mut status_options)).expect("Couldn't get repo statuses");
                     let modified_files: Vec<_> = statuses
                         .iter()
                         .filter(|entry| entry.status().contains(Status::WT_MODIFIED))
@@ -86,12 +89,9 @@ impl GitRepository {
                     // notify for each file
                     for file in modified_files {
                         debug!(change_file=file, "Unstaged files");
+                        // here we should notify the broker of each change
                     }
                 };
-            })
-            .act_on::<Poll>(|actor, _event| {
-                trace!("Received CheckoutBranch message");
-                actor.state.checkout_branch();
             })
             .act_on_async::<Diff>(|actor, event| {
                 let diff: String = if let Some(repo) = &actor.state.repository {
@@ -207,6 +207,14 @@ impl GitRepository {
         trace!("Subscribing to broker for commit message response notifications.");
         let subscription = BrokerSubscribe {
             message_type_id: TypeId::of::<ResponseCommit>(),
+            subscriber_context: actor.context.clone(),
+        };
+
+        actor.state.broker.emit_async(subscription, None).await;
+
+        trace!("Subscribing to broker for poll requests.");
+        let subscription = BrokerSubscribe {
+            message_type_id: TypeId::of::<Poll>(),
             subscriber_context: actor.context.clone(),
         };
 
