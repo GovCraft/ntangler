@@ -41,12 +41,15 @@ impl GitSentinel {
         actor.setup.act_on::<Watch>(|actor, _event| {
             let (tx, mut rx) = tokio::sync::mpsc::channel(200); // Increased channel capacity
             let repository_id = actor.state.repo.id.clone();
+            
             let notify_config = notify::Config::default()
-                .with_poll_interval(Duration::from_secs(30))
+                .with_poll_interval(Duration::from_secs(3))
                 .with_compare_contents(true);
+
             let debouncer_config = Config::default()
-                .with_timeout(Duration::from_millis(2000)) // Increased debounce timeout
+                .with_timeout(Duration::from_millis(1500)) // Increased debounce timeout
                 .with_notify_config(notify_config);
+
             let repository_path = actor.state.repo.path.clone();
             let repository_path_trace = repository_path.clone();
             let watch_staged_only = actor.state.repo.watch_staged_only;
@@ -139,12 +142,14 @@ impl GitSentinel {
             });
         });
         let repo_name = actor.state.repo.path.clone();
+        let branch_name = actor.state.repo.branch_name.clone();
         let context = actor.activate(None).await?;
 
         // Event: Activating GitSentinel
         // Description: Activating the GitSentinel.
         // Context: None
-        info!(repository=repo_name,"GitSentinel activated for");
+        trace!(repository=repo_name,"GitSentinel activated for");
+        info!("Watching repository at {} on branch '{}'.",repo_name, branch_name);
 
         Ok(context)
     }
