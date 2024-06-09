@@ -142,6 +142,7 @@ impl RepositoryActor {
 
                 // Received change, so we need to commit to this repo
                 if let Some(repo) = &actor.state.repository {
+                    let response_commit = event.message;
                     let commit_message = &event.message.commits;
                     let repo = repo.lock().expect("Failed to lock repo mutex");
 
@@ -150,10 +151,9 @@ impl RepositoryActor {
                     // Get the canonical path of the repository root
                     let repo_root_canonical = repo_root.canonicalize().unwrap();
 
-                    // Get the relative path by stripping the repository root prefix
-                    let relative_path = target_file.strip_prefix(&repo_root_canonical).unwrap();
-
                     for commit in &commit_message.commits {
+                        // Get the relative path by stripping the repository root prefix
+                        let relative_path = target_file.strip_prefix(&repo_root_canonical).unwrap();
                         let sig = repo.signature().expect("Failed to get signature");
 
                         // Stage all modified files
@@ -296,7 +296,7 @@ mod unit_tests {
     use tracing::{error, info, trace};
 
     use crate::actors::BrokerActor;
-    use crate::actors::repository_actor::RepositoryActor;
+    use crate::actors::git_repository::RepositoryActor;
     use crate::init_tracing;
     use crate::messages::{NotifyChange, ResponseCommit};
     use crate::repository_config::RepositoryConfig;
@@ -457,6 +457,7 @@ Modified content
         use super::*;
         use std::path::PathBuf;
         use crate::commits::{Commit, CommitDetails, Commits};
+        use pretty_assertions::assert_eq;
 
         #[test]
         fn test_squash_commits() {
@@ -489,28 +490,8 @@ Modified content
                 commits,
             };
 
-            // Function to squash commits
-            fn squash_commits(response_commit: &ResponseCommit) -> String {
-                let mut iter = response_commit.commits.commits.iter();
-                let first_commit = iter.next().unwrap();
-
-                let mut squashed_commit = format!(
-                    "{}\n\n{}",
-                    first_commit.commit.heading, first_commit.commit.description
-                );
-
-                for commit in iter {
-                    squashed_commit.push_str(&format!(
-                        "\n\n{}: {}",
-                        commit.commit.heading, commit.commit.description
-                    ));
-                }
-
-                squashed_commit
-            }
-
             // Squash the commits
-            let squashed_commit = squash_commits(&response_commit);
+            let squashed_commit = response_commit.squash_commits();
 
             // Expected result
             let expected_commit = "Initial commit\n\nThis is the initial commit.\n\nAdded feature: Implemented the new feature.\n\nFixed bug: Fixed a critical bug.";
