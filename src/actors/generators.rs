@@ -20,16 +20,16 @@ use crate::commits::Commits;
 use crate::messages::{AcceptParentBroker, BrokerSubscribe, ResponseCommit, SubmitDiff};
 
 #[akton_actor]
-pub(crate) struct AiActor {
+pub(crate) struct OpenAi {
     client: Option<Arc<Client<OpenAIConfig>>>,
     broker: Context,
 }
 
 #[async_trait]
-impl PooledActor for AiActor {
+impl PooledActor for OpenAi {
     async fn initialize(&self, name: String, parent: &Context) -> Context {
         //TODO: expose broker through context
-        let mut actor = Akton::<AiActor>::create_with_id(&name);
+        let mut actor = Akton::<OpenAi>::create_with_id(&name);
         let client = Client::new();
         actor.state.client = Some(Arc::new(client));
 
@@ -223,6 +223,7 @@ mod unit_tests {
         id: "any id".to_string(),
     };
         }
+    
     lazy_static! {
     static ref DIFF: String = r#"diff --git a/test_file.txt b/test_file.txt
 index 8430408..edc5728 100644
