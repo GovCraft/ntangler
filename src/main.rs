@@ -136,6 +136,7 @@ pub fn init_tracing() {
             .add_directive("tangler::actors::tangler_actor=error".parse().unwrap())
             .add_directive("tangler::actors::brokers=error".parse().unwrap())
             .add_directive("tangler::actors::generators=info".parse().unwrap())
+            .add_directive("tangler::tangler_config=error".parse().unwrap())
             .add_directive("hyper_util=off".parse().unwrap())
             .add_directive("async_openai=trace".parse().unwrap())
             .add_directive(Level::TRACE.into());
