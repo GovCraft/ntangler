@@ -12,13 +12,13 @@ use crate::repository_config::RepositoryConfig;
 use crate::tangler_config::TanglerConfig;
 
 #[akton_actor]
-pub(crate) struct RepositoryActor {
+pub(crate) struct GitRepository {
     repository: Option<Arc<Mutex<Repository>>>,
     config: RepositoryConfig,
     broker: Context,
 }
 
-impl RepositoryActor {
+impl GitRepository {
     /// Initializes the repository actor with the provided custom behavior.
     ///
     /// # Arguments
@@ -31,11 +31,11 @@ impl RepositoryActor {
     pub(crate) async fn init(config: &RepositoryConfig, broker: Context) -> Option<Context> {
         // Define the default behavior as an async closure that takes a reference to the repository configuration.
         let default_behavior = |config: RepositoryConfig, broker: Context| async move {
-            RepositoryActor::default_behavior(&config, broker.clone()).await
+            GitRepository::default_behavior(&config, broker.clone()).await
         };
 
         // Call the `init_with_custom_behavior` function with the default behavior closure and the configuration.
-        RepositoryActor::init_with_custom_behavior(default_behavior, config.clone(), broker).await
+        GitRepository::init_with_custom_behavior(default_behavior, config.clone(), broker).await
     }
 
     pub(crate) async fn init_with_custom_behavior<F, Fut>(
@@ -53,7 +53,7 @@ impl RepositoryActor {
 
     /// Example custom behavior function to be passed into the `init` function.
     pub(crate) async fn default_behavior(config: &RepositoryConfig, broker: Context) -> Option<Context> {
-        let mut actor = Akton::<RepositoryActor>::create_with_id(&config.id);
+        let mut actor = Akton::<GitRepository>::create_with_id(&config.id);
         actor.state.config = config.clone();
         actor.state.broker = broker;
 
@@ -296,7 +296,7 @@ mod unit_tests {
     use tracing::{error, info, trace};
 
     use crate::actors::Broker;
-    use crate::actors::git_repository::RepositoryActor;
+    use crate::actors::repository::GitRepository;
     use crate::init_tracing;
     use crate::messages::{NotifyChange, ResponseCommit};
     use crate::repository_config::RepositoryConfig;
@@ -313,7 +313,7 @@ mod unit_tests {
         };
         let broker = Broker::init().await?;
 
-        let actor_context = RepositoryActor::init(&config, broker).await;
+        let actor_context = GitRepository::init(&config, broker).await;
         assert!(actor_context.is_some());
         let context = actor_context.unwrap();
         context.suspend().await?;
@@ -347,7 +347,7 @@ mod unit_tests {
             move |config: RepositoryConfig, broker: Context| {
                 let sender = sender.clone(); // Clone the Arc again for use inside the async block
                 async move {
-                    let mut actor = Akton::<RepositoryActor>::create_with_id(&config.id);
+                    let mut actor = Akton::<GitRepository>::create_with_id(&config.id);
                     let repo = Repository::open(&config.path).expect("Failed to open mock repo");
                     actor.state.repository = Some(Arc::new(Mutex::new(repo)));
                     actor.state.config = config;
@@ -383,7 +383,7 @@ mod unit_tests {
         };
         let broker = Broker::init().await?;
 
-        let actor_context = RepositoryActor::init_with_custom_behavior(test_behavior, config.clone(), broker).await;
+        let actor_context = GitRepository::init_with_custom_behavior(test_behavior, config.clone(), broker).await;
         assert!(actor_context.is_some());
         let context = actor_context.unwrap();
 
@@ -445,7 +445,7 @@ Modified content
         };
         let broker = Broker::init().await?;
 
-        let actor_context = RepositoryActor::init(&config, broker).await;
+        let actor_context = GitRepository::init(&config, broker).await;
         assert!(actor_context.is_some());
         let context = actor_context.unwrap();
         context.suspend().await?;
