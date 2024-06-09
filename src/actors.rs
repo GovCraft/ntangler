@@ -1,11 +1,11 @@
-pub(crate) use generators::AiActor;
-pub(crate) use broker::Broker;
-pub(crate) use sentinel::Sentinel;
+pub(crate) use generators::OpenAi;
+pub(crate) use brokers::Broker;
+pub(crate) use sentinels::GitSentinel;
 pub(crate) use tangler_actor::TanglerActor;
 
 mod tangler_actor;
-mod git_repository;
-mod sentinel;
+mod repository;
+mod sentinels;
 mod generators;
-mod broker;
+mod brokers;
 
