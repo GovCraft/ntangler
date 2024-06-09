@@ -8,7 +8,7 @@ use notify::{PollWatcher, RecursiveMode};
 use notify_debouncer_mini::{Config, DebounceEventResult, Debouncer, new_debouncer_opt};
 use tracing::{error, info, instrument, trace};
 
-use crate::messages::{NotifyChange, Watch};
+use crate::messages::{NotifyChange, Observe};
 use crate::repository_config::RepositoryConfig;
 
 #[akton_actor]
@@ -38,7 +38,7 @@ impl GitSentinel {
         // Context: Repository configuration details.
         trace!(config = ?config, "Setting up the handler for Watch events.");
 
-        actor.setup.act_on::<Watch>(|actor, _event| {
+        actor.setup.act_on::<Observe>(|actor, _event| {
             let (tx, mut rx) = tokio::sync::mpsc::channel(200); // Increased channel capacity
             let repository_id = actor.state.repo.id.clone();
 
@@ -158,6 +158,7 @@ impl GitSentinel {
 #[cfg(test)]
 mod tests {
     use std::path::PathBuf;
+    use std::time::Duration;
 
     use akton::prelude::*;
     use git2::{DiffOptions, IndexAddOption, Repository, StatusOptions};
@@ -166,6 +167,7 @@ mod tests {
     use rand::thread_rng;
     use tokio::fs::File;
     use tokio::io::AsyncWriteExt;
+    use tokio::time;
     use tracing::{debug, error};
 
     use crate::actors::Tangler;
@@ -183,25 +185,64 @@ mod tests {
         "#.to_string();
     }
 
+    async fn poll_repository_for_changes(repo_path: &str) -> Result<(), git2::Error> {
+        let repo = Repository::open(repo_path)?;
+
+        let mut status_options = StatusOptions::new();
+        status_options.include_untracked(true);
+        status_options.include_ignored(false);
+        status_options.recurse_untracked_dirs(true);
+
+        loop {
+            let statuses = repo.statuses(Some(&mut status_options))?;
+            for entry in statuses.iter() {
+                if entry.status().is_wt_modified() {
+                    println!("Modified but unstaged file: {:?}", entry.path());
+                    // Here you can handle the modified file as needed
+                }
+            }
+            time::sleep(Duration::from_secs(3)).await; // Poll every 3 seconds
+        }
+    }
+
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-    async fn test_watcher() -> anyhow::Result<()> {
+    async fn test_poll_capability() -> anyhow::Result<()> {
+        use std::fs;
+        use std::path::PathBuf;
         use rand::Rng;
         use tokio::fs::File;
         use tokio::io::AsyncWriteExt;
-        use std::path::PathBuf;
+        use git2::{Repository, RepositoryInitOptions};
+        use tokio::time::{self, Duration};
 
         init_tracing();
 
+        // Step 1: Set up a bare repository
+        let bare_repo_path = "./mock-bare-repo";
+        let bare_repo = Repository::init_opts(bare_repo_path, RepositoryInitOptions::new().bare(true))?;
+
+        // Step 2: Clone the bare repository into a working repository
+        let working_repo_path = "./mock-repo-working";
+        let working_repo = Repository::clone(bare_repo_path, working_repo_path)?;
+
+        // Create Tangler config for the working repository
         let tangler_config: TanglerConfig = toml::from_str(&*TOML.clone()).unwrap();
         let config = tangler_config.repositories.first().unwrap().clone();
         let (tangler, broker) = Tangler::init(tangler_config).await?;
         let repo_id = config.id.clone();
 
-        // Create a test file in ./mock-repo-working
-        // Create a test file in ./mock-repo-working
+        // Start polling for changes in the working repository
+        let notification_context = broker.clone();
+        tokio::spawn(async move {
+            if let Err(e) = poll_repository_for_changes(working_repo_path, repo_id.clone(), notification_context).await {
+                error!("Error polling repository: {}", e);
+            }
+        });
+
+        // Step 3: Create and modify a test file in the working repository
         let test_file_path = "test_file.txt"; // Relative to the repository root
         {
-            let mut file = File::create(format!("./mock-repo-working/{}", test_file_path)).await?;
+            let mut file = File::create(format!("{}/{}", working_repo_path, test_file_path)).await?;
             // Generate random string data
             let random_string: String = thread_rng()
                 .sample_iter(&Alphanumeric)
@@ -211,71 +252,16 @@ mod tests {
             file.write_all(random_string.as_bytes()).await?;
             debug!("Wrote test file with random string data: {}", random_string);
         }
-        let path = PathBuf::from(test_file_path);
 
-        // Open the repository
-        let repo = Repository::open("./mock-repo-working")?;
+        // Allow some time for the polling mechanism to detect the change
+        time::sleep(Duration::from_secs(5)).await;
 
+        // Verify that the change was detected
+        // (This part of the test depends on how you handle notifications in your actor system. You might check logs, messages, or some shared state.)
 
-        // Remove any existing index.lock file
-        // let index_lock_path = "./mock-repo-working/.git/index.lock";
-        // if std::path::Path::new(index_lock_path).exists() {
-        //     std::fs::remove_file(index_lock_path)?;
-        // }
-
-        // // Add the file to the repository index and commit if necessary
-        // let mut index = repo.index()?;
-        // index.add_all(["*"].iter(), IndexAddOption::DEFAULT, None)?;
-        // index.write()?;
-        // index.add_path(&path)?;
-        // index.write()?;
-        //
-        // // Check repository status
-        // let mut status_options = StatusOptions::new();
-        // status_options.include_untracked(true);
-        // let statuses = repo.statuses(Some(&mut status_options))?;
-        // for entry in statuses.iter() {
-        //     debug!("File: {:?}, Status: {:?}", entry.path(), entry.status());
-        // }
-
-        // let path = PathBuf::from("*.*");
-        // Pretend we get a change and notify the broker
-        broker.emit_async(NotifyChange { repo_id, path: PathBuf::from("test_file_path") }, None).await;
-
-        // Additional debug information for diff generation
-        let mut diff_options = DiffOptions::new();
-        // diff_options.include_untracked(true);
-        diff_options.minimal(true);
-        diff_options.pathspec(test_file_path);
-        diff_options.pathspec("file2.txt");
-        // diff_options.pathspec("test_file.txt");
-
-        let diff = repo.diff_index_to_workdir(None, Some(&mut diff_options))?;
-        let mut diff_text = Vec::new();
-        // Print the diff
-        // diff.print(git2::DiffFormat::Patch, |delta, hunk, line| {
-        //     match line.origin() {
-        //         '+' => print!("+"),
-        //         '-' => print!("-"),
-        //         ' ' => print!(" "),
-        //         _ => (),
-        //     }
-        //     print!("{}", std::str::from_utf8(line.content()).unwrap());
-        //     true
-        // })?;
-        diff.print(git2::DiffFormat::Patch, |_, _, line| {
-            diff_text.extend_from_slice(line.content());
-            true
-        })?;
-        let changes = String::from_utf8_lossy(&*diff_text);
-        debug!("Generated diff: {}", changes);
-
-        // tangler.suspend().await?;
-
-
-        // Remove the test file after actors are terminated
-        // tokio::fs::remove_file(format!("./mock-repo-working/{}", test_file_path)).await?;
-        // debug!("Removed test file");
+        // Clean up: remove the test repositories
+        fs::remove_dir_all(bare_repo_path)?;
+        fs::remove_dir_all(working_repo_path)?;
 
         Ok(())
     }
