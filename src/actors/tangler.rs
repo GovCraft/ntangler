@@ -11,26 +11,26 @@ use crate::messages::{AcceptParentBroker, BrokerSubscribe, Diff, ErrorNotificati
 use crate::repository_config::RepositoryConfig;
 use crate::tangler_config::TanglerConfig;
 
-/// TanglerActor manages repository actors and a broker.
+/// Tangler manages repository actors and a broker.
 #[akton_actor]
-pub(crate) struct TanglerActor {
+pub(crate) struct Tangler {
     git_repositories: Vec<Context>,
     diff_watchers: Vec<Context>,
     llm_pool: Vec<Context>,
     broker: Context,
 }
 
-impl TanglerActor {
-    /// Initializes the TanglerActor with the given configuration.
+impl Tangler {
+    /// Initializes the Tangler with the given configuration.
     ///
     /// # Parameters
-    /// - `tangler_config`: Configuration for the TanglerActor.
+    /// - `tangler_config`: Configuration for the Tangler.
     ///
     /// # Returns
     /// - `anyhow::Result<(Context, Context)>`: A tuple containing the actor context and broker context.
     #[instrument(skip(tangler_config))]
     pub(crate) async fn init(tangler_config: TanglerConfig) -> anyhow::Result<(Context, Context)> {
-        let mut actor = Akton::<TanglerActor>::create_with_id("tangler");
+        let mut actor = Akton::<Tangler>::create_with_id("tangler");
 
         info!("Initializing the broker actor.");
         actor.state.broker = Broker::init().await?;
@@ -138,7 +138,7 @@ mod tests {
     use tracing::{debug, info, trace};
 
     use crate::actors::repositories::GitRepository;
-    use crate::actors::TanglerActor;
+    use crate::actors::Tangler;
     use crate::init_tracing;
     use crate::messages::ErrorNotification;
     use crate::repository_config::RepositoryConfig;
@@ -162,11 +162,11 @@ mod tests {
             repositories: vec![config],
         };
 
-        // Event: TanglerActor Initialization
-        // Description: Initializing the TanglerActor with the given configuration.
+        // Event: Tangler Initialization
+        // Description: Initializing the Tangler with the given configuration.
         // Context: Tangler configuration details.
-        info!(tangler_config = ?tangler_config, "Initializing the TanglerActor.");
-        let (tangler, broker) = TanglerActor::init(tangler_config).await?;
+        info!(tangler_config = ?tangler_config, "Initializing the Tangler.");
+        let (tangler, broker) = Tangler::init(tangler_config).await?;
 
         // Event: Constructing Error Notification Message
         // Description: Constructing an error notification message to broadcast through the broker.
@@ -207,7 +207,7 @@ mod tests {
         };
 
         // this actor subscribes to ErrorNotification messages
-        let (tangle, broker) = TanglerActor::init(tangler_config).await?;
+        let (tangle, broker) = Tangler::init(tangler_config).await?;
 
         // get a copy of the context
 
