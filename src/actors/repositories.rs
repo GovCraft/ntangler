@@ -155,6 +155,7 @@ impl GitRepository {
                         // Get the relative path by stripping the repository root prefix
                         let relative_path = target_file.strip_prefix(&repo_root_canonical).unwrap();
                         let sig = repo.signature().expect("Failed to get signature");
+                        let relative_path_trace = relative_path.clone();
 
                         // Stage all modified files
                         let mut index = repo.index().expect("Failed to get index");
@@ -176,13 +177,13 @@ impl GitRepository {
                             &tree,
                             &[&parent_commit],
                         ).expect("Failed to commit");
+                        info!("local commit: {}",relative_path_trace);
                     }
 
-                    info!(commits=commit_message.commits.len(),"Local");
                 }
             });
 
-        info!("Subscribing to broker for commit message response notifications.");
+        trace!("Subscribing to broker for commit message response notifications.");
         let subscription = BrokerSubscribe {
             message_type_id: TypeId::of::<ResponseCommit>(),
             subscriber_context: actor.context.clone(),
