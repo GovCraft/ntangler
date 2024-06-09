@@ -37,7 +37,7 @@ impl PooledActor for OpenAi {
         // Event: Setting up SubmitDiff Handler
         // Description: Setting up an actor to handle the `SubmitDiff` event asynchronously.
         // Context: None
-        info!("Setting up an actor to handle the `SubmitDiff` event asynchronously.");
+        trace!("Setting up an actor to handle the `SubmitDiff` event asynchronously.");
         actor.setup
             .act_on_async::<AcceptParentBroker>(|actor, event| {
                 actor.state.broker = event.message.broker.clone();
@@ -199,11 +199,11 @@ impl PooledActor for OpenAi {
             });
 
 
-        // Event: Activating AiActor
-        // Description: Activating the AiActor.
+        let context = actor.activate(None).await.expect("Failed to activate OpenAi generator");
+        // Event: Activating OpenAi generator
+        // Description: Activating the OpenAi generator.
         // Context: None
-        info!(id=&actor.key.value, "Activating the AiActor.");
-        let context = actor.activate(None).await.expect("Failed to activate AiActor");
+        trace!(id=&actor.key.value, "Activated OpenAi generator:");
         context
     }
 }
