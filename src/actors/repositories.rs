@@ -1,13 +1,14 @@
 use std::any::TypeId;
 use std::future::Future;
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
 
 use akton::prelude::*;
 use anyhow::anyhow;
-use git2::{DiffOptions, Error, IndexAddOption, Repository};
+use git2::{DiffOptions, Error, IndexAddOption, Repository, Status, StatusOptions};
 use tracing::{debug, error, info, trace, warn};
 
-use crate::messages::{BrokerSubscribe, CheckoutBranch, Diff, NotifyChange, ResponseCommit, SubmitDiff};
+use crate::messages::{BrokerSubscribe, CheckoutBranch, Diff, NotifyChange, Poll, ResponseCommit, SubmitDiff};
 use crate::repository_config::RepositoryConfig;
 use crate::tangler_config::TanglerConfig;
 
@@ -69,6 +70,26 @@ impl GitRepository {
 
         actor.setup
             .act_on::<CheckoutBranch>(|actor, _event| {
+                trace!("Received Poll message");
+                actor.state.checkout_branch();
+                if let Some(repo) = &actor.state.repository {
+                    let repo = repo.lock().expect("Couldn't lock repository mutex");
+                    let mut status_options = StatusOptions::new();
+                    status_options.include_untracked(true);
+
+                    let statuses = repo.statuses(Some(&mut status_options))?;
+                    let modified_files: Vec<_> = statuses
+                        .iter()
+                        .filter(|entry| entry.status().contains(Status::WT_MODIFIED))
+                        .map(|entry| entry.path().unwrap().to_string())
+                        .collect();
+                    // notify for each file
+                    for file in modified_files {
+                        debug!(change_file=file, "Unstaged files");
+                    }
+                };
+            })
+            .act_on::<Poll>(|actor, _event| {
                 trace!("Received CheckoutBranch message");
                 actor.state.checkout_branch();
             })
@@ -180,7 +201,6 @@ impl GitRepository {
                         ).expect("Failed to commit");
                         info!("Local commit: {:?}",relative_path);
                     }
-
                 }
             });
 
