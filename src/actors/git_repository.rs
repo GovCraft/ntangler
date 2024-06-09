@@ -295,7 +295,7 @@ mod unit_tests {
     use tokio::sync::oneshot;
     use tracing::{error, info, trace};
 
-    use crate::actors::BrokerActor;
+    use crate::actors::Broker;
     use crate::actors::git_repository::RepositoryActor;
     use crate::init_tracing;
     use crate::messages::{NotifyChange, ResponseCommit};
@@ -311,7 +311,7 @@ mod unit_tests {
             watch_staged_only: false,
             id: "any id".to_string(),
         };
-        let broker = BrokerActor::init().await?;
+        let broker = Broker::init().await?;
 
         let actor_context = RepositoryActor::init(&config, broker).await;
         assert!(actor_context.is_some());
@@ -381,7 +381,7 @@ mod unit_tests {
                 }
             }
         };
-        let broker = BrokerActor::init().await?;
+        let broker = Broker::init().await?;
 
         let actor_context = RepositoryActor::init_with_custom_behavior(test_behavior, config.clone(), broker).await;
         assert!(actor_context.is_some());
@@ -443,7 +443,7 @@ Modified content
             watch_staged_only: false,
             id: "any id".to_string(),
         };
-        let broker = BrokerActor::init().await?;
+        let broker = Broker::init().await?;
 
         let actor_context = RepositoryActor::init(&config, broker).await;
         assert!(actor_context.is_some());
