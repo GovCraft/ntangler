@@ -38,29 +38,32 @@ impl RepositoryWatcherActor {
         info!(config = ?config, "Setting up the handler for Watch events.");
 
         actor.setup.act_on::<Watch>(|actor, event| {
-            let (tx, mut rx) = tokio::sync::mpsc::channel(100);
+            let (tx, mut rx) = tokio::sync::mpsc::channel(200); // Increased channel capacity
             let message = &actor.state.repo;
             let repository_id = actor.state.repo.id.clone();
             let notify_config = notify::Config::default()
-                .with_poll_interval(Duration::from_secs(1))
+                .with_poll_interval(Duration::from_secs(5))
                 .with_compare_contents(true);
             let debouncer_config = Config::default()
-                .with_timeout(Duration::from_millis(1000))
+                .with_timeout(Duration::from_millis(2000)) // Increased debounce timeout
                 .with_notify_config(notify_config);
-            let repository_path = actor.state.repo.path.clone();
+            let repository_path = format!("{}", actor.state.repo.path.clone()).clone();
+            let repository_path_trace = repository_path.clone();
             let watch_staged_only = actor.state.repo.watch_staged_only;
+
             let mut debouncer = match new_debouncer_opt::<_, PollWatcher>(
                 debouncer_config,
                 move |debounce_result: DebounceEventResult| {
+                    let repository_path = repository_path.clone();
                     match debounce_result {
                         Ok(events) => {
-                            let mut walker =
-                                WalkBuilder::new(&repository_path)
-                                    .add_custom_ignore_filename(".gitignore")
-                                    .add_custom_ignore_filename(".ignore")
-                                    .standard_filters(true)
-                                    .build();
+                            let mut walker = WalkBuilder::new(&repository_path.clone())
+                                .standard_filters(true)
+                                .add_custom_ignore_filename(".gitignore")
+                                .add_custom_ignore_filename(".ignore")
+                                .build();
                             for event in events {
+                                let repository_path = repository_path.clone();
                                 if let Ok(canonical_event_path) = PathBuf::from(event.path.clone()).canonicalize() {
                                     if walker.any(|entry| {
                                         entry.as_ref()
@@ -86,7 +89,12 @@ impl RepositoryWatcherActor {
                             // Event: Debounce Error
                             // Description: Error occurred during the debounce process.
                             // Context: Error details.
-                            error!("Debounce error: {:?}", e);
+                            if e.to_string().contains("index.lock") {
+                                // Ignore the specific error for index.lock not found
+                                trace!("Ignoring index.lock not found error: {:?}", e);
+                            } else {
+                                error!("Debounce error: {:?}", e);
+                            }
                         }
                     }
                 },
@@ -101,17 +109,8 @@ impl RepositoryWatcherActor {
             // Event: Setting up Watcher
             // Description: Setting up the watcher for the repository.
             // Context: Repository path details.
-            info!("Setting up the watcher for the repository at path: {}", &actor.state.repo.path);
+            info!("Setting up the watcher for the repository at path: {}", &repository_path_trace.clone());
 
-            // if let Err(e) = debouncer.watcher().watch(
-            //     &Path::new(&actor.state.repo.path).join(".git/index"),
-            //     RecursiveMode::NonRecursive,
-            // ) {
-            //     trace!("Couldn't start watching git repo: {:?}", e);
-            //     return;
-            // }
-
-            // if !&actor.state.repo.watch_staged_only {
             if let Err(e) = debouncer.watcher().watch(
                 (&actor.state.repo.path).as_ref(),
                 RecursiveMode::Recursive,
@@ -119,11 +118,11 @@ impl RepositoryWatcherActor {
                 trace!("Couldn't start watching modified files: {:?}", e);
                 return;
             }
-            // }
-            actor.state.watcher = Some(debouncer);
 
+            actor.state.watcher = Some(debouncer);
             let notification_context = actor.state.broker.clone();
             let repo_id = actor.state.repo.id.clone();
+
             tokio::spawn(async move {
                 while let Some((repo_id, path)) = rx.recv().await {
                     // Event: Change Detected
@@ -134,11 +133,6 @@ impl RepositoryWatcherActor {
                     notification_context.emit_async(change_message, None).await;
                 }
             });
-
-            // Event: Watching for Changes
-            // Description: Watching for changes in the repository.
-            // Context: Repository path.
-            info!("Watching for changes in {}...", &actor.state.repo.path);
         });
 
         // Event: Activating RepositoryWatcherActor
@@ -153,18 +147,20 @@ impl RepositoryWatcherActor {
 #[cfg(test)]
 mod tests {
     use std::path::PathBuf;
+
     use akton::prelude::*;
+    use git2::{DiffOptions, IndexAddOption, Repository, StatusOptions};
     use lazy_static::lazy_static;
+    use rand::distributions::Alphanumeric;
+    use rand::thread_rng;
     use tokio::fs::File;
     use tokio::io::AsyncWriteExt;
-    use tracing::debug;
+    use tracing::{debug, error};
+
     use crate::actors::TanglerActor;
     use crate::init_tracing;
     use crate::messages::NotifyChange;
     use crate::tangler_config::TanglerConfig;
-    use git2::{Repository, StatusOptions, DiffOptions};
-    use rand::distributions::Alphanumeric;
-    use rand::thread_rng;
 
     lazy_static! {
         static ref TOML: String = r#"
@@ -218,6 +214,8 @@ mod tests {
 
         // // Add the file to the repository index and commit if necessary
         // let mut index = repo.index()?;
+        // index.add_all(["*"].iter(), IndexAddOption::DEFAULT, None)?;
+        // index.write()?;
         // index.add_path(&path)?;
         // index.write()?;
         //
@@ -229,28 +227,92 @@ mod tests {
         //     debug!("File: {:?}, Status: {:?}", entry.path(), entry.status());
         // }
 
-
         // let path = PathBuf::from("*.*");
         // Pretend we get a change and notify the broker
-        broker.emit_async(NotifyChange { repo_id, path }, None).await;
+        broker.emit_async(NotifyChange { repo_id, path: PathBuf::from("test_file_path") }, None).await;
 
         // Additional debug information for diff generation
-        // let mut diff_options = DiffOptions::new();
-        // diff_options.pathspec("*.*");
-        // let diff = repo.diff_index_to_workdir(None, Some(&mut diff_options))?;
-        // let mut diff_text = Vec::new();
-        // diff.print(git2::DiffFormat::Patch, |_, _, line| {
-        //     diff_text.extend_from_slice(line.content());
+        let mut diff_options = DiffOptions::new();
+        // diff_options.include_untracked(true);
+        diff_options.minimal(true);
+        diff_options.pathspec(test_file_path);
+        diff_options.pathspec("file2.txt");
+        // diff_options.pathspec("test_file.txt");
+
+        let diff = repo.diff_index_to_workdir(None, Some(&mut diff_options))?;
+        let mut diff_text = Vec::new();
+        // Print the diff
+        // diff.print(git2::DiffFormat::Patch, |delta, hunk, line| {
+        //     match line.origin() {
+        //         '+' => print!("+"),
+        //         '-' => print!("-"),
+        //         ' ' => print!(" "),
+        //         _ => (),
+        //     }
+        //     print!("{}", std::str::from_utf8(line.content()).unwrap());
         //     true
         // })?;
-        // let changes = String::from_utf8(diff_text)?;
-        // debug!("Generated diff: {}", changes);
+        diff.print(git2::DiffFormat::Patch, |_, _, line| {
+            diff_text.extend_from_slice(line.content());
+            true
+        })?;
+        let changes = String::from_utf8_lossy(&*diff_text);
+        debug!("Generated diff: {}", changes);
 
-        tangler.suspend().await?;
+        // tangler.suspend().await?;
+
 
         // Remove the test file after actors are terminated
-        tokio::fs::remove_file(format!("./mock-repo-working/{}", test_file_path)).await?;
-        debug!("Removed test file");
+        // tokio::fs::remove_file(format!("./mock-repo-working/{}", test_file_path)).await?;
+        // debug!("Removed test file");
+
+        Ok(())
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn test_path() -> anyhow::Result<()> {
+        use rand::Rng;
+        use tokio::fs::File;
+        use tokio::io::AsyncWriteExt;
+        use std::path::PathBuf;
+
+        init_tracing();
+
+
+        let test_file_path = "./mock-repo-working/main.rs"; // Relative to the repository root
+        let path = PathBuf::from(test_file_path).canonicalize()?;
+
+        // Open the repository
+        let repo = Repository::open("./mock-repo-working")?;
+
+
+        let mut diff_options = DiffOptions::new();
+
+        // Get the repository root directory
+        let repo_root = repo.workdir().unwrap();
+
+        // Get the canonical path of the repository root
+        let repo_root_canonical = repo_root.canonicalize()?;
+
+        // Example canonical path to a file
+        let binding = path.clone();
+        // Get the relative path by stripping the repository root prefix
+        let relative_path = binding.strip_prefix(&repo_root_canonical)?;
+
+        debug!(file_name=?path, "Adding file to pathspec");
+        diff_options.pathspec(relative_path);
+        diff_options.include_untracked(true);
+        // diff_options.minimal(true);
+        let diff = repo.diff_index_to_workdir(None, Some(&mut diff_options)).expect("nope");
+        let mut diff_text = Vec::new();
+        diff.print(git2::DiffFormat::Patch, |_, _, line| {
+            diff_text.extend_from_slice(line.content());
+            true
+        })?;
+        let changes = String::from_utf8_lossy(&*diff_text);
+        debug!("Generated diff: {}", changes);
+        // Print the relative path
+        debug!("Relative path: {}", relative_path.display());
 
         Ok(())
     }
