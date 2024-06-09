@@ -88,6 +88,9 @@ impl RepositoryWatcherActor {
                                 // Ignore the specific error for index.lock not found
                                 trace!("Ignoring index.lock not found error: {:?}", e);
                             } else {
+                                // Event: Debounce Error
+                                // Description: Error occurred during the debounce process.
+                                // Context: Error details.
                                 error!("Debounce error: {:?}", e);
                             }
                         }
@@ -96,6 +99,9 @@ impl RepositoryWatcherActor {
             ) {
                 Ok(debouncer) => debouncer,
                 Err(e) => {
+                    // Event: Watcher Setup Failed
+                    // Description: Failed to set up the watcher for the repository.
+                    // Context: Error details.
                     trace!("Couldn't set up watcher: {:?}", e);
                     return;
                 }
@@ -110,6 +116,9 @@ impl RepositoryWatcherActor {
                 (&actor.state.repo.path).as_ref(),
                 RecursiveMode::Recursive,
             ) {
+                // Event: Watcher Start Failed
+                // Description: Failed to start watching modified files.
+                // Context: Error details.
                 trace!("Couldn't start watching modified files: {:?}", e);
                 return;
             }
