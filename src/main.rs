@@ -27,7 +27,7 @@ use tracing_subscriber::fmt::format::FmtSpan;
 use tangler_config::TanglerConfig;
 
 use crate::actors::GitSentinel;
-use crate::actors::TanglerActor;
+use crate::actors::Tangler;
 use crate::messages::LoadRepo;
 use crate::repository_config::RepositoryConfig;
 
@@ -45,7 +45,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Read and parse the configuration file
     let tangler_config: TanglerConfig = toml::from_str(&fs::read_to_string("./src/config.toml")?)?;
 
-    let (tangler, broker) = TanglerActor::init(tangler_config).await?;
+    let (tangler, broker) = Tangler::init(tangler_config).await?;
 
     // Handle shutdown signal
     match signal::ctrl_c().await {
@@ -69,7 +69,7 @@ mod tests {
 
     use akton::prelude::ActorContext;
 
-    use crate::actors::TanglerActor;
+    use crate::actors::Tangler;
     use crate::init_tracing;
     use crate::repository_config::RepositoryConfig;
     use crate::tangler_config::TanglerConfig;
@@ -81,7 +81,7 @@ mod tests {
         // Read and parse the configuration file
         let tangler_config: TanglerConfig = toml::from_str(&fs::read_to_string("./src/config.toml")?)?;
 
-        let (tangler_actor, _broker) = TanglerActor::init(tangler_config).await?;
+        let (tangler_actor, _broker) = Tangler::init(tangler_config).await?;
 
         tangler_actor.suspend().await?;
         Ok(())
@@ -133,7 +133,7 @@ pub fn init_tracing() {
             .add_directive("akton_core::message::outbound_envelope=error".parse().unwrap())
             .add_directive("tangler::actors::repositories=info".parse().unwrap())
             .add_directive("tangler::actors::sentinels=info".parse().unwrap())
-            .add_directive("tangler::actors::tangler_actor=error".parse().unwrap())
+            .add_directive("tangler::actors::tangler=error".parse().unwrap())
             .add_directive("tangler::actors::brokers=error".parse().unwrap())
             .add_directive("tangler::actors::generators=error".parse().unwrap())
             .add_directive("tangler::tangler_config=error".parse().unwrap())
