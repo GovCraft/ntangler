@@ -5,7 +5,7 @@ use akton::prelude::*;
 use futures::FutureExt;
 use tracing::{debug, error, info, instrument, trace, warn};
 
-use crate::actors::{AiActor, Broker, Sentinel};
+use crate::actors::{OpenAi, Broker, Sentinel};
 use crate::actors::git_repository::RepositoryActor;
 use crate::messages::{AcceptParentBroker, BrokerSubscribe, Diff, ErrorNotification, NotifyChange, SubmitDiff, Watch};
 use crate::repository_config::RepositoryConfig;
@@ -92,7 +92,7 @@ impl TanglerActor {
             actor.state.diff_watchers.push(watcher);
         }
         let pool_size = tangler_config.repositories.len() * 3;
-        let pool_builder = PoolBuilder::default().add_pool::<AiActor>("llm_pool", pool_size, LoadBalanceStrategy::RoundRobin);
+        let pool_builder = PoolBuilder::default().add_pool::<OpenAi>("llm_pool", pool_size, LoadBalanceStrategy::RoundRobin);
         let pool_broker = actor.state.broker.clone();
         info!("Activating the Tangler actor.");
         let actor_context = actor.activate(Some(pool_builder)).await?;
