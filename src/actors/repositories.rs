@@ -65,7 +65,7 @@ impl GitRepository {
                 use git2::ErrorCode::*;
                 let error_message = match e.code() {
                     NotFound => format!(
-                        "Oops! We couldn't find the requested object in the repository at {}. Check the path and try again. More details are available in the local log.",
+                        "Oops! Couldn't find the requested object in the repository at {}. Check the path and try again. More details are in the local log.",
                         config.path
                     ),
                     BareRepo => format!(
