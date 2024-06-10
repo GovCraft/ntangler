@@ -20,7 +20,7 @@ use notify::PollWatcher;
 use notify_debouncer_mini::Debouncer;
 use serde::{Deserialize, Serialize};
 use tokio::signal;
-use tracing::{error, instrument, Level, trace};
+use tracing::{error, info, instrument, Level, trace};
 use tracing_subscriber::{EnvFilter, FmtSubscriber};
 use tracing_subscriber::fmt::format::FmtSpan;
 
@@ -28,7 +28,7 @@ use tangler_config::TanglerConfig;
 
 use crate::actors::GitSentinel;
 use crate::actors::Tangler;
-use crate::messages::LoadRepo;
+use crate::messages::{LoadRepo, Poll};
 use crate::repository_config::RepositoryConfig;
 
 mod actors;
@@ -46,7 +46,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let tangler_config: TanglerConfig = toml::from_str(&fs::read_to_string("./src/config.toml")?)?;
 
     let (tangler, broker) = Tangler::init(tangler_config).await?;
-
+    info!("Emitting poll");
+    broker.emit_async(Poll, None).await;
     // Handle shutdown signal
     match signal::ctrl_c().await {
         Ok(()) => {
@@ -133,20 +134,23 @@ pub fn init_tracing() {
             .add_directive("akton_core::message::outbound_envelope=error".parse().unwrap())
             .add_directive("tangler::actors::repositories=info".parse().unwrap())
             .add_directive("tangler::actors::sentinels=info".parse().unwrap())
-            .add_directive("tangler::actors::tangler=error".parse().unwrap())
+            .add_directive("tangler::actors::sentinels::tests=off".parse().unwrap())
+            .add_directive("tangler::actors::tangler=info".parse().unwrap())
             .add_directive("tangler::actors::brokers=error".parse().unwrap())
+            .add_directive("tangler::actors::brokers[load_subscriber_futures]=error".parse().unwrap())
+            .add_directive("tangler::actors::brokers[load_subscriber_future_by_id]=error".parse().unwrap())
             .add_directive("tangler::actors::generators=error".parse().unwrap())
             .add_directive("tangler::tangler_config=error".parse().unwrap())
             .add_directive("tangler::repository_config=error".parse().unwrap())
             .add_directive("hyper_util=off".parse().unwrap())
-            .add_directive("async_openai=trace".parse().unwrap())
+            .add_directive("async_openai=off".parse().unwrap())
             .add_directive(Level::TRACE.into());
-
         // Set global log level to TRACE
         let subscriber = FmtSubscriber::builder()
             .with_span_events(FmtSpan::NONE)
             .with_max_level(Level::TRACE)
             .compact()
+            .pretty()
             .with_line_number(true)
             .without_time()
             .with_env_filter(filter)
