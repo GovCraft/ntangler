@@ -302,14 +302,14 @@ impl GitRepository {
                         }
                         Err(e) => {
                             error!(
-                            "Uh-oh! We couldn't find the branch: {}. Error details: {}",
+                            "Uh-oh! Couldn't find the branch: {}. Error details: {}",
                             &self.config.branch_name, e
                         );
                         }
                     }
                 }
                 Err(e) => {
-                    error!("Yikes! The repository is locked and we couldn't access it: {}", e);
+                    error!("Yikes! The repository is locked and couldn't be accessed: {}", e);
                 }
             }
         } else {
