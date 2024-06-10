@@ -42,7 +42,7 @@ mod commits;
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     init_tracing();
 
-    println!("Welcome to Tangler! Now watching your repository and making commits to your local branch. Just code—commits are taken care of. Happy coding!");
+    println!("Welcome to Tangler! Now watching your repository and making commits to your local branch. Just code—commits are taken care of. To stop Tangler, press Ctrl+C. Happy coding!");
 
     // Read and parse the configuration file
     let tangler_config: TanglerConfig = toml::from_str(&fs::read_to_string("./src/config.toml")?)?;
