@@ -1,24 +1,26 @@
 use std::any::TypeId;
 use std::future::Future;
+use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
 
 use akton::prelude::*;
 use anyhow::anyhow;
-use git2::{DiffOptions, Error, Repository};
-use tracing::{debug, error, info, trace};
+use git2::{DiffOptions, Error, IndexAddOption, Repository, Status, StatusOptions};
+use tracing::{debug, error, info, trace, warn};
 
-use crate::messages::{BrokerSubscribe, CheckoutBranch, Diff, NotifyChange, ResponseCommit, SubmitDiff};
+use crate::messages::{BrokerSubscribe, CheckoutBranch, Diff, NotifyChange, Poll, ResponseCommit, SubmitDiff};
 use crate::repository_config::RepositoryConfig;
 use crate::tangler_config::TanglerConfig;
 
 #[akton_actor]
-pub(crate) struct RepositoryActor {
+pub(crate) struct GitRepository {
     repository: Option<Arc<Mutex<Repository>>>,
     config: RepositoryConfig,
     broker: Context,
 }
 
-impl RepositoryActor {
+impl GitRepository {
     /// Initializes the repository actor with the provided custom behavior.
     ///
     /// # Arguments
@@ -31,11 +33,11 @@ impl RepositoryActor {
     pub(crate) async fn init(config: &RepositoryConfig, broker: Context) -> Option<Context> {
         // Define the default behavior as an async closure that takes a reference to the repository configuration.
         let default_behavior = |config: RepositoryConfig, broker: Context| async move {
-            RepositoryActor::default_behavior(&config, broker.clone()).await
+            GitRepository::default_behavior(&config, broker.clone()).await
         };
 
         // Call the `init_with_custom_behavior` function with the default behavior closure and the configuration.
-        RepositoryActor::init_with_custom_behavior(default_behavior, config.clone(), broker).await
+        GitRepository::init_with_custom_behavior(default_behavior, config.clone(), broker).await
     }
 
     pub(crate) async fn init_with_custom_behavior<F, Fut>(
@@ -53,7 +55,7 @@ impl RepositoryActor {
 
     /// Example custom behavior function to be passed into the `init` function.
     pub(crate) async fn default_behavior(config: &RepositoryConfig, broker: Context) -> Option<Context> {
-        let mut actor = Akton::<RepositoryActor>::create_with_id(&config.id);
+        let mut actor = Akton::<GitRepository>::create_with_id(&config.id);
         actor.state.config = config.clone();
         actor.state.broker = broker;
 
@@ -72,59 +74,71 @@ impl RepositoryActor {
                 trace!("Received CheckoutBranch message");
                 actor.state.checkout_branch();
             })
-            .act_on_async::<Diff>(|actor, event| {
-                let diff: String = if let Some(repo) = &actor.state.repository {
+            .act_on_async::<Poll>(|actor, _event| {
+                trace!("Received Poll request");
+                let mut diffs: Vec<(String, String)> = Default::default();
+
+                if let Some(repo) = &actor.state.repository {
                     let repo = repo.lock().expect("Couldn't lock repository mutex");
+                    let mut status_options = StatusOptions::new();
+                    status_options.include_untracked(true);
 
-                    // Event: Generating Diff
-                    // Description: Generating a diff for the repository.
-                    // Context: Watch staged only configuration.
-                    info!(file=?event.message.path, "Generating a diff for repository");
+                    let statuses = repo.statuses(Some(&mut status_options)).expect("Couldn't get repo statuses");
+                    let modified_files: Vec<_> = statuses
+                        .iter()
+                        .filter(|entry| entry.status().contains(Status::WT_MODIFIED))
+                        .filter(|entry| entry.path().unwrap() != "./")
+                        .map(|entry| entry.path().unwrap().to_string())
+                        .collect();
 
-                    let mut diff_options = DiffOptions::new();
+                    // notify for each file
+                    for path in modified_files {
+                        trace!(change_file=&path, "Unstaged files");
 
-                    // if let Some(path) = event.message.path.file_name().unwrap().to_str() {
-                    //     diff_options.pathspec(path);
-                    //     // diff_options.minimal(true);
-                    // } else {
-                    //     error!("Failed to convert PathBuf to str");
-                    //     return Box::pin(async move {});
-                    // }
+                        trace!(file=?path, "Generating a diff for repository");
 
-                    // Generate the diff
-                    let diff = repo.diff_index_to_workdir(None, Some(&mut diff_options)).expect("nope");
+                        let mut diff_options = DiffOptions::new();
 
-                    let mut diff_text = Vec::new();
-                    diff.print(git2::DiffFormat::Patch, |_, _, line| {
-                        diff_text.extend_from_slice(line.content());
-                        true
-                    }).expect("Failed to print diff");
+                        // Get the relative path by stripping the repository root prefix
+                        trace!(file_name=?path, "Adding file to pathspec");
 
-                    trace!(raw_diff = ?diff_text, "Raw diff generated for the repository.");
-                    let changes = String::from_utf8_lossy(&diff_text).to_string();
+                        // Set the pathspec to the relative path
+                        // this is where we've been failing
+                        diff_options.pathspec(path.clone());
+                        diff_options.include_untracked(true);
 
-                    // Event: Diff Generated
-                    // Description: The diff for the repository has been generated.
-                    // Context: Diff text.
-                    trace!(diff = changes, "Diff generated for the repository.");
+                        let mut index = repo.index().unwrap();
+                        trace!(path=?index.path().unwrap(), "Diffing against index:");
+                        trace!(working_dir=?repo.workdir().unwrap(), "...in");
 
-                    changes
-                } else {
-                    error!("Received request for Diff but the string was empty.");
-                    String::new()
-                };
+                        // Generate the diff
+                        let diff = repo.diff_index_to_workdir(None, Some(&mut diff_options)).expect("nope");
+                        let mut diff_text = Vec::new();
+                        diff.print(git2::DiffFormat::Patch, |_, _, line| {
+                            diff_text.extend_from_slice(line.content());
+                            true
+                        }).expect("Failed to print diff");
 
-                let id = actor.state.config.id.clone();
+                        trace!(raw_diff = ?diff_text, "Raw diff generated for the repository.");
+                        let changes = String::from_utf8_lossy(&diff_text).to_string();
+                        trace!(diff = changes, "Diff generated for the repository.");
+                        diffs.push((path.clone(), changes));
+                    }
+                }
+                let id = actor.key.value.clone();
                 let broker = actor.state.broker.clone();
-                let diff = diff.clone();
-
+                let path = actor.state.config.path.clone();
                 Box::pin(async move {
-                    if !diff.is_empty() {
+                    for (file, diff) in diffs {
+                        let id = id.clone();
+                        let broker = broker.clone();
+                        let path = file.clone();
                         let trace_id = id.clone();
-                        broker.emit_async(SubmitDiff { diff, id }, None).await;
-                        debug!(repo_id = trace_id, broker=?&broker, "Submitted retrieved Diff to broker.");
-                    } else {
-                        error!("Received request for Diff but no repo diffs found.");
+                        let diff = diff.to_string();
+
+                        debug_assert_ne!(diff, "./".to_string());
+                        broker.emit_async(SubmitDiff { diff, id, path:path.clone() }, None).await;
+                        tracing::trace!(repo_id = trace_id, path=path, "Submitted retrieved Diff to broker.");
                     }
                 })
             })
@@ -134,45 +148,66 @@ impl RepositoryActor {
                 // Context: Commit message details.
                 trace!(commit_message = ?event.message.commits, "Received ReponseCommit message and will attempt to commit changes to the repository.");
 
-                // Received change, so we need to commit to this repo
+
+                // Received commit message, so we need to commit to this repo
                 if let Some(repo) = &actor.state.repository {
+                    let response_commit = event.message;
                     let commit_message = &event.message.commits;
                     let repo = repo.lock().expect("Failed to lock repo mutex");
+                    let target_file = event.message.path.clone();
+
+                    // Get the repository root directory
+                    let repo_root = repo.workdir().unwrap();
+                    // Get the canonical path of the repository root
+                    let repo_root_canonical = repo_root.canonicalize().unwrap();
+                    trace!(file=target_file, "Committing");
+
                     for commit in &commit_message.commits {
                         let sig = repo.signature().expect("Failed to get signature");
+                        let path = PathBuf::from(target_file.clone());
 
                         // Stage all modified files
                         let mut index = repo.index().expect("Failed to get index");
-                        index.add_all(["*"].iter(), git2::IndexAddOption::DEFAULT, None).expect("Failed to add files to index");
+                        trace!(file=?path, "Repo index add");
+                        index.add_path(path.as_ref()).expect("Failed to add files to index");
                         index.write().expect("Failed to write index");
 
                         let tree_id = index.write_tree().expect("Failed to write tree");
                         let tree = repo.find_tree(tree_id).expect("Failed to find tree");
                         let head = repo.head().expect("Failed to get HEAD");
                         let parent_commit = head.peel_to_commit().expect("Failed to get parent commit");
-                        let commit = &format!("{}\n{}", commit.commit.heading, commit.commit.description);
+
+                        let commit_message = &format!("{}\n{}", commit.commit.heading, commit.commit.description);
+
+                        // TODO: optionally sign commits
                         repo.commit(
                             Some("HEAD"),
                             &sig,
                             &sig,
-                            commit,
+                            commit_message,
                             &tree,
                             &[&parent_commit],
                         ).expect("Failed to commit");
+                        info!("Local commit: {:?}", target_file);
                     }
-
-                    // Event: Changes Committed
-                    // Description: Changes have been committed to the repository.
-                    // Context: Commit message details.
-                    info!("Committed changes {} locally", commit_message.commits.len());
                 }
             });
 
-        info!("Subscribing to broker for commit message response notifications.");
         let subscription = BrokerSubscribe {
+            subscriber_id: actor.key.value.clone(),
             message_type_id: TypeId::of::<ResponseCommit>(),
             subscriber_context: actor.context.clone(),
         };
+
+        actor.state.broker.emit_async(subscription, None).await;
+        trace!(type_id=?TypeId::of::<ResponseCommit>(),subscriber=actor.key.value.clone(),"Subscribed to ResponseCommit:");
+
+        let subscription = BrokerSubscribe {
+            subscriber_id: actor.key.value.clone(),
+            message_type_id: TypeId::of::<Poll>(),
+            subscriber_context: actor.context.clone(),
+        };
+        trace!(type_id=?TypeId::of::<Poll>(),subscriber=actor.key.value.clone(),"Subscribed to Poll:");
 
         actor.state.broker.emit_async(subscription, None).await;
 
@@ -281,8 +316,8 @@ mod unit_tests {
     use tokio::sync::oneshot;
     use tracing::{error, info, trace};
 
-    use crate::actors::BrokerActor;
-    use crate::actors::repository_actor::RepositoryActor;
+    use crate::actors::Broker;
+    use crate::actors::repositories::GitRepository;
     use crate::init_tracing;
     use crate::messages::{NotifyChange, ResponseCommit};
     use crate::repository_config::RepositoryConfig;
@@ -297,9 +332,9 @@ mod unit_tests {
             watch_staged_only: false,
             id: "any id".to_string(),
         };
-        let broker = BrokerActor::init().await?;
+        let broker = Broker::init().await?;
 
-        let actor_context = RepositoryActor::init(&config, broker).await;
+        let actor_context = GitRepository::init(&config, broker).await;
         assert!(actor_context.is_some());
         let context = actor_context.unwrap();
         context.suspend().await?;
@@ -333,7 +368,7 @@ mod unit_tests {
             move |config: RepositoryConfig, broker: Context| {
                 let sender = sender.clone(); // Clone the Arc again for use inside the async block
                 async move {
-                    let mut actor = Akton::<RepositoryActor>::create_with_id(&config.id);
+                    let mut actor = Akton::<GitRepository>::create_with_id(&config.id);
                     let repo = Repository::open(&config.path).expect("Failed to open mock repo");
                     actor.state.repository = Some(Arc::new(Mutex::new(repo)));
                     actor.state.config = config;
@@ -367,9 +402,9 @@ mod unit_tests {
                 }
             }
         };
-        let broker = BrokerActor::init().await?;
+        let broker = Broker::init().await?;
 
-        let actor_context = RepositoryActor::init_with_custom_behavior(test_behavior, config.clone(), broker).await;
+        let actor_context = GitRepository::init_with_custom_behavior(test_behavior, config.clone(), broker).await;
         assert!(actor_context.is_some());
         let context = actor_context.unwrap();
 
@@ -390,7 +425,7 @@ mod unit_tests {
         }
 
         let repo_id = config.id;
-        let path = file_path.clone();
+        let path = "test_file.txt".to_string();
         trace!("Notifying actor of change");
         context.emit_async(NotifyChange { repo_id, path }, None).await;
 
@@ -429,12 +464,62 @@ Modified content
             watch_staged_only: false,
             id: "any id".to_string(),
         };
-        let broker = BrokerActor::init().await?;
+        let broker = Broker::init().await?;
 
-        let actor_context = RepositoryActor::init(&config, broker).await;
+        let actor_context = GitRepository::init(&config, broker).await;
         assert!(actor_context.is_some());
         let context = actor_context.unwrap();
         context.suspend().await?;
         Ok(())
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+        use std::path::PathBuf;
+        use crate::commits::{Commit, CommitDetails, Commits};
+        use pretty_assertions::assert_eq;
+
+        #[test]
+        fn test_squash_commits() {
+            // Sample data for testing
+            let commit1 = Commit {
+                commit: CommitDetails {
+                    heading: String::from("Initial commit"),
+                    description: String::from("This is the initial commit."),
+                },
+            };
+            let commit2 = Commit {
+                commit: CommitDetails {
+                    heading: String::from("Added feature"),
+                    description: String::from("Implemented the new feature."),
+                },
+            };
+            let commit3 = Commit {
+                commit: CommitDetails {
+                    heading: String::from("Fixed bug"),
+                    description: String::from("Fixed a critical bug."),
+                },
+            };
+
+            let commits = Commits {
+                commits: vec![commit1, commit2, commit3],
+            };
+
+            let response_commit = ResponseCommit {
+                id: "id".to_string(),
+                path: "src/main.rs".to_string(),
+                commits,
+            };
+
+            // Squash the commits
+            let squashed_commit = response_commit.squash_commits();
+
+            // Expected result
+            let expected_commit = "Initial commit\n\nThis is the initial commit.\n\nAdded feature: Implemented the new feature.\n\nFixed bug: Fixed a critical bug.";
+
+            // Assert the result
+            assert_eq!(squashed_commit, expected_commit);
+        }
     }
 }

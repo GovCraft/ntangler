@@ -2,9 +2,10 @@ use std::fmt;
 
 use serde::{Deserialize, Deserializer, Serialize};
 use sha2::{Digest, Sha256};
+use tracing::{instrument, trace};
 
 /// Represents a repository configuration.
-#[derive(Serialize, Default, Clone)]
+#[derive(Serialize, Default, Clone, PartialEq)]
 pub(crate) struct RepositoryConfig {
     pub(crate) path: String,
     pub(crate) branch_name: String,
@@ -50,19 +51,40 @@ impl<'de> Deserialize<'de> for RepositoryConfig {
     }
 }
 
-/// Calculates a unique ID based on the hash of the path and branch name.
-fn calculate_id(path: &str, branch_name: &str) -> String {
+/// Calculates a unique ID based on the hash of the repository path and branch name.
+///
+/// # Parameters
+/// - `repo_path`: The path of the repository.
+/// - `branch_name`: The name of the branch.
+///
+/// # Returns
+/// A unique ID as a hexadecimal string.
+#[instrument(skip(repo_path, branch_name))]
+fn calculate_id(repo_path: &str, branch_name: &str) -> String {
+    // Event: Calculating Unique ID
+    // Description: Calculating a unique ID based on the hash of the repository path and branch name.
+    // Context: Repository path and branch name.
+    trace!(repo_path = repo_path, branch_name = branch_name, "Calculating unique ID.");
+
     let mut hasher = Sha256::new();
-    hasher.update(path);
+    hasher.update(repo_path);
     hasher.update(branch_name);
-    let result = hasher.finalize();
-    hex::encode(result)
+    let hash_result = hasher.finalize();
+    let unique_id = hex::encode(hash_result);
+
+    // Event: Unique ID Calculated
+    // Description: Unique ID has been calculated.
+    // Context: Unique ID.
+    trace!(unique_id = unique_id, "Unique ID calculated.");
+
+    unique_id
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use toml;
+
+    use super::*;
 
     #[test]
     fn test_calculate_id() {
@@ -94,8 +116,8 @@ mod tests {
             repository: Vec<RepositoryConfig>,
         }
 
-        let _repositories: Repositories = toml::from_str(toml_str).unwrap();
-        let _expected_repositories = vec![
+        let repositories: Repositories = toml::from_str(toml_str).unwrap();
+        let expected_repositories = vec![
             RepositoryConfig {
                 path: "./repo1".to_string(),
                 branch_name: "main".to_string(),
@@ -112,8 +134,7 @@ mod tests {
             },
         ];
 
-        // TODO: revisit
-        // assert_eq!(repositories.repository, expected_repositories);
+        assert_eq!(repositories.repository, expected_repositories);
     }
 
     #[test]
@@ -131,8 +152,8 @@ mod tests {
             repository: Vec<RepositoryConfig>,
         }
 
-        let _repositories: Repositories = toml::from_str(toml_str).unwrap();
-        let _expected_repositories = vec![RepositoryConfig {
+        let repositories: Repositories = toml::from_str(toml_str).unwrap();
+        let expected_repositories = vec![RepositoryConfig {
             path: "./repo1".to_string(),
             branch_name: "main".to_string(),
             api_url: "https://api.example.com/generate-commit-message".to_string(),
@@ -140,7 +161,6 @@ mod tests {
             id: calculate_id("./repo1", "main"),
         }];
 
-        // TODO: revisit
-        // assert_eq!(repositories.repository, expected_repositories);
+        assert_eq!(repositories.repository, expected_repositories);
     }
 }

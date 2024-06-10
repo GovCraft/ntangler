@@ -1,5 +1,6 @@
-use crate::repository_config::RepositoryConfig;
 use serde::Deserialize;
+
+use crate::repository_config::RepositoryConfig;
 
 #[derive(Deserialize, Debug)]
 pub(crate) struct TanglerConfig {

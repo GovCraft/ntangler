@@ -1,5 +1,5 @@
 [[repositories]]
 path = "./"
-branch_name = "main"
+branch_name = "dogfood"
 api_url = "https://api.example.com/generate-commit-message"
 watch_staged_only = false

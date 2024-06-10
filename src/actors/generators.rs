@@ -20,23 +20,24 @@ use crate::commits::Commits;
 use crate::messages::{AcceptParentBroker, BrokerSubscribe, ResponseCommit, SubmitDiff};
 
 #[akton_actor]
-pub(crate) struct AiActor {
+pub(crate) struct OpenAi {
     client: Option<Arc<Client<OpenAIConfig>>>,
     broker: Context,
 }
 
 #[async_trait]
-impl PooledActor for AiActor {
+impl PooledActor for OpenAi {
     async fn initialize(&self, name: String, parent: &Context) -> Context {
         //TODO: expose broker through context
-        let mut actor = Akton::<AiActor>::create_with_id(&name);
+        let mut actor = Akton::<OpenAi>::create_with_id(&name);
         let client = Client::new();
         actor.state.client = Some(Arc::new(client));
+
 
         // Event: Setting up SubmitDiff Handler
         // Description: Setting up an actor to handle the `SubmitDiff` event asynchronously.
         // Context: None
-        info!("Setting up an actor to handle the `SubmitDiff` event asynchronously.");
+        trace!("Setting up an actor to handle the `SubmitDiff` event asynchronously.");
         actor.setup
             .act_on_async::<AcceptParentBroker>(|actor, event| {
                 actor.state.broker = event.message.broker.clone();
@@ -48,6 +49,8 @@ impl PooledActor for AiActor {
             .act_on_async::<SubmitDiff>(|actor, event| {
                 let changes = event.message.diff.clone();
                 let broker = actor.state.broker.clone();
+                let path = event.message.path.clone();
+                let id = event.message.id.clone();
 
                 // Using Box::pin to handle the future.
                 Box::pin(async move {
@@ -71,6 +74,7 @@ impl PooledActor for AiActor {
                                     return;
                                 }
                             };
+
                             let thread_id = thread.id.clone();
                             trace!("Step 1c: Got thread id {}", thread_id);
 
@@ -100,7 +104,7 @@ impl PooledActor for AiActor {
                                 ..Default::default()
                             }).await {
                                 Ok(stream) => {
-                                    debug!("Run stream created");
+                                    trace!("Run stream created");
                                     stream
                                 }
                                 Err(e) => {
@@ -111,6 +115,7 @@ impl PooledActor for AiActor {
                                     return;
                                 }
                             };
+
                             let mut commit_message = String::new();
                             trace!("Step 3b: Processing events from the event stream.");
 
@@ -174,11 +179,10 @@ impl PooledActor for AiActor {
                         // Description: A commit message has been received from the event stream.
                         // Context: Commit message details.
                         if !commit.is_empty() {
-                            debug!(commit=?commit);
                             match serde_json::from_str(&*commit) {
                                 Ok(commits) => {
-                                    // let commits: Commits = serde_json::from_str(&*commit).expect("JSON was not well-formatted");
-                                    broker.emit_async(ResponseCommit { commits }, None).await;
+                                    broker.emit_async(ResponseCommit {id, commits, path }, None).await;
+                                    trace!("Emitted commit message to broker");
                                 }
                                 Err(e) => {
                                     error!(error=?e, "The json wasn't well formed");
@@ -197,24 +201,19 @@ impl PooledActor for AiActor {
             });
 
 
-        // Event: Activating AiActor
-        // Description: Activating the AiActor.
+        let context = actor.activate(None).await.expect("Failed to activate OpenAi generator");
+        // Event: Activating OpenAi generator
+        // Description: Activating the OpenAi generator.
         // Context: None
-        info!(id=&actor.key.value, "Activating the AiActor.");
-        let context = actor.activate(None).await.expect("Failed to activate AiActor");
+        trace!(id=&context.key.value, "Activated OpenAi generator:");
         context
     }
 }
 
 #[cfg(test)]
 mod unit_tests {
-    use akton::prelude::*;
     use lazy_static::lazy_static;
 
-    use crate::actors::{BrokerActor, RepositoryWatcherActor};
-    use crate::actors::ai_actor::AiActor;
-    use crate::init_tracing;
-    use crate::messages::SubmitDiff;
     use crate::repository_config::RepositoryConfig;
 
     lazy_static! {
@@ -226,6 +225,7 @@ mod unit_tests {
         id: "any id".to_string(),
     };
         }
+
     lazy_static! {
     static ref DIFF: String = r#"diff --git a/test_file.txt b/test_file.txt
 index 8430408..edc5728 100644
@@ -236,25 +236,4 @@ Initial content
 Modified content
 "#.to_string();
 }
-
-    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-    #[ignore = "Makes live call"]
-    async fn test_commit_msg_retrieval() -> anyhow::Result<()> {
-        init_tracing();
-
-        let diff = DIFF.clone();
-        let config = CONFIG.clone();
-        let id = config.id.clone();
-        let broker = BrokerActor::init().await?;
-
-        let watcher = RepositoryWatcherActor::init(&config, broker);
-        let ai_actor = Akton::<AiActor>::create();
-
-        let ai_context = ai_actor.state.initialize("".to_string(), &Default::default()).await;
-
-        ai_context.emit_async(SubmitDiff { diff, id }, None).await;
-        ai_context.suspend().await?;
-
-        Ok(())
-    }
 }
