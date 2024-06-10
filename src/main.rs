@@ -50,8 +50,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Handle shutdown signal
     match signal::ctrl_c().await {
         Ok(()) => {
-            eprintln!("Shutting down");
+            eprintln!("Shutting down gracefully. Your code is safe! Please wait a moment.");
             tangler.suspend().await?;
+            eprintln!("All done! Tangler has shut down safely. Happy coding!");
         }
         Err(err) => {
             error!("Received shutdown signal. Wrapping things up... Please wait a moment.", err);
