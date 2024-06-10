@@ -5,7 +5,8 @@ use crate::commits::Commits;
 
 #[akton_message]
 pub(crate) struct ResponseCommit {
-    pub(crate) path: PathBuf,
+    pub(crate) id: String,
+    pub(crate) path: String,
     pub(crate) commits: Commits,
 }
 
