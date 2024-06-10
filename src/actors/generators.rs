@@ -50,6 +50,7 @@ impl PooledActor for OpenAi {
                 let changes = event.message.diff.clone();
                 let broker = actor.state.broker.clone();
                 let path = event.message.path.clone();
+                let id = event.message.id.clone();
 
                 // Using Box::pin to handle the future.
                 Box::pin(async move {
@@ -73,6 +74,7 @@ impl PooledActor for OpenAi {
                                     return;
                                 }
                             };
+
                             let thread_id = thread.id.clone();
                             trace!("Step 1c: Got thread id {}", thread_id);
 
@@ -113,6 +115,7 @@ impl PooledActor for OpenAi {
                                     return;
                                 }
                             };
+
                             let mut commit_message = String::new();
                             trace!("Step 3b: Processing events from the event stream.");
 
@@ -176,11 +179,10 @@ impl PooledActor for OpenAi {
                         // Description: A commit message has been received from the event stream.
                         // Context: Commit message details.
                         if !commit.is_empty() {
-                            trace!(commit=?commit);
                             match serde_json::from_str(&*commit) {
                                 Ok(commits) => {
-                                    // let commits: Commits = serde_json::from_str(&*commit).expect("JSON was not well-formatted");
-                                    broker.emit_async(ResponseCommit { commits, path }, None).await;
+                                    broker.emit_async(ResponseCommit {id, commits, path }, None).await;
+                                    trace!("Emitted commit message to broker");
                                 }
                                 Err(e) => {
                                     error!(error=?e, "The json wasn't well formed");
