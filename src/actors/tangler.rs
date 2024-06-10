@@ -7,7 +7,7 @@ use tracing::{debug, error, info, instrument, trace, warn};
 
 use crate::actors::{OpenAi, Broker, GitSentinel};
 use crate::actors::repositories::GitRepository;
-use crate::messages::{AcceptParentBroker, BrokerSubscribe, Diff, ErrorNotification, NotifyChange, SubmitDiff, Watch};
+use crate::messages::{AcceptParentBroker, BrokerSubscribe, Diff, ErrorNotification, NotifyChange, SubmitDiff, Observe};
 use crate::repository_config::RepositoryConfig;
 use crate::tangler_config::TanglerConfig;
 
@@ -42,7 +42,7 @@ impl Tangler {
                 let context = actor.context.clone();
                 let message = event.message.clone();
                 Box::pin(async move {
-                    info!("Diff submitted for LLM pool");
+                    trace!("Diff submitted for LLM pool");
                     context.emit_async(message, Some("llm_pool")).await
                 })
             })
@@ -50,27 +50,6 @@ impl Tangler {
                 let error_message = &event.message.error_message;
                 error!("Displayed error: {:?}", &error_message);
                 eprintln!("{}", error_message);
-            })
-            .act_on_async::<NotifyChange>(|actor, event| {
-                let repo_id = &event.message.repo_id;
-
-                info!(repo_id = ?repo_id, "Change detected in repo: {:?}", repo_id);
-
-                let repo = actor.state.git_repositories
-                    .iter()
-                    .find(|g| g.key.value.contains(repo_id))
-                    .cloned();
-
-                if let Some(repo) = repo {
-                    debug!(repo_id = ?repo_id, "Emitting Diff message to the repository.");
-                    let path = event.message.path.clone();
-                    Box::pin(async move {
-                        repo.emit_async(Diff { path }, None).await
-                    })
-                } else {
-                    warn!(repo_id = ?repo_id, "No repository found matching the given ID.");
-                    Box::pin(async move {})
-                }
             })
             .on_before_stop_async(|actor| {
                 let broker = actor.state.broker.clone();
@@ -82,48 +61,51 @@ impl Tangler {
         for repo in &tangler_config.repositories {
             let broker = actor.state.broker.clone();
 
-            info!(repo = ?repo, "Initializing a repository actor.");
+            trace!(repo = ?repo, "Initializing a repository actor.");
             if let Some(repo_actor) = GitRepository::init(repo, broker.clone()).await {
                 actor.state.git_repositories.push(repo_actor);
             }
-            info!(repo = ?repo, "Initializing a diff watcher actor.");
+            trace!(repo = ?repo, "Initializing a diff watcher actor.");
             let watcher = GitSentinel::init(repo, broker).await?;
-            watcher.emit_async(Watch, None).await;
+            watcher.emit_async(Observe, None).await;
             actor.state.diff_watchers.push(watcher);
         }
         let pool_size = tangler_config.repositories.len() * 3;
         let pool_builder = PoolBuilder::default().add_pool::<OpenAi>("llm_pool", pool_size, LoadBalanceStrategy::RoundRobin);
         let pool_broker = actor.state.broker.clone();
-        info!("Activating the Tangler actor.");
+        trace!("Activating the Tangler actor.");
         let actor_context = actor.activate(Some(pool_builder)).await?;
 
         //pass the broker to the internal pool actors
         for _ in 0..pool_size {
-            debug!("Sending broker to LLM Pool.");
+            trace!("Sending broker to LLM Pool.");
             let broker = pool_broker.clone();
             actor_context.emit_async(AcceptParentBroker { broker }, Some("llm_pool")).await;
         }
 
-        info!("Subscribing to broker for error notifications.");
         let subscription = BrokerSubscribe {
+            subscriber_id: actor_context.key.value.clone(),
             message_type_id: TypeId::of::<ErrorNotification>(),
             subscriber_context: actor_context.clone(),
         };
         broker_context.emit_async(subscription, None).await;
+        trace!(type_id=?TypeId::of::<ErrorNotification>(),"Subscribed to ErrorNotification:");
 
-        info!("Subscribing to broker for change notifications.");
         let subscription = BrokerSubscribe {
+            subscriber_id: actor_context.key.value.clone(),
             message_type_id: TypeId::of::<NotifyChange>(),
             subscriber_context: actor_context.clone(),
         };
         broker_context.emit_async(subscription, None).await;
+        trace!(type_id=?TypeId::of::<NotifyChange>(),"Subscribed to NotifyChange:");
 
-        info!("Subscribing to broker for submitted diffs notifications.");
         let subscription = BrokerSubscribe {
+            subscriber_id: actor_context.key.value.clone(),
             message_type_id: TypeId::of::<SubmitDiff>(),
             subscriber_context: actor_context.clone(),
         };
         broker_context.emit_async(subscription, None).await;
+        trace!(type_id=?TypeId::of::<SubmitDiff>(),"Subscribed to SubmitDiff:");
 
         Ok((actor_context, broker_context))
     }
