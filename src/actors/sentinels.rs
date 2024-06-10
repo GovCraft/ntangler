@@ -110,8 +110,7 @@ impl GitSentinel {
                 }
             };
 
-            // Event: Setting up Watcher
-            // Description: Setting up the watcher for the repository.
+            // Event: Setting up Watcher            // Description: Setting up the watcher for the repository.
             // Context: Repository path details.
             trace!("Setting up the watcher for the repository at path: {}", &repository_path_trace);
 
@@ -135,9 +134,6 @@ impl GitSentinel {
                     // Event: Change Detected
                     // Description: Detected a change in the repository.
                     // Context: Repository ID.
-                    info!(file = ?path, "Change in");
-                    let change_message = NotifyChange { repo_id, path };
-                    notification_context.emit_async(change_message, None).await;
                     notification_context.emit_async(Poll, None).await;
                 }
             });
