@@ -1,5 +1,6 @@
 use std::any::TypeId;
 use std::future::Future;
+use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -70,11 +71,13 @@ impl GitRepository {
 
         actor.setup
             .act_on::<CheckoutBranch>(|actor, _event| {
-                trace!("Received Poll message");
+                trace!("Received CheckoutBranch message");
                 actor.state.checkout_branch();
             })
-            .act_on::<Poll>(|actor, _event| {
+            .act_on_async::<Poll>(|actor, _event| {
                 trace!("Received Poll request");
+                let mut diffs: Vec<(String, String)> = Default::default();
+
                 if let Some(repo) = &actor.state.repository {
                     let repo = repo.lock().expect("Couldn't lock repository mutex");
                     let mut status_options = StatusOptions::new();
@@ -84,71 +87,58 @@ impl GitRepository {
                     let modified_files: Vec<_> = statuses
                         .iter()
                         .filter(|entry| entry.status().contains(Status::WT_MODIFIED))
+                        .filter(|entry| entry.path().unwrap() != "./")
                         .map(|entry| entry.path().unwrap().to_string())
                         .collect();
+
                     // notify for each file
-                    for file in modified_files {
-                        debug!(change_file=file, "Unstaged files");
-                        // here we should notify the broker of each change
+                    for path in modified_files {
+                        trace!(change_file=&path, "Unstaged files");
+
+                        trace!(file=?path, "Generating a diff for repository");
+
+                        let mut diff_options = DiffOptions::new();
+
+                        // Get the relative path by stripping the repository root prefix
+                        trace!(file_name=?path, "Adding file to pathspec");
+
+                        // Set the pathspec to the relative path
+                        // this is where we've been failing
+                        diff_options.pathspec(path.clone());
+                        diff_options.include_untracked(true);
+
+                        let mut index = repo.index().unwrap();
+                        trace!(path=?index.path().unwrap(), "Diffing against index:");
+                        trace!(working_dir=?repo.workdir().unwrap(), "...in");
+
+                        // Generate the diff
+                        let diff = repo.diff_index_to_workdir(None, Some(&mut diff_options)).expect("nope");
+                        let mut diff_text = Vec::new();
+                        diff.print(git2::DiffFormat::Patch, |_, _, line| {
+                            diff_text.extend_from_slice(line.content());
+                            true
+                        }).expect("Failed to print diff");
+
+                        trace!(raw_diff = ?diff_text, "Raw diff generated for the repository.");
+                        let changes = String::from_utf8_lossy(&diff_text).to_string();
+                        trace!(diff = changes, "Diff generated for the repository.");
+                        diffs.push((path.clone(), changes));
                     }
-                };
-            })
-            .act_on_async::<Diff>(|actor, event| {
-                let diff: String = if let Some(repo) = &actor.state.repository {
-                    let repo = repo.lock().expect("Couldn't lock repository mutex");
-
-                    trace!(file=?event.message.path, "Generating a diff for repository");
-
-                    let mut diff_options = DiffOptions::new();
-
-                    // Get the repository root directory
-                    let repo_root = repo.workdir().unwrap();
-                    // Get the canonical path of the repository root
-                    let repo_root_canonical = repo_root.canonicalize().unwrap();
-                    // Canonicalize the event file path
-                    let path = event.message.path.canonicalize().unwrap();
-
-                    // Get the relative path by stripping the repository root prefix
-                    let relative_path = path.strip_prefix(&repo_root_canonical).unwrap();
-                    debug!(file_name=?relative_path, "Adding file to pathspec");
-
-                    // Set the pathspec to the relative path
-                    diff_options.pathspec(relative_path);
-                    diff_options.include_untracked(true);
-
-                    let mut index = repo.index().unwrap();
-                    trace!(path=?index.path().unwrap(), "Diffing against index:");
-                    debug!(working_dir=?repo.workdir().unwrap(), "...in");
-
-                    // Generate the diff
-                    let diff = repo.diff_index_to_workdir(None, Some(&mut diff_options)).expect("nope");
-                    let mut diff_text = Vec::new();
-                    diff.print(git2::DiffFormat::Patch, |_, _, line| {
-                        diff_text.extend_from_slice(line.content());
-                        true
-                    }).expect("Failed to print diff");
-
-                    trace!(raw_diff = ?diff_text, "Raw diff generated for the repository.");
-                    let changes = String::from_utf8_lossy(&diff_text).to_string();
-                    trace!(diff = changes, "Diff generated for the repository.");
-                    changes
-                } else {
-                    error!("Received request for Diff but the string was empty.");
-                    String::new()
-                };
-
-                let id = actor.state.config.id.clone();
+                }
+                let id = actor.key.value.clone();
                 let broker = actor.state.broker.clone();
-                let diff = diff.clone();
-                let path = event.message.path.clone();
-
+                let path = actor.state.config.path.clone();
                 Box::pin(async move {
-                    if !diff.is_empty() {
+                    for (file, diff) in diffs {
+                        let id = id.clone();
+                        let broker = broker.clone();
+                        let path = file.clone();
                         let trace_id = id.clone();
-                        broker.emit_async(SubmitDiff { diff, id, path }, None).await;
-                        trace!(repo_id = trace_id, broker=?&broker, "Submitted retrieved Diff to broker.");
-                    } else {
-                        warn!("Received request for Diff but no repo diffs found.");
+                        let diff = diff.to_string();
+
+                        debug_assert_ne!(diff, "./".to_string());
+                        broker.emit_async(SubmitDiff { diff, id, path:path.clone() }, None).await;
+                        tracing::trace!(repo_id = trace_id, path=path, "Submitted retrieved Diff to broker.");
                     }
                 })
             })
@@ -158,29 +148,28 @@ impl GitRepository {
                 // Context: Commit message details.
                 trace!(commit_message = ?event.message.commits, "Received ReponseCommit message and will attempt to commit changes to the repository.");
 
-                // Canonicalize the event file path
-                let target_file = event.message.path.canonicalize().expect("Failed to canonicalize path.");
 
-                // Received change, so we need to commit to this repo
+                // Received commit message, so we need to commit to this repo
                 if let Some(repo) = &actor.state.repository {
                     let response_commit = event.message;
                     let commit_message = &event.message.commits;
                     let repo = repo.lock().expect("Failed to lock repo mutex");
+                    let target_file = event.message.path.clone();
 
                     // Get the repository root directory
                     let repo_root = repo.workdir().unwrap();
                     // Get the canonical path of the repository root
                     let repo_root_canonical = repo_root.canonicalize().unwrap();
+                    trace!(file=target_file, "Committing");
 
                     for commit in &commit_message.commits {
-                        // Get the relative path by stripping the repository root prefix
-                        let relative_path = target_file.strip_prefix(&repo_root_canonical).unwrap();
                         let sig = repo.signature().expect("Failed to get signature");
+                        let path = PathBuf::from(target_file.clone());
 
                         // Stage all modified files
                         let mut index = repo.index().expect("Failed to get index");
-                        debug!(file=?relative_path, "Repo index add");
-                        index.add_path(relative_path).expect("Failed to add files to index");
+                        trace!(file=?path, "Repo index add");
+                        index.add_path(path.as_ref()).expect("Failed to add files to index");
                         index.write().expect("Failed to write index");
 
                         let tree_id = index.write_tree().expect("Failed to write tree");
@@ -199,24 +188,26 @@ impl GitRepository {
                             &tree,
                             &[&parent_commit],
                         ).expect("Failed to commit");
-                        info!("Local commit: {:?}",relative_path);
+                        info!("Local commit: {:?}", target_file);
                     }
                 }
             });
 
-        trace!("Subscribing to broker for commit message response notifications.");
         let subscription = BrokerSubscribe {
+            subscriber_id: actor.key.value.clone(),
             message_type_id: TypeId::of::<ResponseCommit>(),
             subscriber_context: actor.context.clone(),
         };
 
         actor.state.broker.emit_async(subscription, None).await;
+        trace!(type_id=?TypeId::of::<ResponseCommit>(),subscriber=actor.key.value.clone(),"Subscribed to ResponseCommit:");
 
-        trace!("Subscribing to broker for poll requests.");
         let subscription = BrokerSubscribe {
+            subscriber_id: actor.key.value.clone(),
             message_type_id: TypeId::of::<Poll>(),
             subscriber_context: actor.context.clone(),
         };
+        trace!(type_id=?TypeId::of::<Poll>(),subscriber=actor.key.value.clone(),"Subscribed to Poll:");
 
         actor.state.broker.emit_async(subscription, None).await;
 
@@ -434,7 +425,7 @@ mod unit_tests {
         }
 
         let repo_id = config.id;
-        let path = file_path.clone();
+        let path = "test_file.txt".to_string();
         trace!("Notifying actor of change");
         context.emit_async(NotifyChange { repo_id, path }, None).await;
 
@@ -516,7 +507,8 @@ Modified content
             };
 
             let response_commit = ResponseCommit {
-                path: PathBuf::from("src/main.rs"),
+                id: "id".to_string(),
+                path: "src/main.rs".to_string(),
                 commits,
             };
 
