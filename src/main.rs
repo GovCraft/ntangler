@@ -55,7 +55,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
         Err(err) => {
             error!("Received shutdown signal. Wrapping things up... Please wait a moment.", err);
-            eprintln!("Oops! Couldn't listen for the shutdown signal: {}. Wrapping things up anyway... Please wait a moment.", err);
+            eprintln!("Oops! Couldn't listen for the shutdown signal: {}. Don't worry, your code is safe! We're still wrapping things up... Please wait a moment.", err);
             tangler.suspend().await?; // Shut down in case of error
         }
     }
