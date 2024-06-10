@@ -313,7 +313,7 @@ impl GitRepository {
                 }
             }
         } else {
-            error!("Oh no! We couldn't locate the repository at: {}", &self.config.path);
+            error!("Oh no! Couldn't locate the repository at: {}", &self.config.path);
         }
     }
 
