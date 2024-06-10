@@ -58,7 +58,8 @@ impl GitSentinel {
         // Description: Activating the GitSentinel.
         // Context: None
         trace!(repository=repo_name,"GitSentinel activated for");
-        println!("Now watching your repository at {repo_name} and making commits to your {branch_name} branch. Just code—commits are taken care of. To stop Tangler, press Ctrl+C. Happy coding!");
+        println!("Now watching your repository at {repo_name} and making commits to your {branch_name} branch. Just code—commits are taken care of. To stop Tangler, press Ctrl+C.");
+        println!("Happy coding!");
 
         Ok(context)
     }
