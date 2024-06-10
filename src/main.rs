@@ -46,8 +46,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let tangler_config: TanglerConfig = toml::from_str(&fs::read_to_string("./src/config.toml")?)?;
 
     let (tangler, broker) = Tangler::init(tangler_config).await?;
-    info!("Emitting poll");
-    broker.emit_async(Poll, None).await;
+
     // Handle shutdown signal
     match signal::ctrl_c().await {
         Ok(()) => {

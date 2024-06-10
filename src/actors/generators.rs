@@ -201,7 +201,8 @@ impl PooledActor for OpenAi {
             });
 
 
-        let context = actor.activate(None).await.expect("Failed to activate OpenAi generator");
+        let context = actor.activate(None).await.expect("Failed to activate OpenAi generator. This should never happen, and yet, here we are.");
+
         // Event: Activating OpenAi generator
         // Description: Activating the OpenAi generator.
         // Context: None

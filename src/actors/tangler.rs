@@ -32,11 +32,11 @@ impl Tangler {
     pub(crate) async fn init(tangler_config: TanglerConfig) -> anyhow::Result<(Context, Context)> {
         let mut actor = Akton::<Tangler>::create_with_id("tangler");
 
-        info!("Initializing the broker actor.");
+        trace!("Initializing the broker actor.");
         actor.state.broker = Broker::init().await?;
         let broker_context = actor.state.broker.clone();
 
-        info!("Setting up the error notification handler.");
+        trace!("Setting up the error notification handler.");
         actor.setup
             .act_on_async::<SubmitDiff>(|actor, event| {
                 let context = actor.context.clone();
@@ -48,7 +48,7 @@ impl Tangler {
             })
             .act_on::<ErrorNotification>(|_, event| {
                 let error_message = &event.message.error_message;
-                error!("Displayed error: {:?}", &error_message);
+                warn!("Displayed user error: {:?}", &error_message);
                 eprintln!("{}", error_message);
             })
             .on_before_stop_async(|actor| {

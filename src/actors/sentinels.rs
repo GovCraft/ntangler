@@ -39,102 +39,14 @@ impl GitSentinel {
         trace!(config = ?config, "Setting up the handler for Watch events.");
 
         actor.setup.act_on::<Observe>(|actor, _event| {
-            let (tx, mut rx) = tokio::sync::mpsc::channel(200); // Increased channel capacity
-            let repository_id = actor.state.repo.id.clone();
-
-            let notify_config = notify::Config::default()
-                .with_poll_interval(Duration::from_secs(3))
-                .with_compare_contents(true);
-
-            let debouncer_config = Config::default()
-                .with_timeout(Duration::from_millis(1500)) // Increased debounce timeout
-                .with_notify_config(notify_config);
-
-            let repository_path = actor.state.repo.path.clone();
-            let repository_path_trace = repository_path.clone();
-            let watch_staged_only = actor.state.repo.watch_staged_only;
-
-            let mut debouncer = match new_debouncer_opt::<_, PollWatcher>(
-                debouncer_config,
-                move |debounce_result: DebounceEventResult| {
-                    match debounce_result {
-                        Ok(events) => {
-                            let mut walker = WalkBuilder::new(&repository_path)
-                                .standard_filters(true)
-                                .add_custom_ignore_filename(".ignore")
-                                .add_custom_ignore_filename(".gitignore")
-                                .build();
-                            for event in events {
-                                if let Ok(canonical_event_path) = PathBuf::from(event.path.clone()).canonicalize() {
-                                    if walker.any(|entry| {
-                                        entry.as_ref()
-                                            .map(|e| e.path().canonicalize().unwrap_or_default() == canonical_event_path)
-                                            .unwrap_or(false)
-                                    }) {
-                                        tracing::trace!(event=?event);
-                                        // We only care about files
-                                        if event.path.is_dir() {
-                                            continue;
-                                        }
-                                        if let Err(e) = tx.blocking_send((repository_id.clone(), canonical_event_path.clone())) {
-                                            // Event: Failed to Send Change Notification
-                                            // Description: Failed to send change notification through the channel.
-                                            // Context: Error details.
-                                            error!("Failed to send change notification: {:?}", e);
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                        Err(e) => {
-                            if e.to_string().contains("index.lock") {
-                                // Ignore the specific error for index.lock not found
-                                trace!("Ignoring index.lock not found error: {:?}", e);
-                            } else {
-                                // Event: Debounce Error
-                                // Description: Error occurred during the debounce process.
-                                // Context: Error details.
-                                error!("Debounce error: {:?}", e);
-                            }
-                        }
-                    }
-                },
-            ) {
-                Ok(debouncer) => debouncer,
-                Err(e) => {
-                    // Event: Watcher Setup Failed
-                    // Description: Failed to set up the watcher for the repository.
-                    // Context: Error details.
-                    trace!("Couldn't set up watcher: {:?}", e);
-                    return;
-                }
-            };
-
-            // Event: Setting up Watcher            // Description: Setting up the watcher for the repository.
-            // Context: Repository path details.
-            trace!("Setting up the watcher for the repository at path: {}", &repository_path_trace);
-
-            if let Err(e) = debouncer.watcher().watch(
-                (&actor.state.repo.path).as_ref(),
-                RecursiveMode::Recursive,
-            ) {
-                // Event: Watcher Start Failed
-                // Description: Failed to start watching modified files.
-                // Context: Error details.
-                trace!("Couldn't start watching modified files: {:?}", e);
-                return;
-            }
-
-            actor.state.watcher = Some(debouncer);
-            let notification_context = actor.state.broker.clone();
-            let repo_id = actor.state.repo.id.clone();
+            let broker = actor.state.broker.clone();
 
             tokio::spawn(async move {
-                while let Some((repo_id, path)) = rx.recv().await {
-                    // Event: Change Detected
-                    // Description: Detected a change in the repository.
-                    // Context: Repository ID.
-                    notification_context.emit_async(Poll, None).await;
+                let broker = broker.clone();
+                loop {
+                    let broker = broker.clone();
+                    broker.emit_async(Poll, None).await;
+                    tokio::time::sleep(Duration::from_secs(60)).await; // Poll every 3 seconds
                 }
             });
         });

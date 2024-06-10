@@ -62,7 +62,54 @@ impl GitRepository {
         let repo = match Repository::open(&config.path) {
             Ok(repo) => repo,
             Err(e) => {
-                error!("Failed to open repository: {}", e);
+                use git2::ErrorCode::*;
+                let error_message = match e.code() {
+                    NotFound => format!(
+                        "Oops! We couldn't find the requested object in the repository at {}. Check the path and try again. More details are available in the local log.",
+                        config.path
+                    ),
+                    BareRepo => format!(
+                        "Heads up! The operation isn't allowed on a bare repository at {}. Please check your repository settings. More details are available in the local log.",
+                        config.path
+                    ),
+                    UnbornBranch => format!(
+                        "It looks like the branch at {} has no commits yet. Please commit something first. More details are available in the local log.",
+                        config.path
+                    ),
+                    Unmerged => format!(
+                        "There's an ongoing merge at {} that's preventing the operation. Please resolve the merge and try again. More details are available in the local log.",
+                        config.path
+                    ),
+                    NotFastForward => format!(
+                        "The reference at {} isn't fast-forwardable. Please perform a merge or rebase. More details are available in the local log.",
+                        config.path
+                    ),
+                    Conflict => format!(
+                        "Checkout conflicts are preventing the operation at {}. Please resolve them and try again. More details are available in the local log.",
+                        config.path
+                    ),
+                    Auth => format!(
+                        "Authentication error while accessing the repository at {}. Please check your credentials. More details are available in the local log.",
+                        config.path
+                    ),
+                    Certificate => format!(
+                        "The server certificate is invalid for the repository at {}. Please verify the certificate. More details are available in the local log.",
+                        config.path
+                    ),
+                    MergeConflict => format!(
+                        "A merge conflict exists at {} and we can't continue. Please resolve the conflict and try again. More details are available in the local log.",
+                        config.path
+                    ),
+                    IndexDirty => format!(
+                        "Unsaved changes in the index at {} would be overwritten. Please commit or stash your changes. More details are available in the local log.",
+                        config.path
+                    ),
+                    _ => format!(
+                        "An internal error occurred while accessing the repository at {}. Please check the local log for more details.",
+                        config.path
+                    ),
+                };
+                error!("{}", error_message);
                 return None;
             }
         };
@@ -226,7 +273,7 @@ impl GitRepository {
             }
             Err(_) => {
                 error!(
-                    "Failed to activate RepositoryActor for repository at {}",
+                    "Whoops! Something went wrong while activating the RepositoryActor for the repository at {}. Don't worry, more details are available in the local log. Hang in there!",
                     &config.path
                 );
                 None
@@ -236,33 +283,40 @@ impl GitRepository {
 
     fn checkout_branch(&mut self) {
         if let Some(repository) = &self.repository {
-            let repo = repository.lock().expect("Couldn't lock repository mutex");
-            match repo.find_branch(&self.config.branch_name, git2::BranchType::Local) {
-                Ok(_branch_ref) => {
-                    trace!("Found branch: {}", &self.config.branch_name);
-                    let checkout_result = repo.checkout_head(Some(
-                        git2::build::CheckoutBuilder::new().path(&self.config.path),
-                    ));
-                    match checkout_result {
-                        Ok(_) => {
-                            //set the repo to this branch
+            match repository.lock() {
+                Ok(repo) => {
+                    match repo.find_branch(&self.config.branch_name, git2::BranchType::Local) {
+                        Ok(_branch_ref) => {
+                            trace!("Found branch: {}", &self.config.branch_name);
+                            let checkout_result = repo.checkout_head(Some(
+                                git2::build::CheckoutBuilder::new().path(&self.config.path),
+                            ));
+                            match checkout_result {
+                                Ok(_) => {
+                                    // Set the repo to this branch
+                                }
+                                Err(e) => {
+                                    error!("Oops! Couldn't switch to the branch head: {}", e);
+                                }
+                            }
                         }
                         Err(e) => {
-                            error!("Failed to checkout head: {}", e)
+                            error!(
+                            "Uh-oh! We couldn't find the branch: {}. Error details: {}",
+                            &self.config.branch_name, e
+                        );
                         }
                     }
                 }
                 Err(e) => {
-                    error!(
-                            "Failed to find branch: {}. Logged error is: {}",
-                            &self.config.branch_name, e
-                        );
+                    error!("Yikes! The repository is locked and we couldn't access it: {}", e);
                 }
-            };
+            }
         } else {
-            error!("Failed to find repository: {}", &self.config.path);
+            error!("Oh no! We couldn't locate the repository at: {}", &self.config.path);
         }
     }
+
     /// Opens an existing repository and checks out a specific branch.
     ///
     /// # Arguments
