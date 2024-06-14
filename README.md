@@ -19,7 +19,7 @@ Welcome to Tangler! Tangler is an innovative AI-driven command line application 
 
 1. **Clone the Repository:**
     ```sh
-    git clone https://github.com/yourusername/tangler.git
+    git clone https://github.com/GovCraft/tangler.git
     cd tangler
     ```
 
@@ -38,6 +38,5 @@ Welcome to Tangler! Tangler is an innovative AI-driven command line application 
 When you start Tangler, it will automatically begin monitoring your repository and making commits to your local branch. Just code—commits are taken care of.
 
 - **To stop Tangler, press:** `Ctrl+C`
-- **To toggle views, press:** `Ctrl+T`
 
-### LLMs
+### Using your own LLM
