@@ -1,12 +1,11 @@
 [package]
-name = "lib"
+name = "entanglement_lib"
 version = "0.1.0"
 edition = "2021"
-
-[[lib]]
-name = "entanglement_lib"
-path = "src/lib.rs"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+ollama-rs = { version = "0.2.0", features = ["stream", "tokio", "tokio-stream", "rustls"] }
+tokio = { version = "1.38.0", features = ["full"] }
+futures-util = "0.3.30"
