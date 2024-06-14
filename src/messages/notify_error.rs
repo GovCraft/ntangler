@@ -1,6 +1,6 @@
 use akton::prelude::*;
 
 #[akton_message]
-pub(crate) struct ErrorNotification  {
+pub(crate) struct NotifyError {
     pub(crate) error_message: String
 }

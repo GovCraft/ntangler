@@ -1,4 +1,4 @@
 use akton::prelude::*;
 
 #[akton_message]
-pub(crate) struct CheckoutBranch;
+pub(crate) struct PollChanges;

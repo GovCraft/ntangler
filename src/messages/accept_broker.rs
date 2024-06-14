@@ -1,6 +1,6 @@
 use akton::prelude::*;
 
 #[akton_message]
-pub(crate) struct AcceptParentBroker {
+pub(crate) struct AcceptBroker {
     pub(crate) broker: Context
 }

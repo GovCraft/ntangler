@@ -1,60 +1,53 @@
 #![allow(unused)]
 
-use std::collections::HashMap;
-use std::fs;
+use std::{env, fs};
+use std::path::PathBuf;
 use std::sync::Once;
 
 use akton::prelude::*;
-use anyhow::{anyhow, Result};
-use async_openai::{
-    Client,
-    types::{
-        AssistantStreamEvent, CreateMessageRequest, CreateRunRequest, CreateThreadRequest,
-        MessageDeltaContent, MessageRole,
-    },
-};
-use async_openai::types::CreateMessageRequestContent;
+use anyhow::Result;
 use futures::StreamExt;
-use git2::{DiffOptions, Repository};
-use notify::PollWatcher;
-use notify_debouncer_mini::Debouncer;
 use serde::{Deserialize, Serialize};
 use tokio::signal;
-use tracing::{error, info, instrument, Level, trace};
+use tracing::{error, Level};
 use tracing_subscriber::{EnvFilter, FmtSubscriber};
 use tracing_subscriber::fmt::format::FmtSpan;
 
-use tangler_config::TanglerConfig;
-
-use crate::actors::GitSentinel;
 use crate::actors::Tangler;
-use crate::messages::{LoadRepo, Poll};
-use crate::repository_config::RepositoryConfig;
+use crate::models::config::TanglerConfig;
 
 mod actors;
-mod config_file;
-mod tangler_config;
+
 mod messages;
-mod repository_config;
-mod commits;
+mod models;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     init_tracing();
 
-    println!("Welcome to Tangler!");
+    // TODO: this needs to move to an actor that reloads the config dynamically
+    // Determine configuration file path according to XDG spec
+    let config_path = get_config_file_path("tangler", "config.toml")?;
 
     // Read and parse the configuration file
-    let tangler_config: TanglerConfig = toml::from_str(&fs::read_to_string("./src/config.toml")?)?;
+    let config_content = fs::read_to_string(&config_path);
+    if config_content.is_err() {
+        error!("Configuration file not found at {:?}. Please create a configuration file at this location with the necessary settings.", config_path);
+        return Err("Configuration file not found".into());
+    }
+
+    let tangler_config: TanglerConfig = toml::from_str(&config_content.unwrap())?;
 
     let (tangler, broker) = Tangler::init(tangler_config).await?;
 
+
     // Handle shutdown signal
+    // need to move this to an actor
     match signal::ctrl_c().await {
         Ok(()) => {
-            eprintln!("Shutting down gracefully. Your code is safe! Please wait a moment.");
+            println!("Shutting down gracefully. Your code is safe! Please wait a moment.");
             tangler.suspend().await?;
-            eprintln!("All done! Tangler has shut down safely. Happy coding!");
+            println!("All done! Tangler has shut down safely. Happy coding!");
         }
         Err(err) => {
             eprintln!("Oops! Couldn't catch the shutdown signal: {}. Don't worry, your code is safe! Wrapping things up... Please wait a moment.", err);
@@ -65,6 +58,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
+// Function to get the configuration file path following the XDG Base Directory Specification
+fn get_config_file_path(app_name: &str, config_file: &str) -> Result<PathBuf, Box<dyn std::error::Error>> {
+    if let Ok(config_home) = env::var("XDG_CONFIG_HOME") {
+        Ok(PathBuf::from(config_home).join(app_name).join(config_file))
+    } else if let Ok(home) = env::var("HOME") {
+        Ok(PathBuf::from(home).join(".config").join(app_name).join(config_file))
+    } else {
+        Err("Could not determine configuration file path".into())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::fs;
@@ -73,15 +77,16 @@ mod tests {
 
     use crate::actors::Tangler;
     use crate::init_tracing;
-    use crate::repository_config::RepositoryConfig;
-    use crate::tangler_config::TanglerConfig;
+    use crate::models::config::RepositoryConfig;
+    use crate::models::config::TanglerConfig;
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn test_main() -> anyhow::Result<()> {
         init_tracing();
 
         // Read and parse the configuration file
-        let tangler_config: TanglerConfig = toml::from_str(&fs::read_to_string("./src/config.toml")?)?;
+        let tangler_config: TanglerConfig =
+            toml::from_str(&fs::read_to_string("./src/config.toml")?)?;
 
         let (tangler_actor, _broker) = Tangler::init(tangler_config).await?;
 
@@ -122,24 +127,40 @@ pub fn init_tracing() {
                     .unwrap(),
             )
             .add_directive("akton_core::common::context=error".parse().unwrap())
-            .add_directive("akton_core::common::context[emit_pool]=error".parse().unwrap())
+            .add_directive(
+                "akton_core::common::context[emit_pool]=error"
+                    .parse()
+                    .unwrap(),
+            )
             .add_directive("akton_core::traits=off".parse().unwrap())
             .add_directive("akton_core::pool::builder=error".parse().unwrap())
             .add_directive("akton_core::actors::awake=error".parse().unwrap())
             .add_directive("akton_core::common::akton=error".parse().unwrap())
             .add_directive("akton_core::common::pool_builder=error".parse().unwrap())
             .add_directive("akton_core::common::system=error".parse().unwrap())
-            .add_directive("akton_core::common::supervisor=trace".parse().unwrap())
+            .add_directive("akton_core::common::supervisor=error".parse().unwrap())
             .add_directive("akton_core::actors::actor=error".parse().unwrap())
             .add_directive("akton_core::actors::idle=error".parse().unwrap())
-            .add_directive("akton_core::message::outbound_envelope=error".parse().unwrap())
-            .add_directive("tangler::actors::repositories=info".parse().unwrap())
-            .add_directive("tangler::actors::sentinels=info".parse().unwrap())
-            .add_directive("tangler::actors::sentinels::tests=off".parse().unwrap())
-            .add_directive("tangler::actors::tangler=info".parse().unwrap())
+            .add_directive(
+                "akton_core::message::outbound_envelope=error"
+                    .parse()
+                    .unwrap(),
+            )
+            .add_directive("tangler::actors::repositories=error".parse().unwrap())
+            .add_directive("tangler::actors::scribe=error".parse().unwrap())
+            .add_directive("tangler::actors::tangler=error".parse().unwrap())
+            .add_directive("tangler::models=error".parse().unwrap())
             .add_directive("tangler::actors::brokers=error".parse().unwrap())
-            .add_directive("tangler::actors::brokers[load_subscriber_futures]=error".parse().unwrap())
-            .add_directive("tangler::actors::brokers[load_subscriber_future_by_id]=error".parse().unwrap())
+            .add_directive(
+                "tangler::actors::brokers[load_subscriber_futures]=error"
+                    .parse()
+                    .unwrap(),
+            )
+            .add_directive(
+                "tangler::actors::brokers[load_subscriber_future_by_id]=error"
+                    .parse()
+                    .unwrap(),
+            )
             .add_directive("tangler::actors::generators=error".parse().unwrap())
             .add_directive("tangler::tangler_config=error".parse().unwrap())
             .add_directive("tangler::repository_config=error".parse().unwrap())
@@ -153,7 +174,7 @@ pub fn init_tracing() {
             .compact()
             .pretty()
             .with_line_number(true)
-            .without_time()
+            //            .without_time()
             .with_env_filter(filter)
             .finish();
 
