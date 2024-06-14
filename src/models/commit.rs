@@ -211,8 +211,7 @@ impl fmt::Display for Commit {
 
         write!(
             f,
-            "{} {}{}{}: {}\n\n{}\n\n{}",
-            self.semver_impact,
+            "{}{}{}: {}\n\n{}\n\n{}",
             self.commit_type, scope_display, commit_type_breaking_marker, self.description, self.body, footers
         )
     }
