@@ -9,8 +9,6 @@ use tracing::{instrument, trace};
 pub(crate) struct RepositoryConfig {
     pub(crate) path: String,
     pub(crate) branch_name: String,
-    pub(crate) api_url: String,
-    pub(crate) watch_staged_only: bool,
     pub(crate) id: String,
 }
 
@@ -19,8 +17,6 @@ impl fmt::Debug for RepositoryConfig {
         f.debug_struct("RepositoryConfig")
             .field("path", &self.path)
             .field("branch_name", &self.branch_name)
-            .field("api_url", &self.api_url)
-            .field("watch_staged_only", &self.watch_staged_only)
             .field("id", &self.id)
             .finish()
     }
@@ -35,8 +31,6 @@ impl<'de> Deserialize<'de> for RepositoryConfig {
         struct RepositoryHelper {
             path: String,
             branch_name: String,
-            api_url: String,
-            watch_staged_only: bool,
         }
 
         let helper = RepositoryHelper::deserialize(deserializer)?;
@@ -44,8 +38,6 @@ impl<'de> Deserialize<'de> for RepositoryConfig {
         Ok(RepositoryConfig {
             path: helper.path,
             branch_name: helper.branch_name,
-            api_url: helper.api_url,
-            watch_staged_only: helper.watch_staged_only,
             id,
         })
     }
