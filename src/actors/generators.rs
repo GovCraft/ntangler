@@ -35,9 +35,9 @@ use vaultrs::kv2;
 
 // Create and read secrets
 #[derive(Debug, Deserialize, Serialize)]
-struct MySecret {
+struct OpenAiToken {
     key: String,
-    password: String,
+    token: String,
 }
 
 
