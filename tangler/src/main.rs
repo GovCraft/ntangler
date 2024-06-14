@@ -86,7 +86,7 @@ mod tests {
 
         // Read and parse the configuration file
         let tangler_config: TanglerConfig =
-            toml::from_str(&fs::read_to_string("./src/config.toml")?)?;
+            toml::from_str(&fs::read_to_string("/config.toml")?)?;
 
         let (tangler_actor, _broker) = Tangler::init(tangler_config).await?;
 
