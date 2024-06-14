@@ -1,23 +1,34 @@
 use std::any::TypeId;
+use std::collections::HashSet;
 use std::future::Future;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
+use std::sync::atomic::AtomicBool;
 use std::time::Duration;
 
 use akton::prelude::*;
 use anyhow::anyhow;
 use git2::{DiffOptions, Error, IndexAddOption, Repository, Status, StatusOptions};
+use git2::FileMode::Commit;
+use rand::prelude::SliceRandom;
+use rand::{Rng, thread_rng};
+use rand::distributions::Alphanumeric;
 use tracing::{debug, error, info, trace, warn};
 
-use crate::messages::{BrokerSubscribe, CheckoutBranch, Diff, NotifyChange, Poll, ResponseCommit, SubmitDiff};
-use crate::repository_config::RepositoryConfig;
-use crate::tangler_config::TanglerConfig;
+use crate::messages::{
+    CommitMessageGenerated, CommitSuccess, DiffCalculated, NotifyChange, PollChanges,
+    SubscribeBroker, SystemStarted,
+};
+use crate::models::{CommitType, Description, Oid, Scope};
+use crate::models::config::RepositoryConfig;
+use crate::models::config::TanglerConfig;
 
 #[akton_actor]
 pub(crate) struct GitRepository {
     repository: Option<Arc<Mutex<Repository>>>,
     config: RepositoryConfig,
     broker: Context,
+    watching: AtomicBool,
 }
 
 impl GitRepository {
@@ -54,28 +65,130 @@ impl GitRepository {
     }
 
     /// Example custom behavior function to be passed into the `init` function.
-    pub(crate) async fn default_behavior(config: &RepositoryConfig, broker: Context) -> Option<Context> {
-        let mut actor = Akton::<GitRepository>::create_with_id(&config.id);
+    pub(crate) async fn default_behavior(
+        config: &RepositoryConfig,
+        broker: Context,
+    ) -> Option<Context> {
+        let actor_config = ActorConfig::new(config.id.clone(), None, None);
+        let mut actor = Akton::<GitRepository>::create_with_config(actor_config);
         actor.state.config = config.clone();
         actor.state.broker = broker;
-
+        trace!(path = actor.state.config.path, "Open repo at");
         let repo = match Repository::open(&config.path) {
             Ok(repo) => repo,
             Err(e) => {
-                error!("Failed to open repository: {}", e);
+                use git2::ErrorCode::*;
+                let error_message = match e.code() {
+                    NotFound => format!(
+                        "Oops! Couldn't find the requested object in the repository at {}. Check the path and try again. More details are in the local log.",
+                        config.path
+                    ),
+                    BareRepo => format!(
+                        "Heads up! The operation isn't allowed on a bare repository at {}. Please check your repository settings. More details are available in the local log.",
+                        config.path
+                    ),
+                    UnbornBranch => format!(
+                        "It looks like the branch at {} has no commits yet. Please commit something first. More details are available in the local log.",
+                        config.path
+                    ),
+                    Unmerged => format!(
+                        "There's an ongoing merge at {} that's preventing the operation. Please resolve the merge and try again. More details are available in the local log.",
+                        config.path
+                    ),
+                    NotFastForward => format!(
+                        "The reference at {} isn't fast-forwardable. Please perform a merge or rebase. More details are available in the local log.",
+                        config.path
+                    ),
+                    Conflict => format!(
+                        "Checkout conflicts are preventing the operation at {}. Please resolve them and try again. More details are available in the local log.",
+                        config.path
+                    ),
+                    Auth => format!(
+                        "Authentication error while accessing the repository at {}. Please check your credentials. More details are available in the local log.",
+                        config.path
+                    ),
+                    Certificate => format!(
+                        "The server certificate is invalid for the repository at {}. Please verify the certificate. More details are available in the local log.",
+                        config.path
+                    ),
+                    MergeConflict => format!(
+                        "A merge conflict exists at {} and we can't continue. Please resolve the conflict and try again. More details are available in the local log.",
+                        config.path
+                    ),
+                    IndexDirty => format!(
+                        "Unsaved changes in the index at {} would be overwritten. Please commit or stash your changes. More details are available in the local log.",
+                        config.path
+                    ),
+                    _ => format!(
+                        "An internal error occurred while accessing the repository at {}. Please check the local log for more details.",
+                        config.path
+                    ),
+                };
+                error!("{}", error_message);
                 return None;
             }
         };
 
         actor.state.repository = Some(Arc::new(Mutex::new(repo)));
 
-        actor.setup
-            .act_on::<CheckoutBranch>(|actor, _event| {
-                trace!("Received CheckoutBranch message");
-                actor.state.checkout_branch();
-            })
-            .act_on_async::<Poll>(|actor, _event| {
-                trace!("Received Poll request");
+
+        actor.setup.act_on::<SystemStarted>(|actor, _event| {
+            let broker = actor.state.broker.clone();
+            trace!(
+                    "Activated RepositoryActor, attempting to checkout branch {}",
+                    &actor.state.config.branch_name
+                );
+            actor.state.checkout_branch();
+        })
+            .act_on_async::<PollChanges>(|actor, _event| {
+                // use crate::models::Commit;
+                // let mut rng = thread_rng();
+                // let commit_types = ["fix", "feat", "other"];
+                // let commit_type_str = commit_types.choose(&mut thread_rng()).unwrap();
+                // let commit_type = CommitType::from(*commit_type_str);
+                //
+                // let repository = [
+                //     "tangler", "akton", "website"
+                // ];
+                // let scope = [
+                //     "api", "parser", "security", "docs", "actors", "readme", "models"
+                // ];
+                //
+                // let lorem_ipsum = [
+                //     "Lorem", "ipsum", "dolor", "sit", "amet", "consectetur", "adipiscing", "elit", "sed", "do",
+                // ];
+                //
+                // let mut rng = thread_rng();
+                // let num_words = rng.gen_range(3..=5); // Randomly choose between 3 and 5 words
+                // let mut repo_id = thread_rng();
+                // let repository = repository.choose(&mut repo_id).unwrap().to_string();
+                // let scope = scope.choose(&mut repo_id).unwrap().to_string();
+                // let random_text: Vec<&str> = lorem_ipsum.choose_multiple(&mut rng, num_words).cloned().collect();
+                // let random_text = random_text.join(" ");
+                // let random_bool = rand::thread_rng().gen_bool(0.1);
+                // //temporary simulation
+                // let broker = actor.state.broker.clone();
+                // Box::pin(async move {
+                //     let commit = crate::models::Commit {
+                //         repository,
+                //         commit_type: commit_type.clone(),
+                //         scope: Some(Scope::from(scope.as_str())),
+                //         description: Description::from(random_text.as_str()),
+                //         body: "".to_string(),
+                //         is_breaking: random_bool,
+                //         footers: vec![],
+                //         semver_impact: Commit::calculate_semver_impact(&commit_type, random_bool),
+                //         ..Default::default()
+                //     };
+                //     let hash: String = rand::thread_rng()
+                //         .sample_iter(&Alphanumeric)
+                //         .take(7)
+                //         .map(char::from)
+                //         .collect();
+                //     let msg = CommitSuccess::new(commit, hash.to_string().to_lowercase());
+                //     broker.emit_async(msg, None).await;
+                // })
+                debug!(actor=actor.state.config.id,"Received Poll request");
                 let mut diffs: Vec<(String, String)> = Default::default();
 
                 if let Some(repo) = &actor.state.repository {
@@ -87,20 +200,21 @@ impl GitRepository {
                     let modified_files: Vec<_> = statuses
                         .iter()
                         .filter(|entry| entry.status().contains(Status::WT_MODIFIED))
-                        .filter(|entry| entry.path().unwrap() != "./")
                         .map(|entry| entry.path().unwrap().to_string())
-                        .collect();
-
+                        .collect::<HashSet<_>>() // Collect into a HashSet to remove duplicates
+                        .into_iter() // Convert back to an iterator
+                        .collect(); // Collect into a Vec
+                    debug!("modified files vec {:?}", &modified_files);
                     // notify for each file
                     for path in modified_files {
-                        trace!(change_file=&path, "Unstaged files");
+                        debug!(change_file=&path, "Unstaged files");
 
                         trace!(file=?path, "Generating a diff for repository");
 
                         let mut diff_options = DiffOptions::new();
 
                         // Get the relative path by stripping the repository root prefix
-                        trace!(file_name=?path, "Adding file to pathspec");
+                        debug!(file_name=?path, "Adding file to pathspec");
 
                         // Set the pathspec to the relative path
                         // this is where we've been failing
@@ -108,7 +222,7 @@ impl GitRepository {
                         diff_options.include_untracked(true);
 
                         let mut index = repo.index().unwrap();
-                        trace!(path=?index.path().unwrap(), "Diffing against index:");
+                        debug!(path=?index.path().unwrap(), "Diffing against index:");
                         trace!(working_dir=?repo.workdir().unwrap(), "...in");
 
                         // Generate the diff
@@ -119,9 +233,9 @@ impl GitRepository {
                             true
                         }).expect("Failed to print diff");
 
-                        trace!(raw_diff = ?diff_text, "Raw diff generated for the repository.");
+                        // trace!(raw_diff = ?diff_text, "Raw diff generated for the repository.");
                         let changes = String::from_utf8_lossy(&diff_text).to_string();
-                        trace!(diff = changes, "Diff generated for the repository.");
+                        // trace!(diff = changes, "Diff generated for the repository.");
                         diffs.push((path.clone(), changes));
                     }
                 }
@@ -137,32 +251,32 @@ impl GitRepository {
                         let diff = diff.to_string();
 
                         debug_assert_ne!(diff, "./".to_string());
-                        broker.emit_async(SubmitDiff { diff, id, path:path.clone() }, None).await;
-                        tracing::trace!(repo_id = trace_id, path=path, "Submitted retrieved Diff to broker.");
+                        broker.emit_async(DiffCalculated { diff, id, path: path.clone() }, None).await;
+                        tracing::debug!(repo_id = trace_id, path=path, "Submitted retrieved Diff to broker.");
                     }
                 })
             })
-            .act_on::<ResponseCommit>(|actor, event| {
+            .act_on_async::<CommitMessageGenerated>(|actor, event| {
                 // Event: Received Commit Response
                 // Description: Received a commit response and will commit changes to the repository.
                 // Context: Commit message details.
-                trace!(commit_message = ?event.message.commits, "Received ReponseCommit message and will attempt to commit changes to the repository.");
+                trace!(commit_message = ?event.message.commit, "Received ReponseCommit message and will attempt to commit changes to the repository.");
 
-
+                let broker = actor.state.broker.clone();
                 // Received commit message, so we need to commit to this repo
-                if let Some(repo) = &actor.state.repository {
-                    let response_commit = event.message;
-                    let commit_message = &event.message.commits;
-                    let repo = repo.lock().expect("Failed to lock repo mutex");
-                    let target_file = event.message.path.clone();
+                let hash = {
+                    if let Some(repo) = &actor.state.repository {
+                        let response_commit = event.message;
+                        let commit_message = &event.message.commit;
+                        let repo = repo.lock().expect("Failed to lock repo mutex");
+                        let target_file = event.message.path.clone();
 
-                    // Get the repository root directory
-                    let repo_root = repo.workdir().unwrap();
-                    // Get the canonical path of the repository root
-                    let repo_root_canonical = repo_root.canonicalize().unwrap();
-                    trace!(file=target_file, "Committing");
+                        // Get the repository root directory
+                        let repo_root = repo.workdir().unwrap();
+                        // Get the canonical path of the repository root
+                        let repo_root_canonical = repo_root.canonicalize().unwrap();
+                        trace!(file=target_file, "Committing");
 
-                    for commit in &commit_message.commits {
                         let sig = repo.signature().expect("Failed to get signature");
                         let path = PathBuf::from(target_file.clone());
 
@@ -177,10 +291,9 @@ impl GitRepository {
                         let head = repo.head().expect("Failed to get HEAD");
                         let parent_commit = head.peel_to_commit().expect("Failed to get parent commit");
 
-                        let commit_message = &format!("{}\n{}", commit.commit.heading, commit.commit.description);
-
+                        let commit_message = &commit_message.to_string();
                         // TODO: optionally sign commits
-                        repo.commit(
+                        let hash = repo.commit(
                             Some("HEAD"),
                             &sig,
                             &sig,
@@ -188,45 +301,54 @@ impl GitRepository {
                             &tree,
                             &[&parent_commit],
                         ).expect("Failed to commit");
-                        info!("Local commit: {:?}", target_file);
+                        hash.to_string()
+                    } else {
+                        "".to_string()
                     }
-                }
+                };
+
+                let commit = event.message.commit.clone();
+                Box::pin(async move {
+                    debug!("Local commit: {:?}", &commit);
+                    let broker = broker.clone();
+                    broker.emit_async(CommitSuccess::new(commit, hash), None).await;
+                })
             });
 
-        let subscription = BrokerSubscribe {
+        let subscription = SubscribeBroker {
             subscriber_id: actor.key.value.clone(),
-            message_type_id: TypeId::of::<ResponseCommit>(),
+            message_type_id: TypeId::of::<CommitMessageGenerated>(),
             subscriber_context: actor.context.clone(),
         };
 
         actor.state.broker.emit_async(subscription, None).await;
-        trace!(type_id=?TypeId::of::<ResponseCommit>(),subscriber=actor.key.value.clone(),"Subscribed to ResponseCommit:");
+        trace!(type_id=?TypeId::of::<CommitMessageGenerated>(),subscriber=actor.key.value.clone(),"Subscribed to ResponseCommit:");
 
-        let subscription = BrokerSubscribe {
+        let subscription = SubscribeBroker {
             subscriber_id: actor.key.value.clone(),
-            message_type_id: TypeId::of::<Poll>(),
+            message_type_id: TypeId::of::<PollChanges>(),
             subscriber_context: actor.context.clone(),
         };
-        trace!(type_id=?TypeId::of::<Poll>(),subscriber=actor.key.value.clone(),"Subscribed to Poll:");
+        trace!(type_id=?TypeId::of::<PollChanges>(),subscriber=actor.key.value.clone(),"Subscribed to Poll:");
 
         actor.state.broker.emit_async(subscription, None).await;
 
+        let subscription = SubscribeBroker {
+            subscriber_id: actor.key.value.clone(),
+            message_type_id: TypeId::of::<SystemStarted>(),
+            subscriber_context: actor.context.clone(),
+        };
+        trace!(type_id=?TypeId::of::<SystemStarted>(),subscriber=actor.key.value.clone(),"Subscribed to SystemStarted:");
+
+        actor.state.broker.emit_async(subscription, None).await;
 
         let context = actor.activate(None).await;
 
-
         match context {
-            Ok(context) => {
-                trace!(
-                    "Activated RepositoryActor, attempting to checkout branch {}",
-                    &config.branch_name
-                );
-                context.emit_async(CheckoutBranch, None).await;
-                Some(context)
-            }
+            Ok(context) => Some(context),
             Err(_) => {
                 error!(
-                    "Failed to activate RepositoryActor for repository at {}",
+                    "Whoops! Something went wrong while activating the RepositoryActor for the repository at {}. Don't worry, more details are available in the local log. Hang in there!",
                     &config.path
                 );
                 None
@@ -236,33 +358,46 @@ impl GitRepository {
 
     fn checkout_branch(&mut self) {
         if let Some(repository) = &self.repository {
-            let repo = repository.lock().expect("Couldn't lock repository mutex");
-            match repo.find_branch(&self.config.branch_name, git2::BranchType::Local) {
-                Ok(_branch_ref) => {
-                    trace!("Found branch: {}", &self.config.branch_name);
-                    let checkout_result = repo.checkout_head(Some(
-                        git2::build::CheckoutBuilder::new().path(&self.config.path),
-                    ));
-                    match checkout_result {
-                        Ok(_) => {
-                            //set the repo to this branch
+            match repository.lock() {
+                Ok(repo) => {
+                    match repo.find_branch(&self.config.branch_name, git2::BranchType::Local) {
+                        Ok(_branch_ref) => {
+                            trace!("Found branch: {}", &self.config.branch_name);
+                            let checkout_result = repo.checkout_head(Some(
+                                git2::build::CheckoutBuilder::new().path(&self.config.path),
+                            ));
+                            match checkout_result {
+                                Ok(_) => {
+                                    // Set the repo to this branch
+                                }
+                                Err(e) => {
+                                    error!("Oops! Couldn't switch to the branch head: {}", e);
+                                }
+                            }
                         }
                         Err(e) => {
-                            error!("Failed to checkout head: {}", e)
+                            error!(
+                                "Uh-oh! Couldn't find the branch: {}. Error details: {}",
+                                &self.config.branch_name, e
+                            );
                         }
                     }
                 }
                 Err(e) => {
                     error!(
-                            "Failed to find branch: {}. Logged error is: {}",
-                            &self.config.branch_name, e
-                        );
+                        "Yikes! The repository is locked and couldn't be accessed: {}",
+                        e
+                    );
                 }
-            };
+            }
         } else {
-            error!("Failed to find repository: {}", &self.config.path);
+            error!(
+                "Oh no! Couldn't locate the repository at: {}",
+                &self.config.path
+            );
         }
     }
+
     /// Opens an existing repository and checks out a specific branch.
     ///
     /// # Arguments
@@ -309,7 +444,7 @@ mod unit_tests {
     use std::path::{Path, PathBuf};
     use std::sync::{Arc, Mutex};
 
-    use akton::prelude::{ActorContext, Akton, Context};
+    use akton::prelude::{ActorConfig, ActorContext, Akton, Context};
     use anyhow::anyhow;
     use git2::{DiffOptions, Repository};
     use pretty_assertions::assert_eq;
@@ -319,8 +454,8 @@ mod unit_tests {
     use crate::actors::Broker;
     use crate::actors::repositories::GitRepository;
     use crate::init_tracing;
-    use crate::messages::{NotifyChange, ResponseCommit};
-    use crate::repository_config::RepositoryConfig;
+    use crate::messages::{CommitMessageGenerated, NotifyChange};
+    use crate::models::config::RepositoryConfig;
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn test_non_existing_branch() -> anyhow::Result<()> {
@@ -368,7 +503,8 @@ mod unit_tests {
             move |config: RepositoryConfig, broker: Context| {
                 let sender = sender.clone(); // Clone the Arc again for use inside the async block
                 async move {
-                    let mut actor = Akton::<GitRepository>::create_with_id(&config.id);
+                    let actor_config = ActorConfig::new(&config.id, None, None);
+                    let mut actor = Akton::<GitRepository>::create_with_config(actor_config);
                     let repo = Repository::open(&config.path).expect("Failed to open mock repo");
                     actor.state.repository = Some(Arc::new(Mutex::new(repo)));
                     actor.state.config = config;
@@ -378,16 +514,20 @@ mod unit_tests {
                         info!("Received NotifyChange message");
                         if let Some(repo) = &actor.state.repository {
                             let repo = repo.lock().expect("Couldn't lock repository mutex");
-                            let diff = repo.diff_index_to_workdir(None, Some(&mut DiffOptions::new()))
+                            let diff = repo
+                                .diff_index_to_workdir(None, Some(&mut DiffOptions::new()))
                                 .expect("Failed to get diff");
                             let mut diff_text = Vec::new();
                             diff.print(git2::DiffFormat::Patch, |_, _, line| {
                                 diff_text.extend_from_slice(line.content());
                                 true
-                            }).expect("Failed to print diff");
-                            let changes = String::from_utf8(diff_text).expect("Failed to convert diff to string");
+                            })
+                                .expect("Failed to print diff");
+                            let changes = String::from_utf8(diff_text)
+                                .expect("Failed to convert diff to string");
                             let mut sender_guard = sender.lock().unwrap();
-                            if let Some(sender) = sender_guard.take() { // Properly take the sender out of the Option
+                            if let Some(sender) = sender_guard.take() {
+                                // Properly take the sender out of the Option
                                 sender.send(changes).expect("Couldn't send test diff");
                             } else {
                                 error!("Sender has already been taken or was never initialized.");
@@ -397,14 +537,18 @@ mod unit_tests {
                         }
                     });
 
-                    let context = actor.activate(None).await.expect("Couldn't activate RepositoryActor");
+                    let context = actor
+                        .activate(None)
+                        .await
+                        .expect("Couldn't activate RepositoryActor");
                     Some(context)
                 }
             }
         };
         let broker = Broker::init().await?;
 
-        let actor_context = GitRepository::init_with_custom_behavior(test_behavior, config.clone(), broker).await;
+        let actor_context =
+            GitRepository::init_with_custom_behavior(test_behavior, config.clone(), broker).await;
         assert!(actor_context.is_some());
         let context = actor_context.unwrap();
 
@@ -427,11 +571,13 @@ mod unit_tests {
         let repo_id = config.id;
         let path = "test_file.txt".to_string();
         trace!("Notifying actor of change");
-        context.emit_async(NotifyChange { repo_id, path }, None).await;
+        context
+            .emit_async(NotifyChange { repo_id, path }, None)
+            .await;
 
         let result = receiver.await?;
 
-// Expected string formatted as a multiline string for clarity and accuracy
+        // Expected string formatted as a multiline string for clarity and accuracy
         let expected_diff = r#"diff --git a/test_file.txt b/test_file.txt
 index 8430408..edc5728 100644
 --- a/test_file.txt
@@ -441,11 +587,11 @@ Initial content
 Modified content
 "#;
 
-// Print both strings to compare visually in the test output
+        // Print both strings to compare visually in the test output
         println!("Expected:\n{}", expected_diff);
         println!("Actual:\n{}", result);
 
-// Assert that the actual diff matches the expected diff
+        // Assert that the actual diff matches the expected diff
         assert_eq!(expected_diff, &result);
         trace!("Removing test file");
         fs::remove_file(&file_path)?;
@@ -471,55 +617,5 @@ Modified content
         let context = actor_context.unwrap();
         context.suspend().await?;
         Ok(())
-    }
-
-    #[cfg(test)]
-    mod tests {
-        use super::*;
-        use std::path::PathBuf;
-        use crate::commits::{Commit, CommitDetails, Commits};
-        use pretty_assertions::assert_eq;
-
-        #[test]
-        fn test_squash_commits() {
-            // Sample data for testing
-            let commit1 = Commit {
-                commit: CommitDetails {
-                    heading: String::from("Initial commit"),
-                    description: String::from("This is the initial commit."),
-                },
-            };
-            let commit2 = Commit {
-                commit: CommitDetails {
-                    heading: String::from("Added feature"),
-                    description: String::from("Implemented the new feature."),
-                },
-            };
-            let commit3 = Commit {
-                commit: CommitDetails {
-                    heading: String::from("Fixed bug"),
-                    description: String::from("Fixed a critical bug."),
-                },
-            };
-
-            let commits = Commits {
-                commits: vec![commit1, commit2, commit3],
-            };
-
-            let response_commit = ResponseCommit {
-                id: "id".to_string(),
-                path: "src/main.rs".to_string(),
-                commits,
-            };
-
-            // Squash the commits
-            let squashed_commit = response_commit.squash_commits();
-
-            // Expected result
-            let expected_commit = "Initial commit\n\nThis is the initial commit.\n\nAdded feature: Implemented the new feature.\n\nFixed bug: Fixed a critical bug.";
-
-            // Assert the result
-            assert_eq!(squashed_commit, expected_commit);
-        }
     }
 }

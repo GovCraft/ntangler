@@ -3,7 +3,7 @@ use std::marker::PhantomData;
 use akton::prelude::*;
 
 #[akton_message]
-pub(crate) struct BrokerSubscribe {
+pub(crate) struct SubscribeBroker {
     pub(crate) subscriber_id: String,
     pub(crate) message_type_id: TypeId,
     pub(crate) subscriber_context: Context

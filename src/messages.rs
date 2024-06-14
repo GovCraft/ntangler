@@ -1,25 +1,23 @@
-mod checkout_branch;
-mod load_repo;
-mod notify_change;
-mod submit_diff;
-mod response_commit;
-mod broker_subscribe;
-mod broker_unsubscribe;
-mod error_notification;
-mod observe;
-mod diff;
-mod accept_parent_broker;
-mod poll;
 
-pub(crate) use checkout_branch::CheckoutBranch;
-pub(crate) use load_repo::LoadRepo;
+mod notify_change;
+mod diff_calculated;
+mod commit_response;
+mod subscribe_broker;
+mod unsubscribe_broker;
+mod notify_error;
+
+mod accept_broker;
+mod poll_changes;
+mod system_started;
+mod commit_success;
+
 pub(crate) use notify_change::NotifyChange;
-pub(crate) use submit_diff::SubmitDiff;
-pub(crate) use response_commit::ResponseCommit;
-pub(crate) use broker_subscribe::BrokerSubscribe;
-pub(crate) use broker_unsubscribe::BrokerUnsubscribe;
-pub(crate) use error_notification::ErrorNotification;
-pub(crate) use observe::Observe;
-pub(crate) use diff::Diff;
-pub(crate) use accept_parent_broker::AcceptParentBroker;
-pub(crate) use poll::Poll;
+pub(crate) use diff_calculated::DiffCalculated;
+pub(crate) use commit_response::CommitMessageGenerated;
+pub(crate) use subscribe_broker::SubscribeBroker;
+pub(crate) use unsubscribe_broker::UnsubscribeBroker;
+pub(crate) use notify_error::NotifyError;
+pub(crate) use commit_success::CommitSuccess;
+pub(crate) use accept_broker::AcceptBroker;
+pub(crate) use poll_changes::PollChanges;
+pub(crate) use system_started::SystemStarted;

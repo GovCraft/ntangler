@@ -4,7 +4,7 @@ use akton::prelude::*;
 
 // TODO: will revisit names shortly
 #[akton_message]
-pub(crate) struct SubmitDiff {
+pub(crate) struct DiffCalculated {
     pub(crate) diff: String,
     pub(crate) path: String,
     pub(crate) id: String,

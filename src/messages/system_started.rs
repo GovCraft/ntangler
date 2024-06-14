@@ -1,4 +1,4 @@
 use akton::prelude::*;
 
 #[akton_message]
-pub(crate) struct Poll;
+pub(crate) struct SystemStarted;

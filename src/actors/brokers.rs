@@ -12,8 +12,12 @@ use futures::stream::FuturesUnordered;
 use futures::StreamExt;
 use tracing::{debug, debug_span, field, info, instrument, trace, trace_span};
 
-use crate::messages::{BrokerSubscribe, BrokerUnsubscribe, ErrorNotification, NotifyChange, Poll, ResponseCommit, SubmitDiff};
+use crate::messages::{
+    CommitMessageGenerated, CommitSuccess, DiffCalculated, NotifyChange, NotifyError, PollChanges,
+    SubscribeBroker, SystemStarted, UnsubscribeBroker,
+};
 
+// TODO: This needs to be generalized and included in the Akton framework
 #[akton_actor]
 pub(crate) struct Broker {
     subscribers: DashMap<TypeId, HashSet<(String, Context)>>,
@@ -26,10 +30,11 @@ impl Broker {
     /// - `anyhow::Result<Context>`: The context of the initialized actor.
     #[instrument]
     pub(crate) async fn init() -> anyhow::Result<Context> {
-        let mut actor = Akton::<Broker>::create_with_id("tangler_broker");
+        let actor_config = ActorConfig::new("broker", None, None);
+        let mut actor = Akton::<Broker>::create_with_config(actor_config);
 
         actor.setup
-            .act_on::<BrokerSubscribe>(|actor, event| {
+            .act_on::<SubscribeBroker>(|actor, event| {
                 // Event: Broker Subscribe
                 // Description: Triggered when a new subscriber is added.
                 // Context: Subscriber's return address, message type ID, and subscriber context.
@@ -48,7 +53,7 @@ impl Broker {
                 // Context: Type ID and subscriber context.
                 debug!(type_id=?type_id, subscriber=subscriber.key.value, "Subscriber added");
             })
-            .act_on::<BrokerUnsubscribe>(|actor, event| {
+            .act_on::<UnsubscribeBroker>(|actor, event| {
                 // Event: Broker Unsubscribe
                 // Description: Triggered when a subscriber is removed.
                 // Context: Subscriber's message type and subscriber context.
@@ -67,20 +72,28 @@ impl Broker {
                 // Context: Type ID and current subscriber context.
                 info!(type_id=?type_id, current_subscriber=current_subscriber.key.value, "Subscriber removed");
             })
-            .act_on_async::<ErrorNotification>(|actor, event| {
-                let futures = actor.state.load_subscriber_futures::<ErrorNotification>(event.message.clone());
+            .act_on_async::<NotifyError>(|actor, event| {
+                let futures = actor.state.load_subscriber_futures::<NotifyError>(event.message.clone());
                 Self::broadcast_futures(futures)
             })
-            .act_on_async::<SubmitDiff>(|actor, event| {
-                let futures = actor.state.load_subscriber_futures::<SubmitDiff>(event.message.clone());
+            .act_on_async::<DiffCalculated>(|actor, event| {
+                let futures = actor.state.load_subscriber_futures::<DiffCalculated>(event.message.clone());
                 Self::broadcast_futures(futures)
             })
-            .act_on_async::<Poll>(|actor, event| {
-                let futures = actor.state.load_subscriber_futures::<Poll>(event.message.clone());
+            .act_on_async::<CommitSuccess>(|actor, event| {
+                let futures = actor.state.load_subscriber_futures::<CommitSuccess>(event.message.clone());
                 Self::broadcast_futures(futures)
             })
-            .act_on_async::<ResponseCommit>(|actor, event| {
-                let futures = actor.state.load_subscriber_future_by_id::<ResponseCommit>(event.message.id.clone(), event.message.clone());
+            .act_on_async::<PollChanges>(|actor, event| {
+                let futures = actor.state.load_subscriber_futures::<PollChanges>(event.message.clone());
+                Self::broadcast_futures(futures)
+            })
+            .act_on_async::<SystemStarted>(|actor, event| {
+                let futures = actor.state.load_subscriber_futures::<SystemStarted>(event.message.clone());
+                Self::broadcast_futures(futures)
+            })
+            .act_on_async::<CommitMessageGenerated>(|actor, event| {
+                let futures = actor.state.load_subscriber_future_by_id::<CommitMessageGenerated>(event.message.id.clone(), event.message.clone());
                 Self::broadcast_futures(futures)
             })
             .act_on_async::<NotifyChange>(|actor, event| {
@@ -119,10 +132,10 @@ impl Broker {
                 // Description: A subscriber has been found for the message type.
                 // Context: Subscriber context and message type ID.
                 debug!(
-                subscriber = &subscriber_context.key.value,
-                message_type = ?&type_id,
-                "Subscriber found"
-            );
+                    subscriber = &subscriber_context.key.value,
+                    message_type = ?&type_id,
+                    "Subscriber found"
+                );
 
                 futures.push(async move {
                     subscriber_context.emit_async(message, None).await;
@@ -133,7 +146,10 @@ impl Broker {
         // Event: Futures Loaded
         // Description: All subscriber futures have been loaded.
         // Context: Number of futures.
-        debug!(futures_count = futures.len(), "All subscriber futures have been loaded.");
+        debug!(
+            futures_count = futures.len(),
+            "All subscriber futures have been loaded."
+        );
 
         futures
     }
@@ -175,19 +191,30 @@ impl Broker {
         // Event: Futures Loaded by ID
         // Description: All subscriber futures have been loaded by ID.
         // Context: Number of futures.
-        debug!(futures_count = futures.len(), "All subscriber futures have been loaded by ID.");
+        debug!(
+            futures_count = futures.len(),
+            "All subscriber futures have been loaded by ID."
+        );
 
-        debug_assert_ne!(futures.len(), 0, "There were no subscribers found for id: {}", id.clone());
+        debug_assert_ne!(
+            futures.len(),
+            0,
+            "There were no subscribers found for id: {}",
+            id.clone()
+        );
         futures
     }
 
     fn broadcast_futures<T>(
-        mut futures: FuturesUnordered<impl Future<Output = T> + Sized>
+        mut futures: FuturesUnordered<impl Future<Output = T> + Sized>,
     ) -> Pin<Box<impl Future<Output = ()> + Sized>> {
         // Event: Broadcasting Futures
         // Description: Broadcasting futures to be processed.
         // Context: Number of futures.
-        debug!(futures_count = futures.len(), "Broadcasting futures to be processed.");
+        debug!(
+            futures_count = futures.len(),
+            "Broadcasting futures to be processed."
+        );
 
         Box::pin(async move {
             while futures.next().await.is_some() {}
@@ -199,3 +226,4 @@ impl Broker {
         })
     }
 }
+
