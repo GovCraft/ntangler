@@ -220,6 +220,7 @@ impl GitRepository {
                         // this is where we've been failing
                         diff_options.pathspec(path.clone());
                         diff_options.include_untracked(true);
+                        diff_options.recurse_untracked_dirs(true);
 
                         let mut index = repo.index().unwrap();
                         debug!(path=?index.path().unwrap(), "Diffing against index:");
