@@ -9,3 +9,6 @@ edition = "2021"
 ollama-rs = { version = "0.2.0", features = ["stream", "tokio", "tokio-stream", "rustls"] }
 tokio = { version = "1.38.0", features = ["full"] }
 futures-util = "0.3.30"
+tracing = { version = "0.1.40", features = ["async-await", "log"] }
+mistralai-client = "0.10.0"
+dotenv = "0.15.0"
