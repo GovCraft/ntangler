@@ -1,3 +1,4 @@
+use std::cmp::Ordering;
 use std::fmt;
 
 use chrono::{DateTime, Utc};
@@ -9,7 +10,7 @@ use crate::models::semver_impact::SemVerImpact;
 use crate::models::traits::TanglerModel;
 
 /// A struct representing a timestamp in UTC.
-#[derive(Clone, Default, Debug)]
+#[derive(Clone, Default, Debug,Eq,  PartialEq)]
 pub(crate) struct TimeStamp(DateTime<Utc>);
 impl TanglerModel for TimeStamp {}
 impl TimeStamp {
@@ -26,6 +27,17 @@ impl TimeStamp {
         info!(timestamp = %now, "TimeStamp instance created");
 
         TimeStamp(now)
+    }
+}
+impl Ord for TimeStamp {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.0.cmp(&other.0)
+    }
+}
+
+impl PartialOrd for TimeStamp {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
     }
 }
 
