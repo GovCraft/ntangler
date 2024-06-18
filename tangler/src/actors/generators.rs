@@ -235,18 +235,6 @@ impl PooledActor for OpenAi {
                 })
             });
 
-//         use dotenv::dotenv;
-//         use std::env;
-//         dotenv().ok();
-// // Create a client
-//         let client = VaultClient::new(
-//             VaultClientSettingsBuilder::default()
-//                 .address("https://127.0.0.1:8200")
-//                 .token("TOKEN")
-//                 .build()
-//                 .unwrap()
-//         ).unwrap();
-//         let secret: MySecret = kv2::read(&client, "secret", "mysecret").await.unwrap();
 
         let context = actor.activate(None).await.expect("Failed to activate OpenAi generator. This should never happen, and yet, here we are.");
 
