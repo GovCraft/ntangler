@@ -1,27 +1,39 @@
 use lazy_static::lazy_static;
 use termcolor::Color;
 use owo_colors::{OwoColorize, Style};
+
+
+pub(crate) const TAB_WIDTH: usize = 8; // You can set this to any number of spaces you want
+pub(crate) const LIST_ROW: usize = 3;
+
+
 lazy_static! {
 
 // app colors
 // Crimson
 pub static ref ACCENT: Style = CRIMSON_9.clone();
+pub static ref MAJOR: Style = CRIMSON_9.clone();
+pub static ref MINOR: Style = CRIMSON_11.clone();
+pub static ref PATCH: Style = CRIMSON_8.clone();
 
 // Indigo
 pub static ref INSTRUCTIONS: Style = INDIGO_11.clone();
 pub static ref BRAND_NAME: Style = INDIGO_9.clone();
-pub static ref REPO_COLOR: Style = INDIGO_11.clone();
+
+pub static ref DESCRIPTION_COLOR: Style = INDIGO_12.clone();
 pub static ref TIME_COLOR: Style = INDIGO_12.clone();
 pub static ref TIME_ELEMENTS_COLOR: Style = INDIGO_8.clone();
 pub static ref HR_COLOR: Style = INDIGO_6.clone();
 
 // Jade
+pub static ref REPO_COLOR: Style = JADE_11.clone();
 pub static ref COMMIT_TYPE_COLOR: Style = JADE_11.clone();
 pub static ref SCOPE_COLOR: Style = JADE_12.clone();
+pub static ref FILENAME: Style = JADE_9.clone();
 
 // Gray
-pub static ref DESCRIPTION_COLOR: Style = INDIGO_12.clone();
 
+pub static ref STATUS: Style = YELLOW_9.clone();
 // Lime
 pub static ref TERTIARY_10: Style = LIME_10.clone();
 // Yellow
