@@ -7,6 +7,7 @@ use tracing::{instrument, trace};
 /// Represents a repository configuration.
 #[derive(Serialize, Default, Clone, PartialEq)]
 pub(crate) struct RepositoryConfig {
+    pub(crate) nickname: String,
     pub(crate) path: String,
     pub(crate) branch_name: String,
     pub(crate) id: String,
@@ -31,6 +32,7 @@ impl<'de> Deserialize<'de> for RepositoryConfig {
         struct RepositoryHelper {
             path: String,
             branch_name: String,
+            nickname: String,
         }
 
         let helper = RepositoryHelper::deserialize(deserializer)?;
@@ -38,6 +40,7 @@ impl<'de> Deserialize<'de> for RepositoryConfig {
         Ok(RepositoryConfig {
             path: helper.path,
             branch_name: helper.branch_name,
+            nickname: helper.nickname,
             id,
         })
     }
