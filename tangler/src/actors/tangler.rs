@@ -38,6 +38,7 @@ impl Tangler {
     pub(crate) async fn init(tangler_config: TanglerConfig) -> anyhow::Result<(Context, Context)> {
         let actor_config = ActorConfig::new("tangler", None, None);
         let mut actor = Akton::<Tangler>::create_with_config(actor_config);
+        let pool_size = tangler_config.repositories.len() * 5;
 
         trace!("Initializing the broker actor.");
         actor.state.broker = Broker::init().await?;
@@ -86,7 +87,6 @@ impl Tangler {
                 }
             }
         }
-        let pool_size = tangler_config.repositories.len() * 3;
         let pool_builder = PoolBuilder::default().add_pool::<OpenAi>(
             "llm_pool",
             pool_size,
