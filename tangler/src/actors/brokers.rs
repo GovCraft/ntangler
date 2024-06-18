@@ -12,10 +12,7 @@ use futures::stream::FuturesUnordered;
 use futures::StreamExt;
 use tracing::{debug, debug_span, field, info, instrument, trace, trace_span};
 
-use crate::messages::{
-    CommitMessageGenerated, CommitSuccess, DiffCalculated, NotifyChange, NotifyError, PollChanges,
-    SubscribeBroker, SystemStarted, UnsubscribeBroker,
-};
+use crate::messages::{CommitEvent, CommitMessageGenerated, CommitPending, CommitPosted, DiffCalculated, NotifyChange, NotifyError, PollChanges, SubscribeBroker, SystemStarted, UnsubscribeBroker};
 
 // TODO: This needs to be generalized and included in the Akton framework
 #[akton_actor]
@@ -51,7 +48,7 @@ impl Broker {
                 // Event: Subscriber Added
                 // Description: A new subscriber has been added to the broker.
                 // Context: Type ID and subscriber context.
-                debug!(type_id=?type_id, subscriber=subscriber.key.value, "Subscriber added");
+                trace!(type_id=?type_id, subscriber=subscriber.key.value, "Subscriber added");
             })
             .act_on::<UnsubscribeBroker>(|actor, event| {
                 // Event: Broker Unsubscribe
@@ -80,8 +77,12 @@ impl Broker {
                 let futures = actor.state.load_subscriber_futures::<DiffCalculated>(event.message.clone());
                 Self::broadcast_futures(futures)
             })
-            .act_on_async::<CommitSuccess>(|actor, event| {
-                let futures = actor.state.load_subscriber_futures::<CommitSuccess>(event.message.clone());
+            .act_on_async::<CommitEvent>(|actor, event| {
+                let futures = actor.state.load_subscriber_futures::<CommitEvent>(event.message.clone());
+                Self::broadcast_futures(futures)
+            })
+            .act_on_async::<CommitPosted>(|actor, event| {
+                let futures = actor.state.load_subscriber_futures::<CommitPosted>(event.message.clone());
                 Self::broadcast_futures(futures)
             })
             .act_on_async::<PollChanges>(|actor, event| {
@@ -131,7 +132,7 @@ impl Broker {
                 // Event: Subscriber Found
                 // Description: A subscriber has been found for the message type.
                 // Context: Subscriber context and message type ID.
-                debug!(
+                trace!(
                     subscriber = &subscriber_context.key.value,
                     message_type = ?&type_id,
                     "Subscriber found"
@@ -146,7 +147,7 @@ impl Broker {
         // Event: Futures Loaded
         // Description: All subscriber futures have been loaded.
         // Context: Number of futures.
-        debug!(
+        trace!(
             futures_count = futures.len(),
             "All subscriber futures have been loaded."
         );
@@ -180,7 +181,7 @@ impl Broker {
                 // Event: Subscriber Found by ID
                 // Description: A subscriber has been found for the message type by ID.
                 // Context: Subscriber ID and message type ID.
-                debug!(subscriber_id = id, message_type = ?type_id, "Subscriber found by ID.");
+                trace!(subscriber_id = id, message_type = ?type_id, "Subscriber found by ID.");
 
                 futures.push(async move {
                     subscriber_context.clone().emit_async(message, None).await;
@@ -191,7 +192,7 @@ impl Broker {
         // Event: Futures Loaded by ID
         // Description: All subscriber futures have been loaded by ID.
         // Context: Number of futures.
-        debug!(
+        trace!(
             futures_count = futures.len(),
             "All subscriber futures have been loaded by ID."
         );
@@ -211,18 +212,17 @@ impl Broker {
         // Event: Broadcasting Futures
         // Description: Broadcasting futures to be processed.
         // Context: Number of futures.
-        debug!(
+        trace!(
             futures_count = futures.len(),
             "Broadcasting futures to be processed."
         );
 
         Box::pin(async move {
             while futures.next().await.is_some() {}
-
             // Event: Futures Broadcast Completed
             // Description: All futures have been processed.
             // Context: None
-            debug!("All futures have been processed.");
+            trace!("All futures have been processed.");
         })
     }
 }
