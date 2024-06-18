@@ -1,4 +1,7 @@
 [workspace]
 members = [
     "tangler",
- "entanglement_server/server", "entanglement_server/lib"]
+    "entanglement_server/server", "entanglement_server/lib"]
+resolver = "2"
+
+
