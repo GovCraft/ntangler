@@ -3,7 +3,7 @@ use std::fmt;
 use serde::{de, Deserialize, Deserializer};
 use serde::de::{MapAccess, Visitor};
 
-use crate::models::{CommitType, Description, Footer, Oid, Scope, TimeStamp};
+use crate::models::{CommitType, Description, Filename, Footer, generate_id, Oid, Scope, TimeStamp};
 use crate::models::semver_impact::SemVerImpact;
 use crate::models::traits::TanglerModel;
 
@@ -15,14 +15,16 @@ impl From<Commit> for String {
 
 #[derive(Debug, Clone, Default)]
 pub(crate) struct Commit {
+    pub(crate) id: String,
     pub(crate) repository: String,
     pub(crate) commit_type: CommitType,
     pub(crate) scope: Option<Scope>,
     pub(crate) description: Description,
+    pub(crate) filename: Filename,
     pub(crate) body: String,
     pub(crate) is_breaking: bool,
     pub(crate) footers: Vec<Footer>,
-    pub(crate) time_stamp: TimeStamp,
+    pub(crate) timestamp: TimeStamp,
     pub(crate) oid: Oid,
     pub(crate) semver_impact: SemVerImpact,
 }
@@ -38,17 +40,22 @@ impl From<&str> for Commit {
 
 impl<'de> Deserialize<'de> for Commit {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-        where
-            D: Deserializer<'de>,
+    where
+        D: Deserializer<'de>,
     {
         #[derive(Deserialize)]
         struct CommitHelper {
-            #[serde(rename = "type")]
+            #[serde(skip)]
+            id: String,
+            //            #[serde(rename = "type")]
+            #[serde(skip)]
             repository: String, // Adjusted to String
             commit_type: String, // Adjusted to String
             scope: Option<Scope>,
             description: Description,
             body: String,
+            #[serde(skip)]
+            file_name: Filename,
             is_breaking: bool,
             footers: Vec<Footer>,
         }
@@ -63,8 +70,8 @@ impl<'de> Deserialize<'de> for Commit {
             }
 
             fn visit_map<V>(self, mut map: V) -> Result<Commit, V::Error>
-                where
-                    V: MapAccess<'de>,
+            where
+                V: MapAccess<'de>,
             {
                 let mut commit_type = None;
                 let mut scope = None;
@@ -93,7 +100,7 @@ impl<'de> Deserialize<'de> for Commit {
                             }
                             description = Some(map.next_value()?);
                         }
-                        "body" => {
+                       "body" => {
                             if body.is_some() {
                                 return Err(de::Error::duplicate_field("body"));
                             }
@@ -125,16 +132,16 @@ impl<'de> Deserialize<'de> for Commit {
                 Commit::calculate_footers(&mut footers, &commit_type, breaking);
 
                 Ok(Commit {
-                    repository: Default::default(),
                     commit_type,
                     scope,
                     description,
                     body,
                     is_breaking: breaking,
                     footers,
-                    time_stamp: TimeStamp::default(),
+                    timestamp: TimeStamp::default(),
                     oid: Oid::default(),
                     semver_impact,
+                    ..Default::default()
                 })
             }
         }
@@ -147,6 +154,14 @@ impl<'de> Deserialize<'de> for Commit {
 }
 
 impl Commit {
+    pub(crate) fn set_id(&mut self, repository:String, filename: &str ) {
+
+
+        let id = generate_id(&repository, Filename::from(filename));
+        self.repository = repository;
+        self.filename = Filename::from(filename);
+       self.id = id;
+    }
     pub(crate) fn calculate_footers(footers: &mut Vec<Footer>, commit_type: &CommitType, breaking: bool) {
         if breaking {
             if !footers.iter().any(|footer| footer.token == "BREAKING CHANGES") {
