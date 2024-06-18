@@ -8,9 +8,12 @@ edition = "2021"
 name = "tangler"
 path = "src/main.rs"
 
+[features]
+demo = []
+
 [dependencies]
 notify = { version = "6.1.1", features = ["serde", "crossbeam-channel"] }
-git2 = "0.18.3"
+git2 = "0.19.0"
 reqwest = { version = "0.12.4", features = ["json"] }
 serde = { version = "1.0.203", features = ["derive"] }
 tokio = { version = "1.38.0", features = ["full"] }
@@ -45,6 +48,7 @@ lazy_static = "1.4.0"
 owo-colors = "4.0.0"
 vaultrs = "0.7.2"
 dotenv = { version = "0.15.0", features = ["clap"] }
+indicatif = { version = "0.17.8", features = ["futures", "tokio", "in_memory"] }
 
 [dev-dependencies]
 lazy_static = "1.4.0"
