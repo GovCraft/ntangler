@@ -7,7 +7,7 @@ use crate::models::{Commit, CommitHeadingTerminal, CommitTypeTerminal, Descripti
 
 /// Represents a successful commit message with its details.
 #[derive(Clone, Debug)]
-pub(crate) enum Category {
+pub(crate) enum CommitEventCategory {
     Pending(PendingCommit),
     Generating(GeneratingCommit),
     Commit(Commit),
@@ -17,7 +17,7 @@ pub(crate) enum Category {
 pub(crate) struct CommitEvent {
     pub(crate) id: String,
     pub(crate) timestamp: TimeStamp,
-    pub(crate) category: Category,
+    pub(crate) category: CommitEventCategory,
 }
 
 impl fmt::Display for CommitEvent {
@@ -29,7 +29,7 @@ impl fmt::Display for CommitEvent {
         let half_tab = " ".repeat(TAB_WIDTH / 2);
 
         match &self.category {
-            Category::Pending(event) => {
+            CommitEventCategory::Pending(event) => {
                 let repository = &event.repository.clone();
                 let filename = &event.filename.clone();
                 let status = &event.status.clone();
@@ -39,7 +39,7 @@ impl fmt::Display for CommitEvent {
                 let repository: RepositoryTerminal = repository.into();
                 display = format!("{repository} {timestamp} {status} {filename}");
             }
-            Category::Generating(event) => {
+            CommitEventCategory::Generating(event) => {
                 let repository = &event.repository.clone();
                 let filename = &event.filename.clone();
                 let status = &event.status.clone();
@@ -49,7 +49,7 @@ impl fmt::Display for CommitEvent {
                 let repository: RepositoryTerminal = repository.into();
                 display = format!("{repository} {timestamp} {status} {filename}");
             }
-            Category::Commit(commit) => {
+            CommitEventCategory::Commit(commit) => {
                 let repository = &commit.repository;
                 let oid = &commit.oid;
                 let description = &commit.description;
@@ -76,15 +76,15 @@ impl fmt::Display for CommitEvent {
 }
 
 impl CommitEvent {
-    pub(crate) fn new(category: Category) -> CommitEvent {
+    pub(crate) fn new(category: CommitEventCategory) -> CommitEvent {
         let (filename, repository) = match &category {
-            Category::Pending(c) => {
+            CommitEventCategory::Pending(c) => {
                 (&c.filename, &c.repository)
             }
-            Category::Generating(c) => {
+            CommitEventCategory::Generating(c) => {
                 (&c.filename, &c.repository)
             }
-            Category::Commit(c) => {
+            CommitEventCategory::Commit(c) => {
                 (&c.filename, &c.repository)
             }
         };

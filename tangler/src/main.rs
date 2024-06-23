@@ -46,12 +46,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     match signal::ctrl_c().await {
         Ok(()) => {
             println!("Shutting down gracefully. Your code is safe! Please wait a moment.");
-            tangler.suspend().await?;
+            tangler.suspend_actor().await?;
             println!("All done! Tangler has shut down safely. Happy coding!");
         }
         Err(err) => {
             eprintln!("Oops! Couldn't catch the shutdown signal: {}. Don't worry, your code is safe! Wrapping things up... Please wait a moment.", err);
-            tangler.suspend().await?; // Shut down in case of error
+            tangler.suspend_actor().await?; // Shut down in case of error
         }
     }
 
@@ -121,11 +121,6 @@ pub fn init_tracing() {
     INIT.call_once(|| {
         // Define an environment filter to suppress logs from specific functions
         let filter = EnvFilter::new("")
-            .add_directive(
-                "akton_core::common::context::peek_state_span=off"
-                    .parse()
-                    .unwrap(),
-            )
             .add_directive("akton_core::common::context=error".parse().unwrap())
             .add_directive(
                 "akton_core::common::context[emit_pool]=error"
@@ -133,12 +128,17 @@ pub fn init_tracing() {
                     .unwrap(),
             )
             .add_directive("akton_core::traits=off".parse().unwrap())
+            .add_directive("akton_core::traits::actor_context=off".parse().unwrap())
             .add_directive("akton_core::pool::builder=error".parse().unwrap())
             .add_directive("akton_core::actors::awake=error".parse().unwrap())
             .add_directive("akton_core::common::akton=error".parse().unwrap())
             .add_directive("akton_core::common::pool_builder=error".parse().unwrap())
             .add_directive("akton_core::common::system=error".parse().unwrap())
             .add_directive("akton_core::common::supervisor=error".parse().unwrap())
+            .add_directive("akton_core::common::broker=error".parse().unwrap())
+            .add_directive("akton_core::common::broker[broadcast]=error".parse().unwrap())
+            .add_directive("akton_core::message=error".parse().unwrap())
+            .add_directive("akton_core::message::outbound_envelope=error".parse().unwrap())
             .add_directive("akton_core::actors::actor=error".parse().unwrap())
             .add_directive("akton_core::actors::idle=error".parse().unwrap())
             .add_directive(
@@ -147,20 +147,11 @@ pub fn init_tracing() {
                     .unwrap(),
             )
             .add_directive("tangler::actors::repositories=error".parse().unwrap())
-            .add_directive("tangler::actors::scribe=error".parse().unwrap())
+            .add_directive("tangler::actors::repositories[default_behavior]=error".parse().unwrap())
+            .add_directive("tangler::actors::scribe=info".parse().unwrap())
+            .add_directive("tangler::actors::scribe[print_hero_message]=error".parse().unwrap())
             .add_directive("tangler::actors::tangler=error".parse().unwrap())
             .add_directive("tangler::models=error".parse().unwrap())
-            .add_directive("tangler::actors::brokers=error".parse().unwrap())
-            .add_directive(
-                "tangler::actors::brokers[load_subscriber_futures]=error"
-                    .parse()
-                    .unwrap(),
-            )
-            .add_directive(
-                "tangler::actors::brokers[load_subscriber_future_by_id]=error"
-                    .parse()
-                    .unwrap(),
-            )
             .add_directive("tangler::actors::generators=error".parse().unwrap())
             .add_directive("tangler::tangler_config=error".parse().unwrap())
             .add_directive("tangler::repository_config=error".parse().unwrap())
@@ -174,7 +165,7 @@ pub fn init_tracing() {
             .compact()
             .pretty()
             .with_line_number(true)
-            //            .without_time()
+            .without_time()
             .with_env_filter(filter)
             .finish();
 

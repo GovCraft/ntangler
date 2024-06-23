@@ -15,7 +15,7 @@ mod commit_event;
 mod commit_authoring;
 
 pub(crate) use commit_event::CommitEvent;
-pub(crate) use commit_event::Category;
+pub(crate) use commit_event::CommitEventCategory;
 pub(crate) use notify_change::NotifyChange;
 pub(crate) use diff_calculated::DiffCalculated;
 pub(crate) use commit_response::CommitMessageGenerated;

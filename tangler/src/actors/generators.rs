@@ -41,10 +41,10 @@ struct OpenAiToken {
 }
 
 
-#[async_trait]
-impl PooledActor for OpenAi {
-    async fn initialize(&self, config: ActorConfig) -> Context {
-        let mut actor = Akton::<OpenAi>::create_with_config(config);
+impl OpenAi {
+    async fn initialize(&self, config: ActorConfig, system: &mut AktonReady) -> Context {
+
+        let mut actor = system.create_actor_with_config::<OpenAi>(config).await;
         let client = Client::new();
         actor.state.client = Some(Arc::new(client));
 
@@ -236,41 +236,41 @@ impl PooledActor for OpenAi {
             });
 
 
-        let context = actor.activate(None).await.expect("Failed to activate OpenAi generator. This should never happen, and yet, here we are.");
+        let context = actor.activate(None).await;
 
         // Event: Activating OpenAi generator
         // Description: Activating the OpenAi generator.
         // Context: None
-        trace!(id = &context.key.value, "Activated OpenAi generator:");
+        trace!(id = &context.key, "Activated OpenAi generator:");
         context
     }
 }
 
-#[cfg(test)]
-mod unit_tests {
-    use lazy_static::lazy_static;
-
-    use crate::models::config::RepositoryConfig;
-
-    lazy_static! {
-        static ref CONFIG: RepositoryConfig = RepositoryConfig {
-            path: "./mock-repo-working".to_string(),
-            branch_name: "new_branch".to_string(),
-            api_url: "".to_string(),
-            watch_staged_only: false,
-            id: "any id".to_string(),
-        };
-    }
-
-    lazy_static! {
-        static ref DIFF: String = r#"diff --git a/test_file.txt b/test_file.txt
-index 8430408..edc5728 100644
---- a/test_file.txt
-+++ b/test_file.txt
-@@ -1 +1,2 @@
-Initial content
-Modified content
-"#
-        .to_string();
-    }
-}
+// #[cfg(test)]
+// mod unit_tests {
+//     use lazy_static::lazy_static;
+//
+//     use crate::models::config::RepositoryConfig;
+//
+//     lazy_static! {
+//         static ref CONFIG: RepositoryConfig = RepositoryConfig {
+//             path: "./mock-repo-working".to_string(),
+//             branch_name: "new_branch".to_string(),
+//             api_url: "".to_string(),
+//             watch_staged_only: false,
+//             id: "any id".to_string(),
+//         };
+//     }
+//
+//     lazy_static! {
+//         static ref DIFF: String = r#"diff --git a/test_file.txt b/test_file.txt
+// index 8430408..edc5728 100644
+// --- a/test_file.txt
+// +++ b/test_file.txt
+// @@ -1 +1,2 @@
+// Initial content
+// Modified content
+// "#
+//         .to_string();
+//     }
+// }
