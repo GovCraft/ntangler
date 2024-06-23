@@ -27,7 +27,7 @@ impl fmt::Display for FilenameTerminal {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
 
 //        write!(f, "{:>10}", self.0.style(REPO_COLOR.clone()));
-        write!(f, "{:>15}", &self.0.style(FILENAME.clone()));
+        write!(f, "{:>15}", &self.0.style(*FILENAME));
         Ok(())
     }
 }

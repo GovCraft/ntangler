@@ -29,9 +29,8 @@ impl Deref for Oid {
 impl fmt::Display for Oid {
     #[instrument(level = "trace", skip(self, f))]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let oid = &self.0[..7];
-        let oid = format!("{}", oid.to_lowercase());
-        write!(f, "{}", oid)
+        let short_oid = &self.0[..7].to_lowercase();
+        write!(f, "{short_oid}")
     }
 }
 

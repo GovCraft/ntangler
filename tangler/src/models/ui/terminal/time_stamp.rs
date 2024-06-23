@@ -27,9 +27,9 @@ impl fmt::Display for TimeStampTerminal {
         // Create a ColorSpec with RGB values
         let val = &self.0.to_string();
 
-        let dim_open_bracket = DimStatic::from(("[", TIME_ELEMENTS_COLOR.clone()));
-        let dim_close_bracket = DimStatic::from(("]", TIME_ELEMENTS_COLOR.clone()));
-        let dim_colon = DimStatic::from((":", TIME_ELEMENTS_COLOR.clone()));
+        let dim_open_bracket = DimStatic::from(("[", *TIME_ELEMENTS_COLOR));
+        let dim_close_bracket = DimStatic::from(("]", *TIME_ELEMENTS_COLOR));
+        let dim_colon = DimStatic::from((":", *TIME_ELEMENTS_COLOR));
 
 // Write colored text to stderr using termcolor
 
@@ -39,15 +39,15 @@ impl fmt::Display for TimeStampTerminal {
 // Write each part of the formatted string
         let mut parts = val.split(':');
         if let Some(first_part) = parts.next() {
-            write!(f, "{}", first_part.style(TIME_COLOR.clone()));
+            write!(f, "{}", first_part.style(*TIME_COLOR));
         }
         for part in parts {
-            write!(f, "{}", dim_colon.style(TIME_ELEMENTS_COLOR.clone()));
-            write!(f, "{}", part.style(TIME_COLOR.clone()));
+            write!(f, "{}", dim_colon.style(*TIME_ELEMENTS_COLOR));
+            write!(f, "{}", part.style(*TIME_COLOR));
         }
 
 // Write the close bracket
-        write!(f, "{}", dim_close_bracket.style(GRAY_9.clone()));
+        write!(f, "{}", dim_close_bracket.style(*GRAY_9));
 
         Ok(())
     }

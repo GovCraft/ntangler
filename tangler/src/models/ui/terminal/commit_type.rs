@@ -23,7 +23,7 @@ impl fmt::Display for CommitTypeTerminal {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
 
         // Write colored text to stderr using termcolor
-        write!(f, "{}", &self.0.style(COMMIT_TYPE_COLOR.clone()).bold()).unwrap();
+        write!(f, "{}", &self.0.style(*COMMIT_TYPE_COLOR).bold()).unwrap();
 
         Ok(())
     }

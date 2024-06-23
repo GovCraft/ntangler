@@ -26,7 +26,7 @@ impl fmt::Display for OidTerminal {
 
 
 
-         write!(f, "{}", &self.0.style(OID_COLOR.clone()));
+         write!(f, "{}", &self.0.style(*OID_COLOR));
         Ok(())
 
     }

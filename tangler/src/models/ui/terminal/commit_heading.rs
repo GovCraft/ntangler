@@ -3,11 +3,12 @@ use std::io::Write;
 use std::ops::Deref;
 
 use console::style;
+use owo_colors::OwoColorize;
 use serde::Deserialize;
 use termcolor::{Color, ColorSpec, StandardStream, WriteColor};
 use tracing::{info, instrument, trace};
 
-use crate::models::{TEAL_11, TEAL_12, ConsoleStyle, GRAY_11, GRAY_12, CommitType, Scope, IsBreakingTerminal, CommitTypeTerminal, ScopeTerminal};
+use crate::models::{TEAL_11, TEAL_12, ConsoleStyle, GRAY_11, GRAY_12, CommitType, Scope, IsBreakingTerminal, CommitTypeTerminal, ScopeTerminal, PUNCUATION_COLOR};
 
 #[derive(Debug, Clone)]
 pub(crate) struct CommitHeadingTerminal((CommitTypeTerminal, ScopeTerminal, IsBreakingTerminal));
@@ -26,13 +27,14 @@ impl fmt::Display for CommitHeadingTerminal {
     #[instrument(level = "trace", skip(self, f))]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let (commit_type, scope, warning) = &self.0;
-
-        write!(f, "{}({}){}", commit_type.to_string(), scope.to_string(), warning.to_string());
+        let left_parens = "(".style(*PUNCUATION_COLOR);
+        let right_parens = ")".style(*PUNCUATION_COLOR);
+        write!(f, "{}{left_parens}{}{right_parens}{}", commit_type, scope, warning);
         Ok(())
     }
 }
 
-impl<'a> From<(CommitTypeTerminal, ScopeTerminal, IsBreakingTerminal)> for CommitHeadingTerminal {
+impl From<(CommitTypeTerminal, ScopeTerminal, IsBreakingTerminal)> for CommitHeadingTerminal {
     #[instrument(level = "info", skip(s))]
     fn from(s: (CommitTypeTerminal, ScopeTerminal, IsBreakingTerminal)) -> Self {
         CommitHeadingTerminal(s)

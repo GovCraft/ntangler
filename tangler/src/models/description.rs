@@ -33,7 +33,7 @@ impl Deref for Description {
 impl fmt::Display for Description {
     #[instrument(level = "trace", skip(self, f))]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let description = format!("{}", &self.0);
+        let description = self.0.to_string();
         let result = write!(f, "{}", description);
 
         result

@@ -146,7 +146,7 @@ impl<'de> Deserialize<'de> for Commit {
             }
         }
 
-        const FIELDS: &'static [&'static str] = &[
+        const FIELDS: &[&str] = &[
             "type", "scope", "description", "body", "breaking", "footers",
         ];
         deserializer.deserialize_struct("Commit", FIELDS, CommitVisitor)
@@ -208,26 +208,14 @@ impl Commit {
 
 impl fmt::Display for Commit {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let scope = self.scope.as_deref().unwrap_or("".into());
-        let scope_display = if scope.is_empty() {
-            "".to_string()
-        } else {
-            format!("({})", scope)
-        };
-
-        let commit_type_breaking_marker = if self.is_breaking { "!" } else { "" };
-
-        let footers = self
-            .footers
-            .iter()
-            .map(|footer| footer.to_string())
-            .collect::<Vec<_>>()
-            .join("\n");
+        let scope_display = self.scope.as_deref().map_or_else(String::new, |s| format!("({})", s));
+        let breaking_marker = if self.is_breaking { "!" } else { "" };
+        let footers = self.footers.iter().map(ToString::to_string).collect::<Vec<_>>().join("\n");
 
         write!(
             f,
             "{}{}{}: {}\n\n{}\n\n{}",
-            self.commit_type, scope_display, commit_type_breaking_marker, self.description, self.body, footers
+            self.commit_type, scope_display, breaking_marker, self.description, self.body, footers
         )
     }
 }

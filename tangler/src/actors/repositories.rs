@@ -2,22 +2,25 @@ use std::any::TypeId;
 use std::collections::HashSet;
 use std::future::Future;
 use std::path::PathBuf;
-use std::sync::{Arc, Mutex};
 use std::sync::atomic::AtomicBool;
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use akton::prelude::*;
 use anyhow::anyhow;
 use git2::{DiffOptions, Error, IndexAddOption, Repository, Status, StatusOptions};
-use rand::{Rng, thread_rng};
 use rand::distributions::Alphanumeric;
 use rand::prelude::SliceRandom;
+use rand::{thread_rng, Rng};
 use tracing::{debug, error, info, trace, warn};
 
-use crate::messages::{CommitEventCategory, CommitAuthoring, CommitEvent, CommitMessageGenerated, CommitPending, CommitPosted, DiffCalculated, NotifyChange, PollChanges, SubscribeBroker, SystemStarted};
-use crate::models::{Commit, CommitType, Description, Filename, GeneratingCommit, Oid, Scope};
+use crate::messages::{
+    CommitAuthoring, CommitEvent, CommitEventCategory, CommitMessageGenerated, CommitPending,
+    CommitPosted, DiffCalculated, NotifyChange, PollChanges, SubscribeBroker, SystemStarted,
+};
 use crate::models::config::RepositoryConfig;
 use crate::models::config::TanglerConfig;
+use crate::models::{Commit, CommitType, Description, Filename, GeneratingCommit, Oid, Scope};
 
 #[akton_actor]
 pub(crate) struct GitRepository {
@@ -38,7 +41,10 @@ impl GitRepository {
     /// # Returns
     ///
     /// An optional `Context`, which is `Some` if the actor was successfully activated, or `None` otherwise.
-    pub(crate) async fn init(config: &RepositoryConfig, system: &mut AktonReady) -> anyhow::Result<Context> {
+    pub(crate) async fn init(
+        config: &RepositoryConfig,
+        system: &mut AktonReady,
+    ) -> anyhow::Result<Context> {
         // Define the default behavior as an async closure that takes a reference to the repository configuration.
         let mut system = system.clone();
         let default_behavior = |config: RepositoryConfig, system: AktonReady| async move {
@@ -56,7 +62,7 @@ impl GitRepository {
     ) -> anyhow::Result<Context>
     where
         F: Fn(RepositoryConfig, AktonReady) -> Fut + Send + Sync + 'static,
-        Fut: Future<Output=anyhow::Result<Context>> + Send,
+        Fut: Future<Output = anyhow::Result<Context>> + Send,
     {
         // Execute the custom behavior and await its result
         custom_behavior(config, system).await
@@ -70,15 +76,17 @@ impl GitRepository {
         let akton = system.clone();
         let actor_name = Arn::with_account("repository")?.add_part(&config.id)?;
 
-        let actor_config = ActorConfig::new(actor_name, None, Some(system.clone().get_broker())).expect("Failed to build repository config");
-        let mut actor = system.create_actor_with_config::<GitRepository>(actor_config).await;
+        let actor_config = ActorConfig::new(actor_name, None, Some(system.clone().get_broker()))
+            .expect("Failed to build repository config");
+        let mut actor = system
+            .create_actor_with_config::<GitRepository>(actor_config)
+            .await;
 
         debug!(path = &config.path, "Open repo '{}' at", &config.nickname);
         let repo = Repository::open(&config.path)?;
 
         actor.state.repository = Some(Arc::new(Mutex::new(repo)));
         actor.state.config = config.clone();
-
 
         actor.setup.act_on::<SystemStarted>(|actor, _event| {
             let broker = actor.state.broker.clone();
@@ -423,8 +431,8 @@ impl GitRepository {
             repo.set_head(branch_ref.name().unwrap())?;
 
             // Checkout the branch
-            let checkout_result =
-                repo.checkout_head(Some(git2::build::CheckoutBuilder::new().force()))?;
+
+            repo.checkout_head(Some(git2::build::CheckoutBuilder::new().force()))?;
         }
         Ok(())
     }

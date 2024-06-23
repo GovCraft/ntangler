@@ -21,7 +21,7 @@ impl Deref for DimStatic {
     type Target = str;
 
     fn deref(&self) -> &Self::Target {
-        &self.str
+        self.str
     }
 }
 

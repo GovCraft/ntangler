@@ -1,7 +1,7 @@
 use std::fmt;
 use termcolor::{Color, ColorSpec, StandardStream, WriteColor};
 use tracing::{instrument, trace};
-use crate::models::{TEAL_9, TEAL_12, ConsoleStyle, Description, DescriptionTerminal, GRAY_11, GRAY_12, Scope, RED_9, TEAL_11, WHITE_PURE, AMBER_9, AMBER_12, GRAY_9, GRAY_10, BG_DARK, ACCENT, MAJOR, MINOR, PATCH};
+use crate::models::{TEAL_9, TEAL_12, ConsoleStyle, Description, DescriptionTerminal, GRAY_11, GRAY_12, Scope, RED_9, TEAL_11, WHITE_PURE, AMBER_9, AMBER_12, GRAY_9, GRAY_10, BG_DARK, ACCENT, MAJOR, MINOR, PATCH, PUNCUATION_COLOR};
 use crate::models::semver_impact::SemVerImpact;
 use crate::models::traits::TanglerModel;
 use std::io::Write;
@@ -17,18 +17,18 @@ impl fmt::Display for SemVerImpactTerminal {
         match self.0.to_string().as_str() {
             "MAJOR" => {
 
-                write!(f, "{:5}", "MAJOR".style(MAJOR.clone().bold()));
+                write!(f, "{:5}", "MAJOR".style((*MAJOR).bold()));
             }
             "MINOR" => {
 
-                write!(f, "{:5}", "MINOR".style(MINOR.clone()));
+                write!(f, "{:5}", "MINOR".style(*MINOR));
             }
             "PATCH" => {
 
-                write!(f, "{:5}", "PATCH".style(PATCH.clone()));
+                write!(f, "{:5}", "PATCH".style(*PATCH));
             }
             _ => {
-                write!(f, "{:^5}", "\u{2014}".style(GRAY_9.clone()));
+                write!(f, "{:^5}", "\u{2014}".style(*PUNCUATION_COLOR));
             }
         };
 

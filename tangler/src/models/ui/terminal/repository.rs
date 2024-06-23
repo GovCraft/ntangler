@@ -28,7 +28,7 @@ impl fmt::Display for RepositoryTerminal {
     #[instrument(level = "trace", skip(self, f))]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let half_tab = " ".repeat(TAB_WIDTH / 2);
-        write!(f, "{half_tab}{:>width$}", self.0.style(REPO_COLOR.clone()), width=10-self.0.len());
+        write!(f, "{half_tab}{:>width$}", self.0.style(*REPO_COLOR), width=10-self.0.len());
 
         Ok(())
     }

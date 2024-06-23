@@ -26,7 +26,7 @@ impl fmt::Display for DescriptionTerminal {
     #[instrument(level = "trace", skip(self, f))]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
 
-        write!(f, "{}", &self.0.style(DESCRIPTION_COLOR.clone()));
+        write!(f, "{}", &self.0.style(*DESCRIPTION_COLOR));
         Ok(())
     }
 }

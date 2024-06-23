@@ -209,7 +209,7 @@ impl OpenAi {
                         // Description: A commit message has been received from the event stream.
                         // Context: Commit message details.
                         if !commit.is_empty() {
-                            match serde_json::from_str(&*commit) {
+                            match serde_json::from_str(&commit) {
                                 Ok(commit) => {
                                     broker
                                         .emit_async(

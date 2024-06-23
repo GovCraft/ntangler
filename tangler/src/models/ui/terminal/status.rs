@@ -15,8 +15,8 @@ impl fmt::Display for Status {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
        let symbol = match self {
             Status::Pending => { "PENDING" }
-            Status::Generating => { "GENERATING" }
+            Status::Generating => { "EDITING" }
         };
-        write!(f, "{:13}", symbol.style(STATUS.clone()))
+        write!(f, "{:13}", symbol.style(*STATUS))
     }
 }

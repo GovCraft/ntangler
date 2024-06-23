@@ -18,7 +18,7 @@ impl From<&str> for Footer {
     fn from(s: &str) -> Self {
         // Assuming the input string is formatted as "token:value"
         let parts: Vec<&str> = s.splitn(2, ':').collect();
-        let token = parts.get(0).unwrap_or(&"").to_string();
+        let token = parts.first().unwrap_or(&"").to_string();
         let value = parts.get(1).unwrap_or(&"").to_string();
 
         Footer { token, value }

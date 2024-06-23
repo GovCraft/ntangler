@@ -28,7 +28,7 @@ impl fmt::Display for ScopeTerminal {
     #[instrument(level = "trace", skip(self, f))]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
 
-        write!(f, "{}", self.0.style(SCOPE_COLOR.clone()));
+        write!(f, "{}", self.0.style(*SCOPE_COLOR));
 
         Ok(())
     }
