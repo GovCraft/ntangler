@@ -25,7 +25,7 @@ use crate::messages::{
 use crate::models::{
     Commit, CommitHeadingTerminal, CommitType, CommitTypeTerminal, DescriptionTerminal, DimStatic,
     FilenameTerminal, IsBreakingTerminal, OidTerminal, OptionalScope, PendingCommit,
-    RepositoryTerminal, Scope, ScopeTerminal, SemVerImpactTerminal, TimeStampTerminal, ACCENT,
+    RepositoryTerminal, Scope, ScopeTerminal, SemVerImpactTerminal, TimeStampTerminal,
     BRAND_NAME, GRASS_11, GRASS_12, GRAY_1, GRAY_10, GRAY_11, GRAY_12, GRAY_2, GRAY_7, GRAY_9,
     HR_COLOR, INSTRUCTIONS, RED_11, RED_9, TEAL_11, TEAL_12, TEAL_7, TEAL_9, WHITE_PURE,
 };

@@ -6,7 +6,7 @@ use console::style;
 use serde::Deserialize;
 use termcolor::{Color, ColorSpec, StandardStream, WriteColor};
 use tracing::{info, instrument};
-use crate::models::{TIME_COLOR, TEAL_11, TEAL_9, ConsoleStyle, DimStatic, GRAY_10, GRAY_11, Scope, TimeStamp, GRAY_9, GRAY_8, TIME_ELEMENTS_COLOR};
+use crate::models::{TIME_COLOR, TEAL_11, TEAL_9, ConsoleStyle, DimStatic, GRAY_10, GRAY_11, Scope, TimeStamp, GRAY_9, GRAY_8, TIME_PUNCTUATION_COLOR};
 use crate::models::ui::terminal::ScopeTerminal;
 use std::io::Write;
 use owo_colors::OwoColorize;
@@ -27,9 +27,9 @@ impl fmt::Display for TimeStampTerminal {
         // Create a ColorSpec with RGB values
         let val = &self.0.to_string();
 
-        let dim_open_bracket = DimStatic::from(("[", *TIME_ELEMENTS_COLOR));
-        let dim_close_bracket = DimStatic::from(("]", *TIME_ELEMENTS_COLOR));
-        let dim_colon = DimStatic::from((":", *TIME_ELEMENTS_COLOR));
+        let dim_open_bracket = DimStatic::from(("[", *TIME_PUNCTUATION_COLOR));
+        let dim_close_bracket = DimStatic::from(("]", *TIME_PUNCTUATION_COLOR));
+        let dim_colon = DimStatic::from((":", *TIME_PUNCTUATION_COLOR));
 
 // Write colored text to stderr using termcolor
 
@@ -42,12 +42,12 @@ impl fmt::Display for TimeStampTerminal {
             write!(f, "{}", first_part.style(*TIME_COLOR));
         }
         for part in parts {
-            write!(f, "{}", dim_colon.style(*TIME_ELEMENTS_COLOR));
+            write!(f, "{}", dim_colon.style(*TIME_PUNCTUATION_COLOR));
             write!(f, "{}", part.style(*TIME_COLOR));
         }
 
 // Write the close bracket
-        write!(f, "{}", dim_close_bracket.style(*GRAY_9));
+        write!(f, "{}", dim_close_bracket.style(*TIME_PUNCTUATION_COLOR));
 
         Ok(())
     }

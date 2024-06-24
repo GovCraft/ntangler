@@ -1,7 +1,7 @@
 use std::fmt;
 use termcolor::{Color, ColorSpec, StandardStream, WriteColor};
 use tracing::{instrument, trace};
-use crate::models::{TEAL_9, TEAL_12, ConsoleStyle, Description, DescriptionTerminal, GRAY_11, GRAY_12, Scope, RED_9, TEAL_11, WHITE_PURE, AMBER_9, AMBER_12, GRAY_9, GRAY_10, BG_DARK, ACCENT, MAJOR, MINOR, PATCH, PUNCUATION_COLOR};
+use crate::models::{TEAL_9, TEAL_12, ConsoleStyle, Description, DescriptionTerminal, GRAY_11, GRAY_12, Scope, RED_9, TEAL_11, WHITE_PURE, AMBER_9, AMBER_12, GRAY_9, GRAY_10, BG_DARK,  MAJOR, MINOR, PATCH, PUNCTUATION_COLOR};
 use crate::models::semver_impact::SemVerImpact;
 use crate::models::traits::TanglerModel;
 use std::io::Write;
@@ -28,7 +28,7 @@ impl fmt::Display for SemVerImpactTerminal {
                 write!(f, "{:5}", "PATCH".style(*PATCH));
             }
             _ => {
-                write!(f, "{:^5}", "\u{2014}".style(*PUNCUATION_COLOR));
+                write!(f, "{:^5}", "\u{2014}".style(*PUNCTUATION_COLOR));
             }
         };
 

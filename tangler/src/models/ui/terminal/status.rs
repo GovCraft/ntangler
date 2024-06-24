@@ -17,6 +17,6 @@ impl fmt::Display for Status {
             Status::Pending => { "PENDING" }
             Status::Generating => { "EDITING" }
         };
-        write!(f, "{:13}", symbol.style(*STATUS))
+        write!(f, "{:8}", symbol.style(*STATUS))
     }
 }

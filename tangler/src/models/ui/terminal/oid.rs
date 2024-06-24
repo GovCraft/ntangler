@@ -7,7 +7,7 @@ use owo_colors::OwoColorize;
 use serde::Deserialize;
 use tracing::{info, instrument};
 
-use crate::models::{ConsoleStyle, GRASS_11, GRASS_12, GRASS_9, GRAY_10, Oid, OID_COLOR, TEAL_11, TEAL_12, TERTIARY_10};
+use crate::models::{ConsoleStyle, GRASS_11, GRASS_12, GRASS_9, GRAY_10, Oid, OID_COLOR, TEAL_11, TEAL_12};
 
 #[derive(Debug, Default, Clone, Deserialize, PartialEq)]
 pub(crate) struct OidTerminal(Oid);

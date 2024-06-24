@@ -8,7 +8,7 @@ use serde::Deserialize;
 use termcolor::{Color, ColorSpec, StandardStream, WriteColor};
 use tracing::{info, instrument, trace};
 
-use crate::models::{TEAL_11, TEAL_12, ConsoleStyle, GRAY_11, GRAY_12, CommitType, Scope, IsBreakingTerminal, CommitTypeTerminal, ScopeTerminal, PUNCUATION_COLOR};
+use crate::models::{TEAL_11, TEAL_12, ConsoleStyle, GRAY_11, GRAY_12, CommitType, Scope, IsBreakingTerminal, CommitTypeTerminal, ScopeTerminal, SCOPE_PUNCTUATION_COLOR};
 
 #[derive(Debug, Clone)]
 pub(crate) struct CommitHeadingTerminal((CommitTypeTerminal, ScopeTerminal, IsBreakingTerminal));
@@ -27,8 +27,8 @@ impl fmt::Display for CommitHeadingTerminal {
     #[instrument(level = "trace", skip(self, f))]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let (commit_type, scope, warning) = &self.0;
-        let left_parens = "(".style(*PUNCUATION_COLOR);
-        let right_parens = ")".style(*PUNCUATION_COLOR);
+        let left_parens = "(".style(*SCOPE_PUNCTUATION_COLOR);
+        let right_parens = ")".style(*SCOPE_PUNCTUATION_COLOR);
         write!(f, "{}{left_parens}{}{right_parens}{}", commit_type, scope, warning);
         Ok(())
     }

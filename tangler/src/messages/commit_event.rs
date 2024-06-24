@@ -1,13 +1,14 @@
-use std::fmt;
-use akton::prelude::*;
 use crate::messages::commit_authoring::CommitAuthoring;
 use crate::messages::CommitPosted;
 use crate::models::{
-    Commit, CommitHeadingTerminal, CommitTypeTerminal, DescriptionTerminal, FilenameTerminal,
-    generate_id, GeneratingCommit, IsBreakingTerminal, Oid, OidTerminal, PendingCommit,
-    RepositoryTerminal, ScopeTerminal, SemVerImpactTerminal, TAB_WIDTH, TimeStamp,
-    TimeStampTerminal,
+    generate_id, Commit, CommitHeadingTerminal, CommitTypeTerminal, DescriptionTerminal,
+    FilenameTerminal, GeneratingCommit, IsBreakingTerminal, Oid, OidTerminal, PendingCommit,
+    RepositoryTerminal, ScopeTerminal, SemVerImpactTerminal, TimeStamp, TimeStampTerminal,
+    PUNCTUATION_COLOR, TAB_WIDTH,
 };
+use akton::prelude::*;
+use owo_colors::OwoColorize;
+use std::fmt;
 
 /// Represents a successful commit message with its details.
 #[derive(Clone, Debug)]
@@ -27,21 +28,27 @@ pub(crate) struct CommitEvent {
 impl fmt::Display for CommitEvent {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let timestamp: TimeStampTerminal = (&self.timestamp).into();
-        let tab = " ".repeat(TAB_WIDTH);
-        let half_tab = " ".repeat(TAB_WIDTH / 2);
+        // let tab = " ".repeat(TAB_WIDTH);
+        // let half_tab = " ".repeat(TAB_WIDTH / 2);
 
         let display = match &self.category {
             CommitEventCategory::Pending(event) => {
                 let filename: FilenameTerminal = (&event.filename).into();
                 let repository: RepositoryTerminal = (&event.repository).into();
                 let status = &event.status;
-                format!("{repository} {timestamp} {status} {filename}")
+                format!(
+                    "{repository} {timestamp} {status}{:^6}{filename}",
+                    "\u{2014}".style(*PUNCTUATION_COLOR)
+                )
             }
             CommitEventCategory::Generating(event) => {
                 let filename: FilenameTerminal = (&event.filename).into();
                 let repository: RepositoryTerminal = (&event.repository).into();
                 let status = &event.status;
-                format!("{repository} {timestamp} {status} {filename}")
+                format!(
+                    "{repository} {timestamp} {status}{:^6}{filename}",
+                    "\u{2014}".style(*PUNCTUATION_COLOR)
+                )
             }
             CommitEventCategory::Commit(commit) => {
                 let oid: OidTerminal = (&commit.oid).into();
@@ -50,8 +57,9 @@ impl fmt::Display for CommitEvent {
                 let commit_heading: CommitHeadingTerminal = (
                     (&commit.commit_type).into(),
                     (&commit.scope).into(),
-                    (&commit.is_breaking).into()
-                ).into();
+                    (&commit.is_breaking).into(),
+                )
+                    .into();
                 let repository: RepositoryTerminal = (&commit.repository).into();
                 let file_name: FilenameTerminal = (&commit.filename).into();
                 format!(
@@ -67,15 +75,9 @@ impl fmt::Display for CommitEvent {
 impl CommitEvent {
     pub(crate) fn new(category: CommitEventCategory) -> CommitEvent {
         let (filename, repository) = match &category {
-            CommitEventCategory::Pending(c) => {
-                (&c.filename, &c.repository)
-            }
-            CommitEventCategory::Generating(c) => {
-                (&c.filename, &c.repository)
-            }
-            CommitEventCategory::Commit(c) => {
-                (&c.filename, &c.repository)
-            }
+            CommitEventCategory::Pending(c) => (&c.filename, &c.repository),
+            CommitEventCategory::Generating(c) => (&c.filename, &c.repository),
+            CommitEventCategory::Commit(c) => (&c.filename, &c.repository),
         };
         let timestamp = TimeStamp::new();
         let id = generate_id(repository, filename.clone());

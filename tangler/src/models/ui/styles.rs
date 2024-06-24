@@ -7,38 +7,53 @@ pub(crate) const LIST_ROW: usize = 3;
 
 lazy_static! {
 
-// app colors
-// Crimson
-pub static ref ACCENT: Style = *CRIMSON_9;
+/***********************   PALETTE   ***************************/
+pub static ref PALETTE_PRIMARY_12: Style = Style::new().truecolor(226,228,229);
+pub static ref PALETTE_PRIMARY_11: Style = *GRAY_11;
+pub static ref PALETTE_PRIMARY_10: Style = *GRAY_10;
+pub static ref PALETTE_PRIMARY_8: Style = *GRAY_8;
 
-// Hero
-pub static ref BRAND_NAME: Style = *GRAY_10;
-pub static ref INSTRUCTIONS: Style = *GRAY_11;
-pub static ref HR_COLOR: Style = *GRAY_6;
+pub static ref BRAND_NAME: Style = *PALETTE_SECONDARY_12;
+pub static ref INSTRUCTIONS: Style = *PALETTE_SECONDARY_13;
+pub static ref PALETTE_SECONDARY_13: Style = Style::new().truecolor(251, 223, 184);
+pub static ref PALETTE_SECONDARY_12: Style = Style::new().truecolor(230, 179, 76);
+pub static ref PALETTE_SECONDARY_11: Style = Style::new().truecolor(184, 142, 59);
+pub static ref PALETTE_SECONDARY_10: Style = Style::new().truecolor(139, 107, 42);
+pub static ref PALETTE_SECONDARY_8: Style = Style::new().truecolor(97, 74, 27);
 
+pub static ref PALETTE_TERTIARY_13: Style = Style::new().truecolor(185, 237, 252);
+pub static ref PALETTE_TERTIARY_12: Style = Style::new().truecolor(76, 204, 230);
+pub static ref PALETTE_TERTIARY_11: Style = Style::new().truecolor(59,163,184);
+pub static ref PALETTE_TERTIARY_10: Style = Style::new().truecolor(43,123,140);
+pub static ref PALETTE_TERTIARY_8: Style = Style::new().truecolor(27,86,98);
 
-// Items
-pub static ref REPO_COLOR: Style = *SKY_11;
+pub static ref ALERT_COLOR: Style = Style::new().truecolor(230,76,127);
 
-pub static ref TIME_ELEMENTS_COLOR: Style = *GRAY_6;
-pub static ref TIME_COLOR: Style = *GRAY_11;
+pub static ref PALETTE_NEUTRAL_11: Style = Style::new().truecolor(146,152,152);
+pub static ref PALETTE_NEUTRAL_10: Style = Style::new().truecolor(111,114,115);
+pub static ref PALETTE_NEUTRAL_8: Style = Style::new().truecolor(77,79,80);
 
-pub static ref OID_COLOR: Style = *GOLD_10;
-pub static ref STATUS: Style = *SKY_11;
+/***********************  UI ELEMENTS  ***************************/
+pub static ref DESCRIPTION_COLOR: Style = *PALETTE_PRIMARY_12;
+
+pub static ref COMMIT_TYPE_COLOR: Style = *PALETTE_SECONDARY_13;
+pub static ref FILENAME: Style = *PALETTE_SECONDARY_12;
+pub static ref SCOPE_COLOR: Style = *PALETTE_SECONDARY_12;
+pub static ref SCOPE_PUNCTUATION_COLOR: Style = *PALETTE_SECONDARY_13;
+pub static ref MINOR: Style = *PALETTE_SECONDARY_13;
+pub static ref PATCH: Style = *PALETTE_SECONDARY_13;
+pub static ref PUNCTUATION_COLOR: Style = *PALETTE_SECONDARY_8;
+pub static ref HR_COLOR: Style = *PALETTE_SECONDARY_8;
+
+pub static ref REPO_COLOR: Style = *PALETTE_TERTIARY_12;
+pub static ref TIME_COLOR: Style = *PALETTE_TERTIARY_12;
+pub static ref STATUS: Style = *PALETTE_SECONDARY_13;
+pub static ref OID_COLOR: Style = *PALETTE_TERTIARY_10;
+pub static ref TIME_PUNCTUATION_COLOR: Style = *PALETTE_TERTIARY_10;
+
 pub static ref MAJOR: Style = *ALERT_COLOR;
-pub static ref MINOR: Style = *GOLD_10;
-pub static ref PATCH: Style = *GRAY_10;
 
-pub static ref FILENAME: Style = *GRAY_11;
-pub static ref COMMIT_TYPE_COLOR: Style = *GOLD_11;
-pub static ref SCOPE_COLOR: Style = *GOLD_10;
-pub static ref DESCRIPTION_COLOR: Style = *GRAY_11;
-
-pub static ref PUNCUATION_COLOR: Style = *GRAY_6;
-pub static ref ALERT_COLOR: Style = *CRIMSON_10;
-
-pub static ref TERTIARY_10: Style = *LIME_10;
-
+/*****************************************************************/
 pub static ref BG_DARK: Style = Style::new().truecolor(16, 18, 17);
 
 pub static ref GRAY_1: Style = Style::new().truecolor(17, 17, 17);
@@ -46,7 +61,7 @@ pub static ref GRAY_2: Style = Style::new().truecolor(25, 25, 25);
 pub static ref GRAY_3: Style = Style::new().truecolor(34, 34, 34);
 pub static ref GRAY_4: Style = Style::new().truecolor(42, 42, 42);
 pub static ref GRAY_5: Style = Style::new().truecolor(49, 49, 49);
-pub static ref GRAY_6: Style = Style::new().truecolor(58, 58, 58);
+pub static ref PALETTE_NEUTRAL_6: Style = Style::new().truecolor(58, 58, 58);
 pub static ref GRAY_7: Style = Style::new().truecolor(72, 72, 72);
 pub static ref GRAY_8: Style = Style::new().truecolor(96, 96, 96);
 pub static ref GRAY_9: Style = Style::new().truecolor(110, 110, 110);
