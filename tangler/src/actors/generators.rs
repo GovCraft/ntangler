@@ -19,19 +19,31 @@ use tokio::sync::mpsc;
 use tokio::task;
 use tokio_retry::strategy::{ExponentialBackoff, jitter};
 use tracing::{debug, error, info, trace, warn};
+use derive_more::*;
+use crate::messages::{AcceptBroker, CommitEvent, CommitEventCategory, CommitMessageGenerated, DiffCalculated, SubscribeBroker};
 
-use crate::messages::{AcceptBroker, CommitMessageGenerated, DiffCalculated, SubscribeBroker};
-use crate::models::Commit;
-
-#[akton_actor]
+#[derive(Clone, Debug, )]
 pub(crate) struct OpenAi {
-    client: Option<Arc<Client<OpenAIConfig>>>,
+    client: Arc<Client<OpenAIConfig>>,
     broker: Context,
-    token: String
+    token: String,
 }
+
+impl Default for OpenAi {
+    fn default() -> Self {
+        OpenAi {
+            client: Arc::new(Client::new()),
+
+            broker: Default::default(),
+            token: String::default(),
+        }
+    }
+}
+
 use serde::{Deserialize, Serialize};
 use vaultrs::client::{VaultClient, VaultClientSettingsBuilder};
 use vaultrs::kv2;
+use crate::models::CommitMessageGeneratedCommit;
 
 // Create and read secrets
 #[derive(Debug, Deserialize, Serialize)]
@@ -40,237 +52,206 @@ struct OpenAiToken {
     token: String,
 }
 
-
 impl OpenAi {
-    async fn initialize(&self, config: ActorConfig, system: &mut AktonReady) -> Context {
-
+    pub(crate) async fn initialize(config: ActorConfig, system: &mut AktonReady) -> anyhow::Result<Context> {
         let mut actor = system.create_actor_with_config::<OpenAi>(config).await;
-        let client = Client::new();
-        actor.state.client = Some(Arc::new(client));
-
+        let broker = system.get_broker();
         // Event: Setting up SubmitDiff Handler
         // Description: Setting up an actor to handle the `SubmitDiff` event asynchronously.
         // Context: None
         trace!("Setting up an actor to handle the `SubmitDiff` event asynchronously.");
         actor
             .setup
-            .act_on::<AcceptBroker>(|actor, event| {
-                actor.state.broker = event.message.broker.clone();
-                let broker_context = actor.state.broker.clone();
-            })
-            .act_on_async::<DiffCalculated>(|actor, event| {
-                let changes = event.message.diff.clone();
-                let broker = actor.state.broker.clone();
-                let path = event.message.path.clone();
-                let id = event.message.id.clone();
+            .act_on_async::<CommitEvent>(|actor, event| {
+                if let CommitEventCategory::DiffGenerated(commit) = &event.message.category {
+                    let changes = commit.diff.clone();
+                    let broker = actor.state.broker.clone();
+                    let path = commit.filename.clone();
+                    let id = event.message.id.clone();
+                    error!("received");
 
-                Box::pin(async move {
-                    let (tx, mut rx) = mpsc::channel(32);
-                    let broker = broker.clone();
+                    Box::pin(async move {
+                        let (tx, mut rx) = mpsc::channel(32);
+                        let broker = broker.clone();
 
-                    task::spawn_blocking(move || {
-                        let rt = Runtime::new().unwrap();
-                        rt.block_on(async move {
-                            // Step 1: Create a new LLM thread via the API.
-                            trace!("Step 1a: Create a new LLM thread via the API");
-                            let client = Client::new();
-                            trace!("Step 1b: Initiate conversation thread");
-                            let thread = match client
-                                .threads()
-                                .create(CreateThreadRequest::default())
-                                .await
-                            {
-                                Ok(thread) => thread,
-                                Err(e) => {
-                                    // Event: Failed to Create Thread
-                                    // Description: Failed to create a new LLM thread via the API.
+                        task::spawn_blocking(move || {
+                            let rt = Runtime::new().unwrap();
+                            rt.block_on(async move {
+                                // Step 1: Create a new LLM thread via the API.
+                                trace!("Step 1a: Create a new LLM thread via the API");
+                                let client = Client::new();
+                                trace!("Step 1b: Initiate conversation thread");
+                                let thread = match client
+                                    .threads()
+                                    .create(CreateThreadRequest::default())
+                                    .await
+                                {
+                                    Ok(thread) => thread,
+                                    Err(e) => {
+                                        // Event: Failed to Create Thread
+                                        // Description: Failed to create a new LLM thread via the API.
+                                        // Context: Error details.
+                                        error!("Failed to create thread: {e}");
+                                        return;
+                                    }
+                                };
+
+                                let thread_id = thread.id.clone();
+                                trace!("Step 1c: Got thread id {}", thread_id);
+
+                                // Step 2: Send changes as a new message in the thread.
+                                trace!("Step 2: Send changes as a new message in the thread.");
+                                if let Err(e) = client
+                                    .threads()
+                                    .messages(&thread.id)
+                                    .create(CreateMessageRequest {
+                                        role: MessageRole::User,
+                                        content: CreateMessageRequestContent::from(changes),
+                                        ..Default::default()
+                                    })
+                                    .await
+                                {
+                                    // Event: Failed to Create Message
+                                    // Description: Failed to send changes as a new message in the thread.
                                     // Context: Error details.
-                                    error!("Failed to create thread: {e}");
+                                    error!("Failed to create message: {e}");
                                     return;
                                 }
-                            };
 
-                            let thread_id = thread.id.clone();
-                            trace!("Step 1c: Got thread id {}", thread_id);
+                                let format = AssistantsApiResponseFormat { r#type: JsonObject };
 
-                            // Step 2: Send changes as a new message in the thread.
-                            trace!("Step 2: Send changes as a new message in the thread.");
-                            if let Err(e) = client
-                                .threads()
-                                .messages(&thread.id)
-                                .create(CreateMessageRequest {
-                                    role: MessageRole::User,
-                                    content: CreateMessageRequestContent::from(changes),
-                                    ..Default::default()
-                                })
-                                .await
-                            {
-                                // Event: Failed to Create Message
-                                // Description: Failed to send changes as a new message in the thread.
-                                // Context: Error details.
-                                error!("Failed to create message: {e}");
-                                return;
-                            }
+                                // Step 3: Initiate a run and handle the event stream.
 
-                            let format = AssistantsApiResponseFormat { r#type: JsonObject };
+                                // TODO: the assistant id should be loaded remotely to accomodate easy updates
+                                trace!("Step 3a: Initiate a run and handle the event stream.");
+                                let mut event_stream = match client
+                                    .threads()
+                                    .runs(&thread.id)
+                                    .create_stream(CreateRunRequest {
+                                        assistant_id: "asst_xiaBOCpksCenAMJSL2F0qqFL".to_string(),
+                                        stream: Some(true),
+                                        parallel_tool_calls: Some(true),
+                                        response_format: Some(
+                                            AssistantsApiResponseFormatOption::Format(format),
+                                        ),
+                                        ..Default::default()
+                                    })
+                                    .await
+                                {
+                                    Ok(stream) => {
+                                        trace!("Run stream created");
+                                        stream
+                                    }
+                                    Err(e) => {
+                                        // Event: Failed to Create Run Stream
+                                        // Description: Failed to initiate a run and handle the event stream.
+                                        // Context: Error details.
+                                        error!("Failed to create run stream: {e}");
+                                        return;
+                                    }
+                                };
 
-                            // Step 3: Initiate a run and handle the event stream.
+                                let mut commit_message = String::new();
+                                trace!("Step 3b: Processing events from the event stream.");
 
-                            // TODO: the assistant id should be loaded remotely to accomodate easy updates
-                            trace!("Step 3a: Initiate a run and handle the event stream.");
-                            let mut event_stream = match client
-                                .threads()
-                                .runs(&thread.id)
-                                .create_stream(CreateRunRequest {
-                                    assistant_id: "asst_xiaBOCpksCenAMJSL2F0qqFL".to_string(),
-                                    stream: Some(true),
-                                    parallel_tool_calls: Some(true),
-                                    response_format: Some(
-                                        AssistantsApiResponseFormatOption::Format(format),
-                                    ),
-                                    ..Default::default()
-                                })
-                                .await
-                            {
-                                Ok(stream) => {
-                                    trace!("Run stream created");
-                                    stream
-                                }
-                                Err(e) => {
-                                    // Event: Failed to Create Run Stream
-                                    // Description: Failed to initiate a run and handle the event stream.
-                                    // Context: Error details.
-                                    error!("Failed to create run stream: {e}");
-                                    return;
-                                }
-                            };
-
-                            let mut commit_message = String::new();
-                            trace!("Step 3b: Processing events from the event stream.");
-
-                            // Processing events from the event stream.
-                            while let Some(event) = event_stream.next().await {
-                                match event {
-                                    Ok(event) => match event {
-                                        AssistantStreamEvent::ThreadMessageDelta(message) => {
-                                            if let Some(content) = message.delta.content {
-                                                for item in content {
-                                                    match item {
-                                                        MessageDeltaContent::ImageFile(_)
-                                                        | MessageDeltaContent::ImageUrl(_) => {}
-                                                        MessageDeltaContent::Text(text) => {
-                                                            if let Some(text) = text.text {
-                                                                if let Some(text) = text.value {
-                                                                    commit_message.push_str(&text);
+                                // Processing events from the event stream.
+                                while let Some(event) = event_stream.next().await {
+                                    match event {
+                                        Ok(event) => match event {
+                                            AssistantStreamEvent::ThreadMessageDelta(message) => {
+                                                if let Some(content) = message.delta.content {
+                                                    for item in content {
+                                                        match item {
+                                                            MessageDeltaContent::ImageFile(_)
+                                                            | MessageDeltaContent::ImageUrl(_) => {}
+                                                            MessageDeltaContent::Text(text) => {
+                                                                if let Some(text) = text.text {
+                                                                    if let Some(text) = text.value {
+                                                                        commit_message.push_str(&text);
+                                                                    }
                                                                 }
                                                             }
                                                         }
                                                     }
                                                 }
                                             }
-                                        }
-                                        AssistantStreamEvent::Done(_) => {}
-                                        _ => {}
-                                    },
-                                    Err(e) => {
-                                        // Event: Error in Event Stream
-                                        // Description: An error occurred while processing the event stream.
-                                        // Context: Error details.
-                                        match e {
-                                            OpenAIError::Reqwest(s) => {
-                                                error!("Reqwest error: {s}");
+                                            AssistantStreamEvent::Done(_) => {}
+                                            _ => {}
+                                        },
+                                        Err(e) => {
+                                            // Event: Error in Event Stream
+                                            // Description: An error occurred while processing the event stream.
+                                            // Context: Error details.
+                                            match e {
+                                                OpenAIError::Reqwest(s) => {
+                                                    error!("Reqwest error: {s}");
+                                                }
+                                                OpenAIError::ApiError(_) => {}
+                                                OpenAIError::JSONDeserialize(_) => {}
+                                                OpenAIError::FileSaveError(_) => {}
+                                                OpenAIError::FileReadError(_) => {}
+                                                OpenAIError::StreamError(s) => {
+                                                    error!("Stream error: {s}");
+                                                }
+                                                OpenAIError::InvalidArgument(_) => {}
                                             }
-                                            OpenAIError::ApiError(_) => {}
-                                            OpenAIError::JSONDeserialize(_) => {}
-                                            OpenAIError::FileSaveError(_) => {}
-                                            OpenAIError::FileReadError(_) => {}
-                                            OpenAIError::StreamError(s) => {
-                                                error!("Stream error: {s}");
-                                            }
-                                            OpenAIError::InvalidArgument(_) => {}
                                         }
                                     }
                                 }
-                            }
 
-                            trace!("Step 4: Return commit msg: {}", &commit_message);
-                            if let Err(e) = tx.send(commit_message).await {
-                                // Event: Failed to Send Commit Message
-                                // Description: Failed to send the commit message through the channel.
-                                // Context: Error details.
-                                error!("Failed to send commit msg: {e}");
-                            }
+                                trace!("Step 4: Return commit msg: {}", &commit_message);
+                                if let Err(e) = tx.send(commit_message).await {
+                                    // Event: Failed to Send Commit Message
+                                    // Description: Failed to send the commit message through the channel.
+                                    // Context: Error details.
+                                    error!("Failed to send commit msg: {e}");
+                                }
+                            });
                         });
-                    });
 
-                    // Await the result from the thread
-                    if let Some(commit) = rx.recv().await {
-                        // Event: Commit Message Received
-                        // Description: A commit message has been received from the event stream.
-                        // Context: Commit message details.
-                        if !commit.is_empty() {
-                            match serde_json::from_str(&commit) {
-                                Ok(commit) => {
-                                    broker
-                                        .emit_async(
-                                            CommitMessageGenerated { id, commit, path },
-                                            None,
-                                        )
-                                        .await;
-                                    trace!("Emitted commit message to broker");
-                                }
-                                Err(e) => {
-                                    error!(error=?e, "The json wasn't well formed");
-                                }
-                            };
+                        // Await the result from the thread
+                        if let Some(commit_message) = rx.recv().await {
+                            // Event: Commit Message Received
+                            // Description: A commit message has been received from the event stream.
+                            // Context: Commit message details.
+                            if !commit_message.is_empty() {
+                                match serde_json::from_str(&commit_message) {
+                                    Ok(commit) => {
+                                        let message = CommitEvent::new(CommitEventCategory::CommitMessageGenerated(CommitMessageGeneratedCommit::new(commit, commit_message)));
+                                        broker
+                                            .emit_async(
+                                                BrokerRequest::new(message),
+                                                None,
+                                            )
+                                            .await;
+                                        trace!("Emitted commit message to broker");
+                                    }
+                                    Err(e) => {
+                                        error!(error=?e, "The json wasn't well formed");
+                                    }
+                                };
+                            } else {
+                                error!("Commit message was empty. Check the logs.")
+                            }
                         } else {
-                            error!("Commit message was empty. Check the logs.")
+                            // Event: No Commit Message Received
+                            // Description: No commit message was received from the event stream.
+                            // Context: None
+                            error!("No commit message received");
                         }
-                    } else {
-                        // Event: No Commit Message Received
-                        // Description: No commit message was received from the event stream.
-                        // Context: None
-                        error!("No commit message received");
-                    }
-                })
+                    })
+                } else {
+                    Box::pin(async move {})
+                }
             });
 
-
+        actor.context.subscribe::<CommitEvent>().await;
         let context = actor.activate(None).await;
 
         // Event: Activating OpenAi generator
         // Description: Activating the OpenAi generator.
         // Context: None
         trace!(id = &context.key, "Activated OpenAi generator:");
-        context
+        Ok(context)
     }
 }
-
-// #[cfg(test)]
-// mod unit_tests {
-//     use lazy_static::lazy_static;
-//
-//     use crate::models::config::RepositoryConfig;
-//
-//     lazy_static! {
-//         static ref CONFIG: RepositoryConfig = RepositoryConfig {
-//             path: "./mock-repo-working".to_string(),
-//             branch_name: "new_branch".to_string(),
-//             api_url: "".to_string(),
-//             watch_staged_only: false,
-//             id: "any id".to_string(),
-//         };
-//     }
-//
-//     lazy_static! {
-//         static ref DIFF: String = r#"diff --git a/test_file.txt b/test_file.txt
-// index 8430408..edc5728 100644
-// --- a/test_file.txt
-// +++ b/test_file.txt
-// @@ -1 +1,2 @@
-// Initial content
-// Modified content
-// "#
-//         .to_string();
-//     }
-// }

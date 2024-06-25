@@ -10,7 +10,7 @@ pub(crate) use is_breaking::IsBreakingTerminal;
 pub(crate) use commit_heading::CommitHeadingTerminal;
 pub(crate) use repository::RepositoryTerminal;
 pub(crate) use status::Status;
-pub(crate) use generating_commit::GeneratingCommit;
+pub(crate) use commit_message_generated_commit::CommitMessageGeneratedCommit;
 pub mod oid;
 mod scope;
 mod time_stamp;
@@ -24,5 +24,5 @@ mod is_breaking;
 mod commit_heading;
 mod filename;
 mod status;
-pub mod generating_commit;
+pub mod commit_message_generated_commit;
 

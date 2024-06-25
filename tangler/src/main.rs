@@ -152,7 +152,7 @@ pub fn init_tracing() {
             .add_directive("tangler::actors::scribe[print_hero_message]=error".parse().unwrap())
             .add_directive("tangler::actors::tangler=error".parse().unwrap())
             .add_directive("tangler::models=error".parse().unwrap())
-            .add_directive("tangler::actors::generators=error".parse().unwrap())
+            .add_directive("tangler::actors::generators=trace".parse().unwrap())
             .add_directive("tangler::tangler_config=error".parse().unwrap())
             .add_directive("tangler::repository_config=error".parse().unwrap())
             .add_directive("hyper_util=off".parse().unwrap())

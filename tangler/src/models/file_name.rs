@@ -33,8 +33,11 @@ impl Deref for Filename {
 impl fmt::Display for Filename {
     #[instrument(level = "trace", skip(self, f))]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-
-        write!(f, "{}", self.0)
+        if let Some(last_segment) = self.0.rsplit('/').next() {
+            write!(f, "{}", last_segment)
+        } else {
+            write!(f, "{}", self.0)
+        }
     }
 }
 

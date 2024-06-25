@@ -17,12 +17,12 @@ use tracing::*;
 use unicode_segmentation::UnicodeSegmentation;
 use unicode_width::UnicodeWidthStr;
 
-use crate::messages::CommitEventCategory::Posted;
+use crate::messages::CommitEventCategory::FileCommitted;
 use crate::messages::{
     CommitEvent, CommitEventCategory, CommitPending, CommitPosted, NotifyError, SubscribeBroker,
     SystemStarted,
 };
-use crate::models::Commit;
+use crate::models::CommittedCommit;
 use crate::models::*;
 use crate::models::{CommitTypeTerminal, MENU_COLOR};
 
@@ -66,6 +66,7 @@ impl Scribe {
                 Scribe::handle_notify_error(&mut actor.state, &event.message.error_message);
             })
             .act_on::<CommitEvent>(|actor, event| {
+                trace!("*");
                 Scribe::handle_commit_event(&mut actor.state, &event.message);
             })
             .act_on::<SystemStarted>(|actor, _event| {
@@ -109,14 +110,14 @@ impl Scribe {
             actor.events.push_front(event.clone());
         }
 
-        if let Posted(commit) = &event.category {
+        if let FileCommitted(commit) = &event.category {
             actor.session_recommendation = std::cmp::max(
                 commit.semver_impact.clone(),
                 actor.session_recommendation.clone(),
             );
             // Update session_count to reflect the true number of Posted events
             actor.session_count = actor.events.iter()
-                .filter(|event| matches!(event.category, CommitEventCategory::Posted(_)))
+                .filter(|event| matches!(event.category, CommitEventCategory::FileCommitted(_)))
                 .count();
         }
 

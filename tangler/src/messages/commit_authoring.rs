@@ -1,7 +1,7 @@
 use std::fmt::{Display, Formatter};
 use akton::prelude::*;
 
-use crate::models::{Commit, Oid, PendingCommit, Status, TimeStamp};
+use crate::models::{CommittedCommit, Oid, PendingCommit, Status, TimeStamp};
 
 /// Represents a successful commit message with its details.
 #[akton_message]
@@ -12,7 +12,7 @@ pub(crate) struct CommitAuthoring {
 impl From<PendingCommit> for CommitAuthoring {
     fn from(value: PendingCommit) -> Self {
         let mut updated = value.clone();
-        updated.status = Status::Generating;
+        updated.status = Status::Committing;
         CommitAuthoring { commit: updated }
     }
 }

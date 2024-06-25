@@ -24,6 +24,7 @@ pub(crate) struct Tangler {
     diff_watchers: Vec<Context>,
     llm_pool: Vec<Context>,
     scribe: Context,
+    generator: Context,
 }
 
 impl Tangler {
@@ -38,6 +39,10 @@ impl Tangler {
                 let broker = actor.akton.get_broker().clone();
 
                 actor.state.scribe = Scribe::initialize("scribe".to_string(), &mut actor.akton).await;
+
+                let generator_config = ActorConfig::new(Arn::with_root("generator").expect("Failed to create generator Aktor-Arn"), None, Some(broker.clone())).expect("Failed to create generator config");
+                actor.state.generator = OpenAi::initialize(generator_config, &mut actor.akton).await.expect("Failed to initialize generator actor");
+
                 actor
                     .setup
                     .act_on_async::<DiffCalculated>(|actor, event| {

@@ -8,7 +8,7 @@ use std::time::Duration;
 
 use akton::prelude::*;
 use anyhow::anyhow;
-use git2::{DiffOptions, Error, IndexAddOption, Repository, Status, StatusOptions};
+use git2::{DiffOptions, Error, IndexAddOption, Repository, StatusOptions, Status as GitStatus};
 use rand::distributions::Alphanumeric;
 use rand::prelude::SliceRandom;
 use rand::{thread_rng, Rng};
@@ -20,7 +20,7 @@ use crate::messages::{
 };
 use crate::models::config::RepositoryConfig;
 use crate::models::config::TanglerConfig;
-use crate::models::{Commit, CommitType, Description, Filename, GeneratingCommit, Oid, Scope};
+use crate::models::{CommittedCommit, CommitType, Description, Filename, CommitMessageGeneratedCommit, Oid, Scope, PendingCommit, DiffGeneratedCommit, Status};
 
 #[akton_actor]
 pub(crate) struct GitRepository {
@@ -28,7 +28,7 @@ pub(crate) struct GitRepository {
     config: RepositoryConfig,
     broker: Context,
     watching: AtomicBool,
-    pending: Vec<Commit>,
+    pending: Vec<CommittedCommit>,
 }
 
 impl GitRepository {
@@ -62,7 +62,7 @@ impl GitRepository {
     ) -> anyhow::Result<Context>
     where
         F: Fn(RepositoryConfig, AktonReady) -> Fut + Send + Sync + 'static,
-        Fut: Future<Output = anyhow::Result<Context>> + Send,
+        Fut: Future<Output=anyhow::Result<Context>> + Send,
     {
         // Execute the custom behavior and await its result
         custom_behavior(config, system).await
@@ -91,7 +91,7 @@ impl GitRepository {
         actor.setup.act_on::<SystemStarted>(|actor, _event| {
             let broker = actor.state.broker.clone();
             if !&actor.state.config.branch_name.is_empty() {
-                trace!(
+                debug!(
                     "Activated RepositoryActor, attempting to checkout branch {}",
                     &actor.state.config.branch_name
                 );
@@ -100,145 +100,66 @@ impl GitRepository {
                 error!("Repository config branch name was empty!")
             }
         })
+            .act_on_async::<PollChanges>(|actor, _event| {
+                let actor_key = &actor.key;
+                debug!(actor=actor.state.config.nickname,"Received Poll request");
+                let mut modified_files = Vec::new();
+                if let Some(repo) = &actor.state.repository {
+                    let repo = repo.lock().expect("Couldn't lock repository mutex");
+                    let mut status_options = StatusOptions::new();
+                    status_options.include_untracked(true);
+
+                    let statuses = repo.statuses(Some(&mut status_options)).expect("Couldn't get repo statuses");
+                    modified_files = statuses
+                        .iter()
+                        .filter(|entry| entry.status().contains(GitStatus::WT_MODIFIED))
+                        .map(|entry| entry.path().unwrap().to_string())
+                        .collect::<HashSet<_>>() // Collect into a HashSet to remove duplicates
+                        .into_iter() // Convert back to an iterator
+                        .collect(); // Collect into a Vec
+                    debug!("modified files vec {:?}", &modified_files);
+                }
+                let id = actor.state.config.nickname.clone();
+                let broker = actor.akton.get_broker();
+                let path = actor.state.config.path.clone();
+                Box::pin(async move {
+                    for file in modified_files {
+                        warn!("*");
+                        let id = id.clone();
+                        let broker = broker.clone();
+                        let path = file.clone();
+                        let trace_id = id.clone();
+
+                        let msg= CommitEvent::new(CommitEventCategory::FilePending(PendingCommit::new(id, Filename::new(&path))));
+                        broker.emit_async(BrokerRequest::new(msg), None).await;
+                        // broker.emit_async(BrokerRequest::new(DiffCalculated { diff, id, path: path.clone() }), None).await;
+                        tracing::debug!(repo_id = trace_id, path=path, "Submitted retrieved Diff to broker.");
+                    }
+                })
+            })
             .act_on_async::<CommitEvent>(|actor, event| {
                 //temporary simulation
-                use crate::models::Commit;
+                use crate::models::CommittedCommit;
                 let broker = actor.akton.get_broker().clone();
 
                 match &event.message.category {
-                    CommitEventCategory::Pending(pending_commit) => {
+                    CommitEventCategory::FilePending(pending_commit) => {
+                        //make sure this message is for this repo
+                        if event.message.id != actor.state.config.id {
+                            trace!(message_id=event.message.id,repo_id=actor.state.config.id,"Rejecting message meant for a different actor");
+                            return Box::pin(async move {  });
+                        }
                         let mut rng = thread_rng();
-                        let commit_types = ["fix", "feat", "other"];
-                        let commit_type_str = commit_types.choose(&mut thread_rng()).unwrap();
-                        let commit_type = CommitType::from(*commit_type_str);
-
-                        let repository = actor.state.config.id.clone();
-                        let scope = [
-                            "api", "parser", "security", "docs", "actors", "readme", "models"
-                        ];
-
-                        let lorem_ipsum = [
-                            "Lorem", "ipsum", "dolor", "sit", "amet", "consectetur", "adipiscing", "elit", "sed", "do",
-                        ];
-
-                        let mut rng = thread_rng();
-                        let num_words = rng.gen_range(3..=5); // Randomly choose between 3 and 5 words
-                        let mut repo_id = thread_rng();
-                        let scope = scope.choose(&mut repo_id).unwrap().to_string();
-                        let random_text: Vec<&str> = lorem_ipsum.choose_multiple(&mut rng, num_words).cloned().collect();
-                        let random_text = random_text.join(" ");
-                        let random_bool = rand::thread_rng().gen_bool(0.1);
-
                         let pending_commit = pending_commit.clone();
+                        let pending_commit = pending_commit.clone();
+                        let path = pending_commit.filename;
+                        let broker = broker.clone();
+                        let nickname = actor.state.config.nickname.clone();
+                        let id = actor.state.config.id.clone();
+                        if let Some(repo) = &actor.state.repository {
+                            let repo = repo.lock().expect("Couldn't lock repository mutex");
 
-                        Box::pin(async move {
-                            let pending_commit = pending_commit.clone();
-                            let authoring_commit: GeneratingCommit = pending_commit.clone().into();
-                            let broker = broker.clone();
-                            tokio::time::sleep(Duration::from_secs(4)).await; // Poll every 3 seconds
-                            let msg = CommitEvent::new(CommitEventCategory::Generating(authoring_commit));
-                            broker.emit_async(BrokerRequest::new(msg), None).await;
-
-                            tokio::time::sleep(Duration::from_secs(1)).await; // Poll every 3 seconds
-                            tokio::spawn(async move {
-                                let broker = broker.clone();
-                                let hash: String = rand::thread_rng()
-                                    .sample_iter(&Alphanumeric)
-                                    .take(7)
-                                    .map(char::from)
-                                    .collect();
-                                let oid = Oid::from(hash.as_str());
-                                let mut commit = crate::models::Commit {
-                                    repository,
-                                    commit_type: commit_type.clone(),
-                                    scope: Some(Scope::from(scope.as_str())),
-                                    description: Description::from(random_text.as_str()),
-                                    body: "".to_string(),
-                                    is_breaking: random_bool,
-                                    footers: vec![],
-                                    semver_impact: Commit::calculate_semver_impact(&commit_type, random_bool),
-                                    oid,
-                                    ..Default::default()
-                                };
-                                commit.set_id(pending_commit.repository.clone(), &pending_commit.filename);
-                                let msg = CommitEvent::new(CommitEventCategory::Posted(commit));
-                                tracing::debug!("Sending CommitPending");
-                                broker.emit_async(BrokerRequest::new(msg), None).await;
-                            });
-                        })
-                    }
-                    _ => { Box::pin(async move {}) }
-                }
-            })
-            .act_on_async::<PollChanges>(|actor, _event| {
-                let actor_key = &actor.key;
-                #[cfg(feature = "demo")]
-                {
-                    trace!(actor_id=&actor.key,"Received PollChanges from broker:");
-                    //randomly have something to emit
-                    let random_bool = rand::thread_rng().gen_bool(0.5);
-                    if random_bool {
-                        return Box::pin(async move {});
-                    }
-                    use crate::models::Commit;
-                    let mut rng = thread_rng();
-                    let filename = [
-                        "main.rs",        // Rust
-                        "lib.rs",         // Rust
-                        "mod.rs",         // Rust
-                        "config.ts",      // TypeScript
-                        "utils.ts",       // TypeScript
-                        "handlers.ts",    // TypeScript
-                        "app.py",         // Python
-                        "models.py",      // Python
-                        "services.py",    // Python
-                        "errors.py"       // Python
-                    ];
-                    let filename_str = filename.choose(&mut thread_rng()).unwrap();
-                    let filename = Filename::from(*filename_str);
-                    let repository = actor.state.config.nickname.clone();
-
-                    //temporary simulation
-                    let broker = actor.akton.get_broker().clone();
-                    let actor_key = actor_key.clone();
-                    Box::pin(async move {
-                        let commit = crate::models::PendingCommit::new(
-                            repository,
-                            filename,
-                        );
-                        let hash: String = rand::thread_rng()
-                            .sample_iter(&Alphanumeric)
-                            .take(7)
-                            .map(char::from)
-                            .collect();
-                        let msg = CommitEvent::new(CommitEventCategory::Pending(commit));
-                        debug!(actor_id=&actor_key,"Sending CommitEvent(Pending):");
-                        broker.emit_async(BrokerRequest::new(msg), None).await;
-                    })
-                }
-
-                #[cfg(not(feature = "demo"))]
-                {
-                    debug!(actor=actor.state.config.id,"Received Poll request");
-                    let mut diffs: Vec<(String, String)> = Default::default();
-
-                    if let Some(repo) = &actor.state.repository {
-                        let repo = repo.lock().expect("Couldn't lock repository mutex");
-                        let mut status_options = StatusOptions::new();
-                        status_options.include_untracked(true);
-
-                        let statuses = repo.statuses(Some(&mut status_options)).expect("Couldn't get repo statuses");
-                        let modified_files: Vec<_> = statuses
-                            .iter()
-                            .filter(|entry| entry.status().contains(Status::WT_MODIFIED))
-                            .map(|entry| entry.path().unwrap().to_string())
-                            .collect::<HashSet<_>>() // Collect into a HashSet to remove duplicates
-                            .into_iter() // Convert back to an iterator
-                            .collect(); // Collect into a Vec
-                        debug!("modified files vec {:?}", &modified_files);
-                        // notify for each file
-                        for path in modified_files {
-                            debug!(change_file=&path, "Unstaged files");
+                            debug!(change_file=?&path, "Unstaged files");
 
                             trace!(file=?path, "Generating a diff for repository");
 
@@ -249,7 +170,7 @@ impl GitRepository {
 
                             // Set the pathspec to the relative path
                             // this is where we've been failing
-                            diff_options.pathspec(path.clone());
+                            diff_options.pathspec(path.to_string().clone());
                             diff_options.include_untracked(true);
                             diff_options.recurse_untracked_dirs(true);
 
@@ -267,29 +188,27 @@ impl GitRepository {
 
                             // trace!(raw_diff = ?diff_text, "Raw diff generated for the repository.");
                             let changes = String::from_utf8_lossy(&diff_text).to_string();
+                            let diff_event = DiffGeneratedCommit::new(id, changes, path.to_string(), nickname, Status::Thinking);
                             // trace!(diff = changes, "Diff generated for the repository.");
-                            diffs.push((path.clone(), changes));
-                        }
-                    }
-                    let id = actor.key.clone();
-                    let broker = actor.state.broker.clone();
-                    let path = actor.state.config.path.clone();
-                    Box::pin(async move {
-                        for (file, diff) in diffs {
-                            let id = id.clone();
-                            let broker = broker.clone();
-                            let path = file.clone();
-                            let trace_id = id.clone();
-                            let diff = diff.to_string();
+                            Box::pin(async move {
+                                tokio::time::sleep(Duration::from_secs(4)).await; // Poll every 3 seconds
 
-                            debug_assert_ne!(diff, "./".to_string());
-                            broker.emit_async(DiffCalculated { diff, id, path: path.clone() }, None).await;
-                            tracing::debug!(repo_id = trace_id, path=path, "Submitted retrieved Diff to broker.");
+                                let msg = CommitEvent::new(CommitEventCategory::DiffGenerated(diff_event));
+                                broker.emit_async(BrokerRequest::new(msg), None).await;
+                            })
+                        } else {
+                            Box::pin(async move {})
                         }
-                    })
+                    },
+                    _ => { Box::pin(async move {}) }
                 }
             })
             .act_on_async::<CommitMessageGenerated>(|actor, event| {
+                if event.message.id != actor.state.config.id {
+                    trace!(message_id=event.message.id,repo_id=actor.state.config.id,"Rejecting message meant for a different actor");
+                    return Box::pin(async move {  });
+                }
+
                 // Event: Received Commit Response
                 // Description: Received a commit response and will commit changes to the repository.
                 // Context: Commit message details.
@@ -326,14 +245,15 @@ impl GitRepository {
 
                         let commit_message = &commit_message.to_string();
                         // TODO: optionally sign commits
-                        let hash = repo.commit(
-                            Some("HEAD"),
-                            &sig,
-                            &sig,
-                            commit_message,
-                            &tree,
-                            &[&parent_commit],
-                        ).expect("Failed to commit");
+                        // let hash = repo.commit(
+                        //     Some("HEAD"),
+                        //     &sig,
+                        //     &sig,
+                        //     commit_message,
+                        //     &tree,
+                        //     &[&parent_commit],
+                        // ).expect("Failed to commit");
+                        let hash= "demohash";
                         hash.to_string()
                     } else {
                         "".to_string()
@@ -344,7 +264,7 @@ impl GitRepository {
                 Box::pin(async move {
                     debug!("Local commit: {:?}", &commit);
                     let broker = broker.clone();
-                    let msg = CommitEvent::new(CommitEventCategory::Posted(commit));
+                    let msg = CommitEvent::new(CommitEventCategory::FileCommitted(commit));
                     broker.emit_async(BrokerRequest::new(msg), None).await;
                 })
             });

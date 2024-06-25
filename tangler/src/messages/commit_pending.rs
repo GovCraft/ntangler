@@ -1,7 +1,7 @@
 use akton::prelude::*;
 use derive_more::*;
 
-use crate::models::{Commit, Oid, PendingCommit, TimeStamp};
+use crate::models::{CommittedCommit, Oid, PendingCommit, TimeStamp};
 
 /// Represents a successful commit message with its details.
 #[akton_message]

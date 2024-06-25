@@ -8,14 +8,14 @@ use crate::models::semver_impact::SemVerImpact;
 use crate::models::traits::TanglerModel;
 use derive_more::*;
 
-impl From<Commit> for String {
-    fn from(commit_details: Commit) -> Self {
+impl From<CommittedCommit> for String {
+    fn from(commit_details: CommittedCommit) -> Self {
         commit_details.to_string()
     }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Default)]
-pub(crate) struct Commit {
+pub(crate) struct CommittedCommit {
     pub(crate) id: String,
     pub(crate) repository: String,
     pub(crate) commit_type: CommitType,
@@ -30,16 +30,16 @@ pub(crate) struct Commit {
     pub(crate) semver_impact: SemVerImpact,
 }
 
-impl TanglerModel for Commit {}
+impl TanglerModel for CommittedCommit {}
 
-impl From<&str> for Commit {
+impl From<&str> for CommittedCommit {
     fn from(s: &str) -> Self {
-        let commit_details: Commit = serde_json::from_str(s).unwrap_or_default();
+        let commit_details: CommittedCommit = serde_json::from_str(s).unwrap_or_default();
         commit_details
     }
 }
 
-impl<'de> Deserialize<'de> for Commit {
+impl<'de> Deserialize<'de> for CommittedCommit {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
@@ -64,13 +64,13 @@ impl<'de> Deserialize<'de> for Commit {
         struct CommitVisitor;
 
         impl<'de> Visitor<'de> for CommitVisitor {
-            type Value = Commit;
+            type Value = CommittedCommit;
 
             fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
                 formatter.write_str("struct Commit")
             }
 
-            fn visit_map<V>(self, mut map: V) -> Result<Commit, V::Error>
+            fn visit_map<V>(self, mut map: V) -> Result<CommittedCommit, V::Error>
             where
                 V: MapAccess<'de>,
             {
@@ -128,11 +128,11 @@ impl<'de> Deserialize<'de> for Commit {
                 let body = body.ok_or_else(|| de::Error::missing_field("body"))?;
                 let breaking = breaking.ok_or_else(|| de::Error::missing_field("breaking"))?;
 
-                let semver_impact = Commit::calculate_semver_impact(&commit_type, breaking);
+                let semver_impact = CommittedCommit::calculate_semver_impact(&commit_type, breaking);
 
-                Commit::calculate_footers(&mut footers, &commit_type, breaking);
+                CommittedCommit::calculate_footers(&mut footers, &commit_type, breaking);
 
-                Ok(Commit {
+                Ok(CommittedCommit {
                     commit_type,
                     scope,
                     description,
@@ -154,7 +154,7 @@ impl<'de> Deserialize<'de> for Commit {
     }
 }
 
-impl Commit {
+impl CommittedCommit {
     pub(crate) fn set_id(&mut self, repository:String, filename: &str ) {
 
 
@@ -207,7 +207,7 @@ impl Commit {
     }
 }
 
-impl fmt::Display for Commit {
+impl fmt::Display for CommittedCommit {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let scope_display = self.scope.as_deref().map_or_else(String::new, |s| format!("({})", s));
         let breaking_marker = if self.is_breaking { "!" } else { "" };
@@ -256,7 +256,7 @@ mod tests {
     #[test]
     fn test_display_commit_details() {
         let commit_type: CommitType = "fix".into();
-        let commit_details = Commit {
+        let commit_details = CommittedCommit {
             commit_type: commit_type.clone(),
             scope: Some("api".into()),
             description: "prevent racing of requests".into(),
@@ -265,7 +265,7 @@ mod tests {
                 Footer { token: "Reviewed-by".to_string(), value: "Z".to_string() },
                 Footer { token: "Refs".to_string(), value: "#123".to_string() },
             ],
-            semver_impact: Commit::calculate_semver_impact(&commit_type, false),
+            semver_impact: CommittedCommit::calculate_semver_impact(&commit_type, false),
             ..Default::default()
         };
 
@@ -280,7 +280,7 @@ mod tests {
 { "type": "fix", "scope": "actors", "description": "fix commit message deserialization", "body": "Corrected the deserialization logic to properly handle commit messages within the PooledActor for OpenAi. Previously, it was attempting to deserialize into a 'commits' structure, which has been fixed to deserialize into a 'commit' structure.", "breaking": false, "footers": [] }
         "#;
 
-        let commit_details: Commit = serde_json::from_str(json_data).unwrap();
+        let commit_details: CommittedCommit = serde_json::from_str(json_data).unwrap();
 
         assert_eq!(commit_details.commit_type, "fix".into());
         assert_eq!(commit_details.scope, Some("actors".into()));
@@ -307,7 +307,7 @@ mod tests {
         }
         "#;
 
-        let commit_details: Commit = serde_json::from_str(json_data).unwrap();
+        let commit_details: CommittedCommit = serde_json::from_str(json_data).unwrap();
 
         assert_eq!(commit_details.commit_type, "fix".into());
         assert_eq!(commit_details.scope, None);
@@ -324,7 +324,7 @@ mod tests {
     #[test]
     #[traced_test]
     fn test_display_commit_details_without_footers() {
-        let commit_details = Commit {
+        let commit_details = CommittedCommit {
             commit_type: "feat".into(),
             scope: None,
             description: "add new feature".into(),
@@ -341,7 +341,7 @@ mod tests {
     #[test]
     #[traced_test]
     fn test_display_commit_details_long_scope() {
-        let commit_details = Commit {
+        let commit_details = CommittedCommit {
             commit_type: "refactor".into(),
             scope: Some("very_long_and_descriptive_scope_name".into()),
             description: "refactor component".into(),
@@ -370,7 +370,7 @@ mod tests {
         }
         "#;
 
-        let commit_details: Commit = serde_json::from_str(json_data).unwrap();
+        let commit_details: CommittedCommit = serde_json::from_str(json_data).unwrap();
 
         info!(
             commit_type = %commit_details.commit_type,
@@ -393,7 +393,7 @@ mod tests {
     #[test]
     #[traced_test]
     fn test_commit_details_with_no_scope() {
-        let commit_details = Commit {
+        let commit_details = CommittedCommit {
             commit_type: "chore".into(),
             scope: None,
             description: "maintenance tasks".into(),
@@ -419,7 +419,7 @@ mod tests {
         assert_eq!(footer.token, "Co-authored-by");
         assert_eq!(footer.value, "Jane Doe");
 
-        let commit = Commit {
+        let commit = CommittedCommit {
             commit_type: "fix".into(),
             scope: Some("ui".into()),
             description: "fix button alignment".into(),

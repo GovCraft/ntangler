@@ -10,9 +10,10 @@ use derive_more::*;
 /// Represents a successful commit message with its details.
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) enum CommitEventCategory {
-    Pending(PendingCommit),
-    Generating(GeneratingCommit),
-    Posted(Commit),
+    FilePending(PendingCommit),
+    DiffGenerated(DiffGeneratedCommit),
+    CommitMessageGenerated(CommitMessageGeneratedCommit),
+    FileCommitted(CommittedCommit),
 }
 
 #[akton_message]
@@ -23,6 +24,7 @@ pub(crate) struct CommitEvent {
     pub(crate) category: CommitEventCategory,
 }
 
+/* TODO: this is convenient but incorrect, types should be responsible for their own formatting and the scribe should be responsible for layout; this is a message */
 impl fmt::Display for CommitEvent {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         // let tab = " ".repeat(TAB_WIDTH);
@@ -31,7 +33,7 @@ impl fmt::Display for CommitEvent {
         let time_stamp = "\u{2014}\u{2014}".style(*TIME_COLOR);
 
         let display = match &self.category {
-            CommitEventCategory::Pending(event) => {
+            CommitEventCategory::FilePending(event) => {
                 let time_stamp = "\u{2014}\u{2014}".style(*STATUS_PENDING);
                 let filename = &event.filename.style(*FILENAME_PENDING);
                 let repository = &event.repository.style(*REPO_PENDING_COLOR);
@@ -46,12 +48,27 @@ impl fmt::Display for CommitEvent {
                     {filename:<COLUMN_HEADING_FIVE_LENGTH$}"
                 )
             }
-            CommitEventCategory::Generating(event) => {
+            CommitEventCategory::DiffGenerated(event) => {
+                let time_stamp = "\u{2014}\u{2014}".style(*STATUS_PENDING);
+                let filename = &event.filename.style(*FILENAME_PENDING);
+                let repository = &event.repository.style(*REPO_PENDING_COLOR);
+                let status = &event.status.style(*STATUS_PENDING).to_string();
+                format!(
+                    "\
+                    {half_tab}\
+                    {repository:<COLUMN_HEADING_ONE_LENGTH$} \
+                    {time_stamp:^COLUMN_HEADING_TWO_LENGTH$} \
+                    {status:^COLUMN_HEADING_THREE_LENGTH$}\
+                    {emdash:^COLUMN_HEADING_FOUR_LENGTH$} \
+                    {filename:<COLUMN_HEADING_FIVE_LENGTH$}"
+                )
+            }
+            CommitEventCategory::CommitMessageGenerated(event) => {
                 let emdash = "  \u{2022}  ".style(*ALERT_COLOR);
 
                 let time_stamp = "\u{2014}\u{2014}".style(*ALERT_COLOR);
-                let filename = &event.filename.style(*ALERT_COLOR);
-                let repository = &event.repository.style(*ALERT_COLOR);
+                let filename = &event.commit.filename.style(*ALERT_COLOR);
+                let repository = &event.commit.repository.style(*ALERT_COLOR);
                 let status = &event.status.style(*ALERT_COLOR).to_string();
                 format!(
                     "{half_tab}\
@@ -62,7 +79,7 @@ impl fmt::Display for CommitEvent {
                     {filename:<COLUMN_HEADING_FIVE_LENGTH$}"
                 )
             }
-            CommitEventCategory::Posted(event) => {
+            CommitEventCategory::FileCommitted(event) => {
                 let timestamp = &self.timestamp.style(*TIME_COLOR);
                 let oid: OidTerminal = (&event.oid).into();
                 let description: DescriptionTerminal = (&event.description).into();
@@ -98,9 +115,10 @@ impl fmt::Display for CommitEvent {
 impl CommitEvent {
     pub(crate) fn new(category: CommitEventCategory) -> CommitEvent {
         let (filename, repository) = match &category {
-            CommitEventCategory::Pending(c) => (&c.filename, &c.repository),
-            CommitEventCategory::Generating(c) => (&c.filename, &c.repository),
-            CommitEventCategory::Posted(c) => (&c.filename, &c.repository),
+            CommitEventCategory::FilePending(c) => (&c.filename, &c.repository),
+            CommitEventCategory::CommitMessageGenerated(c) => (&c.commit.filename, &c.commit.repository),
+            CommitEventCategory::FileCommitted(c) => (&c.filename, &c.repository),
+            CommitEventCategory::DiffGenerated(c) => {(&Filename::new(&c.filename), &c.repository)}
         };
         let timestamp = TimeStamp::new();
         let id = generate_id(repository, filename.clone());
