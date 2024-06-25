@@ -1,13 +1,13 @@
 use std::fmt;
 use termcolor::{Color, ColorSpec, StandardStream, WriteColor};
 use tracing::{instrument, trace};
-use crate::models::{TEAL_9, TEAL_12, ConsoleStyle, Description, DescriptionTerminal, GRAY_11, GRAY_12, Scope, RED_9, TEAL_11, WHITE_PURE, AMBER_9, AMBER_12, GRAY_9, GRAY_10, BG_DARK,  MAJOR, MINOR, PATCH, PUNCTUATION_COLOR};
+use crate::models::*;
 use crate::models::semver_impact::SemVerImpact;
 use crate::models::traits::TanglerModel;
 use std::io::Write;
 use owo_colors::OwoColorize;
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) struct SemVerImpactTerminal(SemVerImpact);
 
 impl ConsoleStyle for SemVerImpactTerminal {}
@@ -17,18 +17,18 @@ impl fmt::Display for SemVerImpactTerminal {
         match self.0.to_string().as_str() {
             "MAJOR" => {
 
-                write!(f, "{:5}", "MAJOR".style((*MAJOR).bold()));
+                write!(f, "{}", "MAJOR".style(*MAJOR));
             }
             "MINOR" => {
 
-                write!(f, "{:5}", "MINOR".style(*MINOR));
+                write!(f, "{}", "MINOR".style(*MINOR));
             }
             "PATCH" => {
 
-                write!(f, "{:5}", "PATCH".style(*PATCH));
+                write!(f, "{}", "PATCH".style(*PATCH));
             }
             _ => {
-                write!(f, "{:^5}", "\u{2014}".style(*PUNCTUATION_COLOR));
+                write!(f, "{}", "\u{2022}".style(*PUNCTUATION_COLOR));
             }
         };
 

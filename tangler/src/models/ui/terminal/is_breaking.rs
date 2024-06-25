@@ -7,7 +7,7 @@ use serde::Deserialize;
 use termcolor::{Color, ColorSpec, StandardStream, WriteColor};
 use tracing::{info, instrument, trace};
 
-use crate::models::{TEAL_11, TEAL_12, ConsoleStyle, GRAY_11, GRAY_12, DimStatic, WHITE_PURE, BG_DARK, GRAY_10, GRAY_9, ALERT_COLOR, PUNCTUATION_COLOR, TIME_PUNCTUATION_COLOR};
+use crate::models::{TEAL_11, TEAL_12, ConsoleStyle, GRAY_11, GRAY_12, DimStatic, WHITE_PURE, BG_DARK, GRAY_10, GRAY_9, ALERT_COLOR, PUNCTUATION_COLOR, TIME_PUNCTUATION_COLOR, SCOPE_PUNCTUATION_COLOR};
 
 #[derive(Debug, Default, Clone, Deserialize, PartialEq)]
 pub(crate) struct IsBreakingTerminal(bool);
@@ -26,9 +26,9 @@ impl fmt::Display for IsBreakingTerminal {
     #[instrument(level = "trace", skip(self, f))]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if self.0 {
-            write!(f, "{}{}", "!".style(*ALERT_COLOR).bold(), ":".style(*PUNCTUATION_COLOR));
+            write!(f, "{}{}", "!".style(*ALERT_COLOR).bold(), ":".style(*SCOPE_PUNCTUATION_COLOR));
         } else {
-            write!(f, "{}", ":".style(*PUNCTUATION_COLOR));
+            write!(f, "{}", ":".style(*SCOPE_PUNCTUATION_COLOR));
         }
 
         Ok(())

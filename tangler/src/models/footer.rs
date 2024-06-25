@@ -5,9 +5,9 @@ use serde::{Deserialize, Deserializer};
 use tracing::{info, instrument, trace};
 use crate::models::Description;
 use crate::models::traits::TanglerModel;
-
+use derive_more::*;
 /// Represents a footer in a commit message, which consists of a token and a value.
-#[derive(Debug, Clone, Default)]
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) struct Footer {
     pub(crate) token: String,
     pub(crate) value: String,

@@ -8,7 +8,7 @@ use crate::models::{Description, Filename, FilenameTerminal, Footer, generate_id
 use crate::models::semver_impact::SemVerImpact;
 //use crate::models::traits::TanglerModel;
 
-#[derive(Debug, Clone, Default)]
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) struct GeneratingCommit {
     pub(crate) id: String,
     pub(crate) repository: String,

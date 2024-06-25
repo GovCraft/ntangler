@@ -4,7 +4,7 @@ use owo_colors::OwoColorize;
 use crate::models::STATUS;
 
 use indicatif::ProgressBar;
-#[derive(Default, Clone, Debug)]
+#[derive(Clone, Default, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) enum Status {
     #[default]
     Pending,
@@ -17,6 +17,6 @@ impl fmt::Display for Status {
             Status::Pending => { "PENDING" }
             Status::Generating => { "EDITING" }
         };
-        write!(f, "{:8}", symbol.style(*STATUS))
+        write!(f, "{:8}", symbol)
     }
 }

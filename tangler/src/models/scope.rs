@@ -6,8 +6,8 @@ use serde::Deserialize;
 use tracing::{info, instrument};
 use crate::models::Oid;
 use crate::models::traits::TanglerModel;
-
-#[derive(Debug, Default, Clone, Deserialize, PartialEq)]
+use derive_more::*;
+#[derive(Clone,Default, Debug, PartialEq, Eq, PartialOrd, Ord, Deserialize)]
 pub(crate) struct Scope(String);
 impl TanglerModel for Scope {}
 impl Deref for Scope {

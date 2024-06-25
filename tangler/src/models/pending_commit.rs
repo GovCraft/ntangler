@@ -4,14 +4,14 @@ use std::hash::{DefaultHasher, Hash, Hasher};
 
 use serde::{de, Deserialize, Deserializer};
 use serde::de::{MapAccess, Visitor};
-
+use derive_more::*;
 use crate::models::{Description, Filename, FilenameTerminal, Footer, generate_id, Oid, RepositoryTerminal, Scope, Status, TimeStamp, TimeStampTerminal};
 use crate::models::semver_impact::SemVerImpact;
 //use crate::models::traits::TanglerModel;
 
 
 
-#[derive(Debug, Clone, Default)]
+#[derive(Clone,Default, Debug, PartialEq, Eq, PartialOrd, Ord,)]
 pub(crate) struct PendingCommit {
     pub(crate) id: String,
     pub(crate) repository: String,

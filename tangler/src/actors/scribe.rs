@@ -1,16 +1,15 @@
+use std::cmp::PartialEq;
 use std::collections::VecDeque;
-use std::fmt::{format, Debug};
+use std::fmt::Debug;
 use std::io::{stderr, Write};
-use std::ops::Deref;
-use std::str::FromStr;
 use std::time::Duration;
-use std::{any::TypeId, fmt, fmt::Display};
+use std::{any::TypeId, fmt::Display};
 
 use akton::prelude::*;
 use atty::is;
-use chrono::{DateTime, Local, NaiveDateTime, TimeZone, Utc};
-use console::{style, Color as TermColor, StyledObject, Term};
-use indicatif::{ProgressBar, ProgressStyle};
+use chrono::{DateTime, Local, TimeZone, Utc};
+use console::{pad_str, style, Alignment, Term};
+use indicatif::{ProgressBar, ProgressStyle, TermLike};
 use owo_colors::OwoColorize;
 use termcolor::{BufferWriter, Color, ColorChoice, ColorSpec, StandardStream, WriteColor};
 use tokio::sync::mpsc;
@@ -18,20 +17,18 @@ use tracing::*;
 use unicode_segmentation::UnicodeSegmentation;
 use unicode_width::UnicodeWidthStr;
 
+use crate::messages::CommitEventCategory::Posted;
 use crate::messages::{
     CommitEvent, CommitEventCategory, CommitPending, CommitPosted, NotifyError, SubscribeBroker,
     SystemStarted,
 };
-use crate::models::{
-    Commit, CommitHeadingTerminal, CommitType, CommitTypeTerminal, DescriptionTerminal, DimStatic,
-    FilenameTerminal, IsBreakingTerminal, OidTerminal, OptionalScope, PendingCommit,
-    RepositoryTerminal, Scope, ScopeTerminal, SemVerImpactTerminal, TimeStampTerminal,
-    BRAND_NAME, GRASS_11, GRASS_12, GRAY_1, GRAY_10, GRAY_11, GRAY_12, GRAY_2, GRAY_7, GRAY_9,
-    HR_COLOR, INSTRUCTIONS, RED_11, RED_9, TEAL_11, TEAL_12, TEAL_7, TEAL_9, WHITE_PURE,
-};
+use crate::models::Commit;
+use crate::models::*;
+use crate::models::{CommitTypeTerminal, MENU_COLOR};
 
-const TAB_WIDTH: usize = 8; // You can set this to any number of spaces you want
+const TAB_WIDTH: usize = 8;
 const LIST_ROW: usize = 3;
+const DISPLAY_WINDOW: usize = 11;
 
 #[akton_actor]
 pub(crate) struct Scribe {
@@ -40,6 +37,8 @@ pub(crate) struct Scribe {
     tab: String,
     half_tab: String,
     events: VecDeque<CommitEvent>,
+    session_count: usize,
+    session_recommendation: SemVerImpact,
 }
 
 impl Scribe {
@@ -50,7 +49,7 @@ impl Scribe {
         let actor_config = ActorConfig::new(Arn::with_root(name).unwrap(), None, Some(broker))
             .expect("Failed to create Scribe config");
         let term = Term::stdout();
-        term.set_title("Tangler Ai");
+        term.set_title("Tangler Ai Commits");
         term.hide_cursor();
 
         let mut actor = system
@@ -64,53 +63,22 @@ impl Scribe {
         actor
             .setup
             .act_on::<NotifyError>(|actor, event| {
-                let error_message = &event.message.error_message;
-                tracing::warn!("Displayed user error: {:?}", error_message);
-                if let Some(stderr) = &actor.state.stderr {
-                    stderr.write_line(error_message);
-                }
+                Scribe::handle_notify_error(&mut actor.state, &event.message.error_message);
             })
             .act_on::<CommitEvent>(|actor, event| {
-                let event_id = &event.message.id;
-                let mut replaced = false;
-
-                for existing_event in actor.state.events.iter_mut() {
-                    if existing_event.id == *event_id {
-                        *existing_event = event.message.clone();
-                        replaced = true;
-                        break;
-                    }
-                }
-
-                if !replaced {
-                    actor.state.events.push_front(event.message.clone());
-                }
-
-                if actor.state.events.len() > 10 {
-                    actor.state.events.pop_back();
-                }
-
-                if let Some(stderr) = &actor.state.stderr {
-                    stderr.move_cursor_to(0, LIST_ROW).unwrap();
-
-                    Scribe::clear_console();
-
-                    let mut events: Vec<_> = actor.state.events.clone().drain(..).collect();
-                    events.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
-
-                    for event in &events {
-                        stderr.clear_line();
-                        stderr.write_line(event.to_string().as_str()).unwrap();
-                    }
-                }
+                Scribe::handle_commit_event(&mut actor.state, &event.message);
             })
             .act_on::<SystemStarted>(|actor, _event| {
-                Self::print_hero_message(&actor.state);
+                Scribe::handle_system_started(&mut actor.state);
             })
             .on_before_stop(|actor| {
-                if let Some(stderr) = &actor.state.stderr {
-                    stderr.show_cursor().expect("Failed to re-show cursor");
-                }
+                actor
+                    .state
+                    .stderr
+                    .as_ref()
+                    .unwrap()
+                    .show_cursor()
+                    .expect("Failed to re-show cursor");
             });
 
         actor.context.subscribe::<CommitEvent>().await;
@@ -119,30 +87,163 @@ impl Scribe {
         actor.activate(None).await
     }
 
-    fn clear_console() {
-        let term = Term::stderr();
-        term.clear_to_end_of_screen();
-    }
-
-    #[instrument]
-    fn print_hero_message(scribe: &Scribe) {
-        if let Some(stderr) = &scribe.stderr {
-            trace!("printing hero");
-            stderr.clear_screen();
-
-            stderr.move_cursor_to(0, LIST_ROW - 2).unwrap();
-
-            let tangler = "Tangler".style(*BRAND_NAME);
-            let instructions = "Ctrl-C (Stop)".style(*INSTRUCTIONS);
-            let display = format!("{}{tangler} {instructions}", &scribe.half_tab);
-            stderr.write_line(&display);
-            scribe.print_horizontal_rule();
+    fn handle_notify_error(actor: &mut Scribe, error_message: &str) {
+        warn!("Displayed user error: {:?}", error_message);
+        if let Some(stderr) = &actor.stderr {
+            stderr.write_line(error_message).unwrap();
         }
     }
+
+    fn handle_system_started(actor: &mut Scribe) {
+        Scribe::clear_console();
+        Scribe::print_headings(&actor);
+    }
+
+    fn handle_commit_event(actor: &mut Scribe, event: &CommitEvent) {
+        let previous_events = actor.events.clone();
+
+        // Update events or add new ones
+        if let Some(existing_event) = actor.events.iter_mut().find(|e| e.id == event.id) {
+            *existing_event = event.clone();
+        } else {
+            actor.events.push_front(event.clone());
+            actor.session_count += 1;
+        }
+
+        if let Posted(commit) = &event.category {
+            actor.session_recommendation = std::cmp::max(
+                commit.semver_impact.clone(),
+                actor.session_recommendation.clone(),
+            );
+        }
+
+        actor.truncate_events();
+
+        // Update the display for changed events only
+        actor.update_changed_events(&previous_events, &actor.events);
+        actor.print_menu();
+    }
+
+    fn truncate_events(&mut self) {
+        while self.events.len() > DISPLAY_WINDOW {
+            self.events.pop_back();
+        }
+    }
+
+    fn update_changed_events(
+        &self,
+        previous_events: &VecDeque<CommitEvent>,
+        current_events: &VecDeque<CommitEvent>,
+    ) {
+        if let Some(stderr) = &self.stderr {
+            for i in 0..current_events.len() {
+                if current_events.get(i) != previous_events.get(i) {
+                    stderr.move_cursor_to(0, LIST_ROW + i).unwrap();
+                    stderr.clear_line().unwrap();
+                    stderr.write_line(&current_events[i].to_string()).unwrap();
+                }
+            }
+        }
+    }
+
+    fn clear_console() {
+        Term::stderr().clear_to_end_of_screen().unwrap();
+    }
+
+    fn print_headings(&self) {
+        if let Some(stderr) = &self.stderr {
+            stderr.move_cursor_to(0, LIST_ROW - 2).unwrap();
+            let display = format!(
+                "{}{:^COLUMN_HEADING_ONE_LENGTH$} \
+                {:^COLUMN_HEADING_TWO_LENGTH$} \
+                {:^COLUMN_HEADING_THREE_LENGTH$}\
+                {:^COLUMN_HEADING_FOUR_LENGTH$} \
+                {:^COLUMN_HEADING_FIVE_LENGTH$} \
+                {:^COLUMN_HEADING_SIX_LENGTH$} \
+                {:^COLUMN_HEADING_SEVEN_LENGTH$}",
+                self.half_tab,
+                COLUMN_HEADING_ONE,
+                COLUMN_HEADING_TWO,
+                COLUMN_HEADING_THREE,
+                COLUMN_HEADING_FOUR,
+                COLUMN_HEADING_FIVE,
+                COLUMN_HEADING_SIX,
+                COLUMN_HEADING_SEVEN
+            );
+            stderr.write_line(display.as_str()).unwrap();
+            self.print_horizontal_rule();
+        }
+    }
+
     fn print_horizontal_rule(&self) {
         if let Some(stderr) = &self.stderr {
-            let hr = "-".repeat(75);
-            eprintln!("{}{}", self.half_tab, hr.style(*HR_COLOR));
+            let (_, terminal_columns) = Term::stderr().size();
+            let canvas_length = terminal_columns - (TAB_WIDTH as u16);
+            let hr = "-".repeat(canvas_length as usize);
+            stderr
+                .write_line(&format!("{}{}", self.half_tab, hr.style(*HR_COLOR)))
+                .unwrap();
         }
+    }
+
+    fn print_menu(&self) {
+        if let Some(stderr) = &self.stderr {
+            stderr.move_cursor_to(0, 2 + DISPLAY_WINDOW);
+            self.print_horizontal_rule();
+            stderr.write_line(&self.format_footer()).unwrap();
+        }
+    }
+
+    fn format_footer(&self) -> String {
+        let instructions_text = "Ctrl-C (Stop)".style(*PALETTE_NEUTRAL_11).to_string();
+        let (_, screen_width) = Term::stderr().size();
+        let semver_recommendation_text_binding: SemVerImpactTerminal =
+            (&self.session_recommendation).into();
+        let semver_recommendation_text_binding = semver_recommendation_text_binding.to_string();
+        let semver_recommendation_text = pad_str(
+            &semver_recommendation_text_binding,
+            7,
+            Alignment::Center,
+            None,
+        );
+        let semver_label_text = "Max SemVer:".style(*PALETTE_NEUTRAL_11).to_string();
+        let session_commits_label_text = "Session commits:".style(*PALETTE_NEUTRAL_11).to_string();
+        let session_commits_text = format!("{:<5}", self.session_count.style(*COMMIT_COUNT));
+        let copyright_text = format!(
+            "\u{00A9} Govcraft 2024 Tangler v{}",
+            env!("CARGO_PKG_VERSION")
+        );
+
+        let canvas_width = screen_width as usize - TAB_WIDTH;
+        let instructions_width =
+            self.calculate_instructions_width(
+            canvas_width,
+            &session_commits_label_text,
+            &session_commits_text,
+            &copyright_text,
+            &semver_label_text,
+            &semver_recommendation_text,
+        );
+        let instructions_text = pad_str(&instructions_text, instructions_width, Alignment::Left, None);
+
+        format!(
+            "{}{semver_label_text}{semver_recommendation_text} {session_commits_label_text} {session_commits_text} {instructions_text}{copyright_text}",
+            self.half_tab
+        )
+    }
+
+    fn calculate_instructions_width(
+        &self,
+        canvas_width: usize,
+        session_commits_label_text: &str,
+        session_commits_text: &str,
+        copyright_text: &str,
+        semver_label_text: &str,
+        semver_recommendation_text: &str,
+    ) -> usize {
+        let total_length = session_commits_label_text.len()
+            + session_commits_text.len()
+            + semver_label_text.len();
+        canvas_width.saturating_sub(total_length)
     }
 }

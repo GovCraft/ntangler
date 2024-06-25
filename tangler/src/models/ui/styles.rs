@@ -1,3 +1,4 @@
+use console::{colors_enabled_stderr, Term};
 use lazy_static::lazy_static;
 use owo_colors::{OwoColorize, Style};
 use termcolor::Color;
@@ -6,62 +7,89 @@ pub(crate) const TAB_WIDTH: usize = 8; // You can set this to any number of spac
 pub(crate) const LIST_ROW: usize = 3;
 
 lazy_static! {
-
+pub static ref has_true_colors : bool = colors_enabled_stderr();
 /***********************   PALETTE   ***************************/
-pub static ref PALETTE_PRIMARY_12: Style = Style::new().truecolor(226,228,229);
-pub static ref PALETTE_PRIMARY_11: Style = *GRAY_11;
-pub static ref PALETTE_PRIMARY_10: Style = *GRAY_10;
-pub static ref PALETTE_PRIMARY_8: Style = *GRAY_8;
+pub static ref PALETTE_PRIMARY_13: Style = Style::new().truecolor(175,95,255);
+pub static ref PALETTE_PRIMARY_12: Style = *PURPLE_12;
+pub static ref PALETTE_PRIMARY_11: Style = *PURPLE_11;
+pub static ref PALETTE_PRIMARY_10: Style = *PURPLE_10;
+pub static ref PALETTE_PRIMARY_9: Style = *PURPLE_9;
+pub static ref PALETTE_PRIMARY_8: Style = *PURPLE_8;
+pub static ref PALETTE_PRIMARY_6: Style = *PURPLE_6;
+pub static ref PALETTE_PRIMARY_5: Style = *PURPLE_5;
 
-pub static ref BRAND_NAME: Style = *PALETTE_SECONDARY_12;
-pub static ref INSTRUCTIONS: Style = *PALETTE_SECONDARY_13;
-pub static ref PALETTE_SECONDARY_13: Style = Style::new().truecolor(251, 223, 184);
-pub static ref PALETTE_SECONDARY_12: Style = Style::new().truecolor(230, 179, 76);
-pub static ref PALETTE_SECONDARY_11: Style = Style::new().truecolor(184, 142, 59);
-pub static ref PALETTE_SECONDARY_10: Style = Style::new().truecolor(139, 107, 42);
-pub static ref PALETTE_SECONDARY_8: Style = Style::new().truecolor(97, 74, 27);
+pub static ref PALETTE_SECONDARY_13: Style = *MINT_12;
+pub static ref PALETTE_SECONDARY_12: Style = *MINT_12;
+pub static ref PALETTE_SECONDARY_11: Style = *MINT_11;
+pub static ref PALETTE_SECONDARY_10: Style = *MINT_10;
+pub static ref PALETTE_SECONDARY_9:  Style = *MINT_9;
+pub static ref PALETTE_SECONDARY_8:  Style = *MINT_8;
 
-pub static ref PALETTE_TERTIARY_13: Style = Style::new().truecolor(185, 237, 252);
-pub static ref PALETTE_TERTIARY_12: Style = Style::new().truecolor(76, 204, 230);
-pub static ref PALETTE_TERTIARY_11: Style = Style::new().truecolor(59,163,184);
-pub static ref PALETTE_TERTIARY_10: Style = Style::new().truecolor(43,123,140);
-pub static ref PALETTE_TERTIARY_8: Style = Style::new().truecolor(27,86,98);
+pub static ref PALETTE_TERTIARY_13: Style = *AMBER_12;
+pub static ref PALETTE_TERTIARY_12: Style = *AMBER_12;
+pub static ref PALETTE_TERTIARY_11: Style = *AMBER_11;
+pub static ref PALETTE_TERTIARY_10: Style = *AMBER_10;
+pub static ref PALETTE_TERTIARY_9: Style  = *AMBER_9;
+pub static ref PALETTE_TERTIARY_8: Style  = *AMBER_8;
 
-pub static ref ALERT_COLOR: Style = Style::new().truecolor(230,76,127);
+pub static ref ALERT_COLOR: Style = *ORANGE_11;
 
-pub static ref PALETTE_NEUTRAL_11: Style = Style::new().truecolor(146,152,152);
-pub static ref PALETTE_NEUTRAL_10: Style = Style::new().truecolor(111,114,115);
-pub static ref PALETTE_NEUTRAL_8: Style = Style::new().truecolor(77,79,80);
+pub static ref PALETTE_NEUTRAL_13: Style = Style::new().white();
+pub static ref PALETTE_NEUTRAL_12: Style = *MAUVE_12;
+pub static ref PALETTE_NEUTRAL_11: Style = *MAUVE_11;
+pub static ref PALETTE_NEUTRAL_10: Style = *MAUVE_10;
+pub static ref PALETTE_NEUTRAL_9: Style = *MAUVE_9;
+pub static ref PALETTE_NEUTRAL_8: Style = *MAUVE_8;
+pub static ref PALETTE_NEUTRAL_7: Style = *MAUVE_7;
+pub static ref PALETTE_NEUTRAL_6: Style = *MAUVE_6;
+pub static ref PALETTE_NEUTRAL_5: Style = *MAUVE_5;
+pub static ref PALETTE_NEUTRAL_4: Style = *MAUVE_4;
 
 /***********************  UI ELEMENTS  ***************************/
-pub static ref DESCRIPTION_COLOR: Style = *PALETTE_PRIMARY_12;
+pub static ref BRAND_NAME: Style = *PALETTE_PRIMARY_9;
 
-pub static ref COMMIT_TYPE_COLOR: Style = *PALETTE_SECONDARY_13;
-pub static ref FILENAME: Style = *PALETTE_SECONDARY_12;
-pub static ref SCOPE_COLOR: Style = *PALETTE_SECONDARY_12;
-pub static ref SCOPE_PUNCTUATION_COLOR: Style = *PALETTE_SECONDARY_13;
-pub static ref MINOR: Style = *PALETTE_SECONDARY_13;
-pub static ref PATCH: Style = *PALETTE_SECONDARY_13;
-pub static ref PUNCTUATION_COLOR: Style = *PALETTE_SECONDARY_8;
-pub static ref HR_COLOR: Style = *PALETTE_SECONDARY_8;
+pub static ref COMMIT_TYPE_COLOR: Style = *PALETTE_PRIMARY_11;
+pub static ref FILENAME: Style = *PALETTE_NEUTRAL_12;
+pub static ref SCOPE_COLOR: Style = *PALETTE_PRIMARY_11;
+pub static ref SCOPE_PUNCTUATION_COLOR: Style = *PALETTE_PRIMARY_11;
+pub static ref REPO_PENDING_COLOR: Style = *PALETTE_TERTIARY_12;
+pub static ref REPO_WRITING_COLOR: Style = *PALETTE_PRIMARY_11;
+pub static ref REPO_COLOR: Style = *PALETTE_PRIMARY_11;
+pub static ref TIME_PUNCTUATION_COLOR: Style = *PALETTE_PRIMARY_11;
+pub static ref COMMIT_COUNT: Style = *PALETTE_PRIMARY_11;
 
-pub static ref REPO_COLOR: Style = *PALETTE_TERTIARY_12;
-pub static ref TIME_COLOR: Style = *PALETTE_TERTIARY_12;
-pub static ref STATUS: Style = *PALETTE_SECONDARY_13;
-pub static ref OID_COLOR: Style = *PALETTE_TERTIARY_10;
-pub static ref TIME_PUNCTUATION_COLOR: Style = *PALETTE_TERTIARY_10;
+pub static ref OID_COLOR: Style = *PALETTE_PRIMARY_12;
+pub static ref TIME_COLOR_PENDING: Style = *PALETTE_PRIMARY_12;
+pub static ref TIME_COLOR: Style = *PALETTE_PRIMARY_12;
+
+pub static ref INSTRUCTIONS: Style = *PALETTE_NEUTRAL_13;
+pub static ref MINOR: Style = *PALETTE_TERTIARY_12;
+pub static ref PATCH: Style = *PALETTE_TERTIARY_12;
+pub static ref STATUS: Style = *PALETTE_TERTIARY_12;
+pub static ref STATUS_PENDING: Style = *PALETTE_TERTIARY_12;
+pub static ref PUNCTUATION_COLOR: Style = *PALETTE_NEUTRAL_10;
+pub static ref PUNCTUATION_PENDING_COLOR: Style = *PALETTE_NEUTRAL_10;
+pub static ref FILENAME_PENDING: Style = *PALETTE_TERTIARY_12;
+pub static ref TIME_PUNCTUATION_PENDING: Style = *PALETTE_NEUTRAL_10;
+pub static ref MENU_COLOR: Style = *PALETTE_NEUTRAL_7;
+pub static ref HR_COLOR: Style = *PALETTE_NEUTRAL_4;
 
 pub static ref MAJOR: Style = *ALERT_COLOR;
 
+pub static ref DESCRIPTION_COLOR: Style = *PALETTE_NEUTRAL_12;
+
+
 /*****************************************************************/
 pub static ref BG_DARK: Style = Style::new().truecolor(16, 18, 17);
+}
+lazy_static! {
 
 pub static ref GRAY_1: Style = Style::new().truecolor(17, 17, 17);
 pub static ref GRAY_2: Style = Style::new().truecolor(25, 25, 25);
 pub static ref GRAY_3: Style = Style::new().truecolor(34, 34, 34);
 pub static ref GRAY_4: Style = Style::new().truecolor(42, 42, 42);
 pub static ref GRAY_5: Style = Style::new().truecolor(49, 49, 49);
-pub static ref PALETTE_NEUTRAL_6: Style = Style::new().truecolor(58, 58, 58);
+pub static ref GRAY_6: Style = Style::new().truecolor(58, 58, 58);
 pub static ref GRAY_7: Style = Style::new().truecolor(72, 72, 72);
 pub static ref GRAY_8: Style = Style::new().truecolor(96, 96, 96);
 pub static ref GRAY_9: Style = Style::new().truecolor(110, 110, 110);
@@ -81,8 +109,6 @@ pub static ref MAUVE_9: Style = Style::new().truecolor(111, 109, 120);
 pub static ref MAUVE_10: Style = Style::new().truecolor(124, 122, 133);
 pub static ref MAUVE_11: Style = Style::new().truecolor(181, 178, 188);
 pub static ref MAUVE_12: Style = Style::new().truecolor(238, 238, 240);
-}
-lazy_static! {
     pub static ref TOMATO_1: Style = Style::new().truecolor(24, 17, 17);
     pub static ref TOMATO_2: Style = Style::new().truecolor(31, 21, 19);
     pub static ref TOMATO_3: Style = Style::new().truecolor(57, 23, 20);

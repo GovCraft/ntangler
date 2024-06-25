@@ -6,6 +6,7 @@ use serde::de::{MapAccess, Visitor};
 use crate::models::{CommitType, Description, Filename, Footer, generate_id, Oid, Scope, TimeStamp};
 use crate::models::semver_impact::SemVerImpact;
 use crate::models::traits::TanglerModel;
+use derive_more::*;
 
 impl From<Commit> for String {
     fn from(commit_details: Commit) -> Self {
@@ -13,7 +14,7 @@ impl From<Commit> for String {
     }
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Default)]
 pub(crate) struct Commit {
     pub(crate) id: String,
     pub(crate) repository: String,

@@ -1,6 +1,6 @@
 use std::fmt;
 use std::ops::Deref;
-
+use derive_more::*;
 use console::style;
 use serde::Deserialize;
 use termcolor::{Color, ColorSpec, StandardStream, WriteColor};
@@ -9,7 +9,7 @@ use tracing::{info, instrument, trace};
 use crate::models::{ConsoleStyle, TimeStamp};
 use crate::models::traits::TanglerModel;
 
-#[derive(Debug, Default, Clone, Deserialize, PartialEq)]
+#[derive(Clone,Default, Debug, PartialEq, Eq, PartialOrd, Ord, Deserialize)]
 pub(crate) struct Description(String);
 
 impl TanglerModel for Description {}

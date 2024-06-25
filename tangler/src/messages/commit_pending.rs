@@ -1,4 +1,5 @@
 use akton::prelude::*;
+use derive_more::*;
 
 use crate::models::{Commit, Oid, PendingCommit, TimeStamp};
 

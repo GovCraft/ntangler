@@ -161,7 +161,7 @@ impl GitRepository {
                                     ..Default::default()
                                 };
                                 commit.set_id(pending_commit.repository.clone(), &pending_commit.filename);
-                                let msg = CommitEvent::new(CommitEventCategory::Commit(commit));
+                                let msg = CommitEvent::new(CommitEventCategory::Posted(commit));
                                 tracing::debug!("Sending CommitPending");
                                 broker.emit_async(BrokerRequest::new(msg), None).await;
                             });
@@ -344,7 +344,7 @@ impl GitRepository {
                 Box::pin(async move {
                     debug!("Local commit: {:?}", &commit);
                     let broker = broker.clone();
-                    let msg = CommitEvent::new(CommitEventCategory::Commit(commit));
+                    let msg = CommitEvent::new(CommitEventCategory::Posted(commit));
                     broker.emit_async(BrokerRequest::new(msg), None).await;
                 })
             });

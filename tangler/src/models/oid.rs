@@ -3,11 +3,11 @@ use std::ops::Deref;
 
 use serde::Deserialize;
 use tracing::{info, instrument};
-
+use derive_more::*;
 use crate::models::Footer;
 use crate::models::traits::TanglerModel;
 
-#[derive(Debug, Default, Clone, Deserialize, PartialEq)]
+#[derive(Clone,Default, Debug, PartialEq, Eq, PartialOrd, Ord, Deserialize)]
 pub(crate) struct Oid(String);
 
 impl TanglerModel for Oid {}

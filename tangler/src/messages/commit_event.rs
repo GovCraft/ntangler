@@ -1,24 +1,22 @@
 use crate::messages::commit_authoring::CommitAuthoring;
 use crate::messages::CommitPosted;
-use crate::models::{
-    generate_id, Commit, CommitHeadingTerminal, CommitTypeTerminal, DescriptionTerminal,
-    FilenameTerminal, GeneratingCommit, IsBreakingTerminal, Oid, OidTerminal, PendingCommit,
-    RepositoryTerminal, ScopeTerminal, SemVerImpactTerminal, TimeStamp, TimeStampTerminal,
-    PUNCTUATION_COLOR, TAB_WIDTH,
-};
+use crate::models::*;
 use akton::prelude::*;
 use owo_colors::OwoColorize;
 use std::fmt;
+use console::{Alignment, pad_str};
+use derive_more::*;
 
 /// Represents a successful commit message with its details.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) enum CommitEventCategory {
     Pending(PendingCommit),
     Generating(GeneratingCommit),
-    Commit(Commit),
+    Posted(Commit),
 }
 
 #[akton_message]
+#[derive(PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) struct CommitEvent {
     pub(crate) id: String,
     pub(crate) timestamp: TimeStamp,
@@ -27,43 +25,70 @@ pub(crate) struct CommitEvent {
 
 impl fmt::Display for CommitEvent {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let timestamp: TimeStampTerminal = (&self.timestamp).into();
         // let tab = " ".repeat(TAB_WIDTH);
-        // let half_tab = " ".repeat(TAB_WIDTH / 2);
+        let half_tab = " ".repeat(TAB_WIDTH / 2);
+        let emdash = "  \u{2022}  ".style(*STATUS_PENDING);
+        let time_stamp = "\u{2022}\u{2022}:\u{2022}\u{2022}:\u{2022}\u{2022}".style(*TIME_COLOR);
 
         let display = match &self.category {
             CommitEventCategory::Pending(event) => {
-                let filename: FilenameTerminal = (&event.filename).into();
-                let repository: RepositoryTerminal = (&event.repository).into();
-                let status = &event.status;
+                let time_stamp =
+                    "\u{2022}\u{2022}:\u{2022}\u{2022}:\u{2022}\u{2022}".style(*STATUS_PENDING);
+                let filename = &event.filename.style(*FILENAME_PENDING);
+                let repository = &event.repository.style(*REPO_PENDING_COLOR);
+                let status = &event.status.style(*STATUS_PENDING).to_string();
                 format!(
-                    "{repository} {timestamp} {status}{:^6}{filename}",
-                    "\u{2014}".style(*PUNCTUATION_COLOR)
+                    "\
+                    {half_tab}\
+                    {repository:<COLUMN_HEADING_ONE_LENGTH$} \
+                    {time_stamp:^COLUMN_HEADING_TWO_LENGTH$} \
+                    {status:^COLUMN_HEADING_THREE_LENGTH$}\
+                    {emdash:^COLUMN_HEADING_FOUR_LENGTH$} \
+                    {filename:<COLUMN_HEADING_FIVE_LENGTH$}"
                 )
             }
             CommitEventCategory::Generating(event) => {
-                let filename: FilenameTerminal = (&event.filename).into();
-                let repository: RepositoryTerminal = (&event.repository).into();
-                let status = &event.status;
+                let emdash = "  \u{2022}  ".style(*ALERT_COLOR);
+
+                let time_stamp =
+                    "\u{2022}\u{2022}:\u{2022}\u{2022}:\u{2022}\u{2022}".style(*ALERT_COLOR);
+                let filename = &event.filename.style(*ALERT_COLOR);
+                let repository = &event.repository.style(*ALERT_COLOR);
+                let status = &event.status.style(*ALERT_COLOR).to_string();
                 format!(
-                    "{repository} {timestamp} {status}{:^6}{filename}",
-                    "\u{2014}".style(*PUNCTUATION_COLOR)
+                    "{half_tab}\
+                    {repository:<COLUMN_HEADING_ONE_LENGTH$} \
+                    {time_stamp:^COLUMN_HEADING_TWO_LENGTH$} \
+                    {status:^COLUMN_HEADING_THREE_LENGTH$}\
+                    {emdash:^COLUMN_HEADING_FOUR_LENGTH$} \
+                    {filename:<COLUMN_HEADING_FIVE_LENGTH$}"
                 )
             }
-            CommitEventCategory::Commit(commit) => {
-                let oid: OidTerminal = (&commit.oid).into();
-                let description: DescriptionTerminal = (&commit.description).into();
-                let semver_impact: SemVerImpactTerminal = (&commit.semver_impact).into();
+            CommitEventCategory::Posted(event) => {
+                let timestamp = &self.timestamp.style(*TIME_COLOR);
+                let oid: OidTerminal = (&event.oid).into();
+                let description: DescriptionTerminal = (&event.description).into();
+                let semver_impact: SemVerImpactTerminal = (&event.semver_impact).into();
+                let semver_impact = semver_impact.to_string();
+                let semver_impact = pad_str(&semver_impact, *COLUMN_HEADING_FOUR_LENGTH, Alignment::Center, None);
+                // let semver_impact = format!("{semver_impact:^COLUMN_HEADING_FOUR_LENGTH$}");
                 let commit_heading: CommitHeadingTerminal = (
-                    (&commit.commit_type).into(),
-                    (&commit.scope).into(),
-                    (&commit.is_breaking).into(),
+                    (&event.commit_type).into(),
+                    (&event.scope).into(),
+                    (&event.is_breaking).into(),
                 )
                     .into();
-                let repository: RepositoryTerminal = (&commit.repository).into();
-                let file_name: FilenameTerminal = (&commit.filename).into();
+                let repository = &event.repository.style(*REPO_COLOR);
+                let filename = &event.filename;
                 format!(
-                    "{repository} {timestamp} {oid} {semver_impact} {file_name} {commit_heading} {description}"
+                    "{half_tab}\
+                    {repository:<COLUMN_HEADING_ONE_LENGTH$} \
+                    {timestamp:^COLUMN_HEADING_TWO_LENGTH$} \
+                    {oid:^COLUMN_HEADING_THREE_LENGTH$} \
+                    {semver_impact} \
+                    {filename:<COLUMN_HEADING_FIVE_LENGTH$} \
+                    {commit_heading:<COLUMN_HEADING_SIX_LENGTH$} \
+                    {description:<COLUMN_HEADING_SEVEN_LENGTH$}"
                 )
             }
         };
@@ -77,7 +102,7 @@ impl CommitEvent {
         let (filename, repository) = match &category {
             CommitEventCategory::Pending(c) => (&c.filename, &c.repository),
             CommitEventCategory::Generating(c) => (&c.filename, &c.repository),
-            CommitEventCategory::Commit(c) => (&c.filename, &c.repository),
+            CommitEventCategory::Posted(c) => (&c.filename, &c.repository),
         };
         let timestamp = TimeStamp::new();
         let id = generate_id(repository, filename.clone());

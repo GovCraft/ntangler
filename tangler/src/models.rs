@@ -9,6 +9,7 @@ pub(crate) use scope::{OptionalScope, Scope};
 pub(crate) use time_stamp::TimeStamp;
 pub(crate) use ui::*;
 pub(crate) use file_name::Filename;
+pub(crate) use semver_impact::SemVerImpact;
 mod footer;
 mod commit_type;
 mod scope;

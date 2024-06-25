@@ -9,7 +9,7 @@ use tracing::{info, instrument, trace};
 use crate::models::{ConsoleStyle, TimeStamp};
 use crate::models::traits::TanglerModel;
 
-#[derive(Debug, Default, Clone, Deserialize, PartialEq)]
+#[derive(Debug, Default, Clone, Deserialize, PartialEq ,Eq, PartialOrd, Ord)]
 pub(crate) struct Filename(String);
 
 impl TanglerModel for Filename {}
@@ -33,10 +33,8 @@ impl Deref for Filename {
 impl fmt::Display for Filename {
     #[instrument(level = "trace", skip(self, f))]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let filename = self.0.to_string();
-        let result = write!(f, "{filename}");
 
-        result
+        write!(f, "{}", self.0)
     }
 }
 

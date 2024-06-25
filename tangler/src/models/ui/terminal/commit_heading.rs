@@ -29,7 +29,7 @@ impl fmt::Display for CommitHeadingTerminal {
         let (commit_type, scope, warning) = &self.0;
         let left_parens = "(".style(*SCOPE_PUNCTUATION_COLOR);
         let right_parens = ")".style(*SCOPE_PUNCTUATION_COLOR);
-        write!(f, "{}{left_parens}{}{right_parens}{}", commit_type, scope, warning);
+        write!(f, "{commit_type}{left_parens}{scope}{right_parens}{warning}");
         Ok(())
     }
 }
