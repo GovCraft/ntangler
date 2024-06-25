@@ -28,12 +28,11 @@ impl fmt::Display for CommitEvent {
         // let tab = " ".repeat(TAB_WIDTH);
         let half_tab = " ".repeat(TAB_WIDTH / 2);
         let emdash = "  \u{2022}  ".style(*STATUS_PENDING);
-        let time_stamp = "\u{2022}\u{2022}:\u{2022}\u{2022}:\u{2022}\u{2022}".style(*TIME_COLOR);
+        let time_stamp = "\u{2014}\u{2014}".style(*TIME_COLOR);
 
         let display = match &self.category {
             CommitEventCategory::Pending(event) => {
-                let time_stamp =
-                    "\u{2022}\u{2022}:\u{2022}\u{2022}:\u{2022}\u{2022}".style(*STATUS_PENDING);
+                let time_stamp = "\u{2014}\u{2014}".style(*STATUS_PENDING);
                 let filename = &event.filename.style(*FILENAME_PENDING);
                 let repository = &event.repository.style(*REPO_PENDING_COLOR);
                 let status = &event.status.style(*STATUS_PENDING).to_string();
@@ -50,8 +49,7 @@ impl fmt::Display for CommitEvent {
             CommitEventCategory::Generating(event) => {
                 let emdash = "  \u{2022}  ".style(*ALERT_COLOR);
 
-                let time_stamp =
-                    "\u{2022}\u{2022}:\u{2022}\u{2022}:\u{2022}\u{2022}".style(*ALERT_COLOR);
+                let time_stamp = "\u{2014}\u{2014}".style(*ALERT_COLOR);
                 let filename = &event.filename.style(*ALERT_COLOR);
                 let repository = &event.repository.style(*ALERT_COLOR);
                 let status = &event.status.style(*ALERT_COLOR).to_string();

@@ -107,7 +107,6 @@ impl Scribe {
             *existing_event = event.clone();
         } else {
             actor.events.push_front(event.clone());
-            actor.session_count += 1;
         }
 
         if let Posted(commit) = &event.category {
@@ -115,6 +114,10 @@ impl Scribe {
                 commit.semver_impact.clone(),
                 actor.session_recommendation.clone(),
             );
+            // Update session_count to reflect the true number of Posted events
+            actor.session_count = actor.events.iter()
+                .filter(|event| matches!(event.category, CommitEventCategory::Posted(_)))
+                .count();
         }
 
         actor.truncate_events();
@@ -191,6 +194,7 @@ impl Scribe {
             stderr.move_cursor_to(0, 2 + DISPLAY_WINDOW);
             self.print_horizontal_rule();
             stderr.write_line(&self.format_footer()).unwrap();
+            stderr.clear_to_end_of_screen().unwrap()
         }
     }
 
@@ -215,8 +219,7 @@ impl Scribe {
         );
 
         let canvas_width = screen_width as usize - TAB_WIDTH;
-        let instructions_width =
-            self.calculate_instructions_width(
+        let instructions_width = self.calculate_instructions_width(
             canvas_width,
             &session_commits_label_text,
             &session_commits_text,
@@ -224,12 +227,36 @@ impl Scribe {
             &semver_label_text,
             &semver_recommendation_text,
         );
-        let instructions_text = pad_str(&instructions_text, instructions_width, Alignment::Left, None);
+        let instructions_text = pad_str(
+            &instructions_text,
+            instructions_width,
+            Alignment::Left,
+            None,
+        );
 
         format!(
             "{}{semver_label_text}{semver_recommendation_text} {session_commits_label_text} {session_commits_text} {instructions_text}{copyright_text}",
             self.half_tab
         )
+    }
+
+    fn calculate_remaining_width(
+        &self,
+        canvas_width: usize,
+        session_commits_label_text: &str,
+        session_commits_text: &str,
+        semver_label_text: &str,
+    ) -> usize {
+        let total_length =
+            session_commits_label_text.len() + session_commits_text.len() + semver_label_text.len();
+        let remaining_width = canvas_width.saturating_sub(total_length);
+
+        if remaining_width == 0 {
+            let adjusted_length = session_commits_label_text.len() + semver_label_text.len();
+            canvas_width.saturating_sub(adjusted_length)
+        } else {
+            remaining_width
+        }
     }
 
     fn calculate_instructions_width(
@@ -241,9 +268,23 @@ impl Scribe {
         semver_label_text: &str,
         semver_recommendation_text: &str,
     ) -> usize {
-        let total_length = session_commits_label_text.len()
-            + session_commits_text.len()
-            + semver_label_text.len();
-        canvas_width.saturating_sub(total_length)
+        // Calculate total text length and remaining width
+        let remaining_width = self.calculate_remaining_width(
+            canvas_width,
+            session_commits_label_text,
+            session_commits_text,
+            semver_label_text,
+        );
+
+        trace!("Remaining width without adjustments: {}", remaining_width);
+
+        if remaining_width == 0 {
+            let adjusted_total_length = session_commits_label_text.len() + semver_label_text.len();
+            let adjusted_width = canvas_width.saturating_sub(adjusted_total_length);
+            trace!("Width after adjustment: {}", adjusted_width);
+            return adjusted_width;
+        }
+
+        remaining_width
     }
 }
