@@ -1,8 +1,5 @@
-use crate::models::TimeStamp;
 use chrono::{DateTime, TimeZone, Utc};
-use derive_more::*;
 use git2::{Signature, Time};
-use serde::Deserialize;
 
 #[derive(Clone, Default, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) struct TangledSignature {
