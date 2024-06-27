@@ -14,7 +14,7 @@ use tokio::signal;
 use tracing::{error, Level};
 use tracing_appender::rolling::{RollingFileAppender, Rotation};
 use tracing_subscriber::fmt::format::FmtSpan;
-use tracing_subscriber::{EnvFilter, FmtSubscriber};
+use tracing_subscriber::{EnvFilter, FmtSubscriber,layer::SubscriberExt};
 
 use crate::actors::Tangler;
 use crate::models::config::TanglerConfig;
