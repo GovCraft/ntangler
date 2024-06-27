@@ -109,7 +109,7 @@ pub fn setup_tracing(app_name: &str, config_file: &str) {
             .add_directive("akton_core::actors::actor=error".parse().unwrap())
             .add_directive("akton_core::actors::idle=error".parse().unwrap())
             .add_directive("akton_core::message::outbound_envelope=error".parse().unwrap())
-            .add_directive("ntangler::actors=off".parse().unwrap())
+            .add_directive("ntangler::actors=trace".parse().unwrap())
             .add_directive("ntangler::actors::repositories[handle_poll_request]=off".parse().unwrap())
             .add_directive("ntangler::actors::scribe=off".parse().unwrap())
             .add_directive("ntangler::actors::scribe[print_hero_message]=off".parse().unwrap())
