@@ -63,9 +63,9 @@ impl Scribe {
 
         actor
             .setup
-            .act_on::<NotifyError>(|actor, event| {
-                Scribe::handle_notify_error(&mut actor.state, &event.message.error_message);
-            })
+            // .act_on::<NotifyError>(|actor, event| {
+            //     Scribe::handle_notify_error(&mut actor.state, &event.message.error_message);
+            // })
             .act_on::<DiffQueued>(|actor, event| {
                 let msg = event.message.clone();
                 let app_event: AppEvent = msg.into();
