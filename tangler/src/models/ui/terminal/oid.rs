@@ -7,11 +7,13 @@ use owo_colors::OwoColorize;
 use serde::Deserialize;
 use tracing::{info, instrument};
 
-use crate::models::{ConsoleStyle, GRASS_11, GRASS_12, GRASS_9, GRAY_10, Oid, OID_COLOR, TEAL_11, TEAL_12};
+use crate::models::{
+    ConsoleStyle, Oid, GRASS_11, GRASS_12, GRASS_9, GRAY_10, OID_COLOR, TEAL_11, TEAL_12,
+};
 
 #[derive(Debug, Default, Clone, Deserialize, PartialEq)]
 pub(crate) struct OidTerminal(Oid);
-impl ConsoleStyle for OidTerminal{}
+impl ConsoleStyle for OidTerminal {}
 impl Deref for OidTerminal {
     type Target = str;
 
@@ -23,12 +25,8 @@ impl Deref for OidTerminal {
 impl fmt::Display for OidTerminal {
     #[instrument(level = "trace", skip(self, f))]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-
-
-
-         write!(f, "{}", &self.0.style(*OID_COLOR));
+        write!(f, "{}", &self.0.style(*OID_COLOR));
         Ok(())
-
     }
 }
 

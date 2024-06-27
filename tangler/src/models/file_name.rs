@@ -6,21 +6,19 @@ use serde::Deserialize;
 use termcolor::{Color, ColorSpec, StandardStream, WriteColor};
 use tracing::{info, instrument, trace};
 
-use crate::models::{ConsoleStyle, TimeStamp};
 use crate::models::traits::TanglerModel;
+use crate::models::{ConsoleStyle, TimeStamp};
 
-#[derive(Debug, Default, Clone, Deserialize, PartialEq ,Eq, PartialOrd, Ord)]
+#[derive(Debug, Default, Clone, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) struct Filename(String);
 
 impl TanglerModel for Filename {}
-
 
 impl Filename {
     pub(crate) fn new(filename: &str) -> Filename {
         Filename(filename.to_string())
     }
 }
-
 
 impl Deref for Filename {
     type Target = str;
@@ -33,8 +31,11 @@ impl Deref for Filename {
 impl fmt::Display for Filename {
     #[instrument(level = "trace", skip(self, f))]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-
-        write!(f, "{}", self.0)
+        if let Some(last_segment) = self.0.rsplit('/').next() {
+            write!(f, "{}", last_segment)
+        } else {
+            write!(f, "{}", self.0)
+        }
     }
 }
 

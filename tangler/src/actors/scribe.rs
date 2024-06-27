@@ -2,6 +2,7 @@ use std::cmp::PartialEq;
 use std::collections::VecDeque;
 use std::fmt::Debug;
 use std::io::{stderr, Write};
+use std::sync::Arc;
 use std::time::Duration;
 use std::{any::TypeId, fmt::Display};
 
@@ -17,12 +18,11 @@ use tracing::*;
 use unicode_segmentation::UnicodeSegmentation;
 use unicode_width::UnicodeWidthStr;
 
-use crate::messages::CommitEventCategory::Posted;
 use crate::messages::{
-    CommitEvent, CommitEventCategory, CommitPending, CommitPosted, NotifyError, SubscribeBroker,
+    CommitPosted, DiffQueued, FinalizedCommit, GenerationStarted, NotifyError, SubscribeBroker,
     SystemStarted,
 };
-use crate::models::Commit;
+use crate::models::CommittedCommit;
 use crate::models::*;
 use crate::models::{CommitTypeTerminal, MENU_COLOR};
 
@@ -31,12 +31,13 @@ const LIST_ROW: usize = 3;
 const DISPLAY_WINDOW: usize = 11;
 
 #[akton_actor]
+#[derive(Clone)]
 pub(crate) struct Scribe {
     stdout: Option<Term>,
     stderr: Option<Term>,
     tab: String,
     half_tab: String,
-    events: VecDeque<CommitEvent>,
+    events: VecDeque<AppEvent>,
     session_count: usize,
     session_recommendation: SemVerImpact,
 }
@@ -65,8 +66,26 @@ impl Scribe {
             .act_on::<NotifyError>(|actor, event| {
                 Scribe::handle_notify_error(&mut actor.state, &event.message.error_message);
             })
-            .act_on::<CommitEvent>(|actor, event| {
-                Scribe::handle_commit_event(&mut actor.state, &event.message);
+            .act_on::<DiffQueued>(|actor, event| {
+                let msg = event.message.clone();
+                let app_event: AppEvent = msg.into();
+                Scribe::handle_commit_event(&mut actor.state, &app_event);
+            })
+            .act_on::<GenerationStarted>(|actor, event| {
+                let msg = event.message.clone();
+                let app_event: AppEvent = msg.into();
+                Scribe::handle_commit_event(&mut actor.state, &app_event);
+            })
+            .act_on::<FinalizedCommit>(|actor, event| {
+                let msg = event.message.clone();
+                let app_event: AppEvent = msg.clone().into();
+                actor.state.session_recommendation = std::cmp::max(
+                    msg.commit_message.semver_impact.clone(),
+                    actor.state.session_recommendation.clone(),
+                );
+                // Update session_count to reflect the true number of Posted events
+                actor.state.session_count += 1;
+                Scribe::handle_commit_event(&mut actor.state, &app_event);
             })
             .act_on::<SystemStarted>(|actor, _event| {
                 Scribe::handle_system_started(&mut actor.state);
@@ -81,8 +100,10 @@ impl Scribe {
                     .expect("Failed to re-show cursor");
             });
 
-        actor.context.subscribe::<CommitEvent>().await;
         actor.context.subscribe::<SystemStarted>().await;
+        actor.context.subscribe::<DiffQueued>().await;
+        actor.context.subscribe::<GenerationStarted>().await;
+        actor.context.subscribe::<FinalizedCommit>().await;
 
         actor.activate(None).await
     }
@@ -99,32 +120,24 @@ impl Scribe {
         Scribe::print_headings(&actor);
     }
 
-    fn handle_commit_event(actor: &mut Scribe, event: &CommitEvent) {
-        let previous_events = actor.events.clone();
-
+    fn handle_commit_event(scribe: &mut Scribe, event: &AppEvent) {
+        let previous_events = scribe.events.clone();
         // Update events or add new ones
-        if let Some(existing_event) = actor.events.iter_mut().find(|e| e.id == event.id) {
+        if let Some(existing_event) = scribe
+            .events
+            .iter_mut()
+            .find(|e| e.get_id() == event.get_id())
+        {
             *existing_event = event.clone();
         } else {
-            actor.events.push_front(event.clone());
+            scribe.events.push_front(event.clone());
         }
 
-        if let Posted(commit) = &event.category {
-            actor.session_recommendation = std::cmp::max(
-                commit.semver_impact.clone(),
-                actor.session_recommendation.clone(),
-            );
-            // Update session_count to reflect the true number of Posted events
-            actor.session_count = actor.events.iter()
-                .filter(|event| matches!(event.category, CommitEventCategory::Posted(_)))
-                .count();
-        }
-
-        actor.truncate_events();
+        scribe.truncate_events();
 
         // Update the display for changed events only
-        actor.update_changed_events(&previous_events, &actor.events);
-        actor.print_menu();
+        scribe.update_changed_events(&previous_events, &scribe.events);
+        scribe.print_menu();
     }
 
     fn truncate_events(&mut self) {
@@ -135,8 +148,8 @@ impl Scribe {
 
     fn update_changed_events(
         &self,
-        previous_events: &VecDeque<CommitEvent>,
-        current_events: &VecDeque<CommitEvent>,
+        previous_events: &VecDeque<AppEvent>,
+        current_events: &VecDeque<AppEvent>,
     ) {
         if let Some(stderr) = &self.stderr {
             for i in 0..current_events.len() {

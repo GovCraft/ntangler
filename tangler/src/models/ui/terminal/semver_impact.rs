@@ -1,11 +1,11 @@
-use std::fmt;
-use termcolor::{Color, ColorSpec, StandardStream, WriteColor};
-use tracing::{instrument, trace};
-use crate::models::*;
 use crate::models::semver_impact::SemVerImpact;
 use crate::models::traits::TanglerModel;
-use std::io::Write;
+use crate::models::*;
 use owo_colors::OwoColorize;
+use std::fmt;
+use std::io::Write;
+use termcolor::{Color, ColorSpec, StandardStream, WriteColor};
+use tracing::{instrument, trace};
 
 #[derive(Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) struct SemVerImpactTerminal(SemVerImpact);
@@ -16,15 +16,12 @@ impl fmt::Display for SemVerImpactTerminal {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.0.to_string().as_str() {
             "MAJOR" => {
-
                 write!(f, "{}", "MAJOR".style(*MAJOR));
             }
             "MINOR" => {
-
                 write!(f, "{}", "MINOR".style(*MINOR));
             }
             "PATCH" => {
-
                 write!(f, "{}", "PATCH".style(*PATCH));
             }
             _ => {

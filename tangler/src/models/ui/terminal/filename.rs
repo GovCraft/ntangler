@@ -7,7 +7,7 @@ use serde::Deserialize;
 use termcolor::{Color, ColorSpec, StandardStream, WriteColor};
 use tracing::{info, instrument, trace};
 
-use crate::models::{TEAL_11, TEAL_12, ConsoleStyle, Filename, GRAY_11, GRAY_12, FILENAME};
+use crate::models::{ConsoleStyle, Filename, FILENAME, GRAY_11, GRAY_12, TEAL_11, TEAL_12};
 
 #[derive(Debug, Default, Clone, Deserialize, PartialEq)]
 pub(crate) struct FilenameTerminal(Filename);
@@ -25,8 +25,7 @@ impl Deref for FilenameTerminal {
 impl fmt::Display for FilenameTerminal {
     #[instrument(level = "trace", skip(self, f))]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-
-//        write!(f, "{:>10}", self.0.style(REPO_COLOR.clone()));
+        //        write!(f, "{:>10}", self.0.style(REPO_COLOR.clone()));
         write!(f, "{:>15}", &self.0.style(*FILENAME));
         Ok(())
     }
