@@ -1,4 +1,3 @@
-mod diff_calculated;
 
 mod notify_error;
 
@@ -25,7 +24,6 @@ pub(crate) use generation_started::GenerationStarted;
 pub(crate) use accept_broker::AcceptBroker;
 pub(crate) use commit_message_generated::CommitMessageGenerated;
 pub(crate) use commit_posted::CommitPosted;
-pub(crate) use diff_calculated::DiffCalculated;
 
 pub(crate) use notify_error::NotifyError;
 pub(crate) use poll_changes::RepositoryPollRequested;
