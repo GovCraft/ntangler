@@ -1,41 +1,36 @@
-#![allow(unused)]
-
+use std::{env, fs};
 use std::ffi::OsString;
-use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::sync::mpsc::channel;
-use std::sync::{Arc, Mutex, Once};
-use std::time::Duration;
-use std::{env, fs, io};
+use std::sync::Once;
 
-use crate::actors::Tangler;
-use crate::models::config::TanglerConfig;
 use akton::prelude::*;
 use anyhow::Result;
 use console::Term;
-use futures::StreamExt;
-use indicatif::TermLike;
-use notify::{recommended_watcher, RecursiveMode, Watcher};
-use notify_debouncer_mini::{new_debouncer, DebounceEventResult, DebouncedEvent};
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use tokio::signal;
-use tracing::{error, trace, Level};
+use tracing::Level;
 use tracing_appender::rolling::{RollingFileAppender, Rotation};
+use tracing_subscriber::{EnvFilter, FmtSubscriber};
 use tracing_subscriber::fmt::format::FmtSpan;
-use tracing_subscriber::{layer::SubscriberExt, EnvFilter, FmtSubscriber};
+
+use crate::actors::Tangler;
+use crate::models::config::TanglerConfig;
 
 mod actors;
 mod messages;
 mod models;
+
 #[derive(Debug, Deserialize)]
 struct LogConfig {
     log_directives: Vec<String>,
 }
+
 fn read_log_config(config_path: &PathBuf) -> LogConfig {
     let config_content =
         fs::read_to_string(config_path).expect("Unable to read log configuration file");
     toml::from_str(&config_content).expect("Invalid configuration format")
 }
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     setup_tracing("ntangler", "config.toml");
@@ -57,14 +52,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         config_path.display()
     ))?;
 
-    let (tangler, broker) = Tangler::initialize(tangler_config).await?;
+    let (tangler, _broker) = Tangler::initialize(tangler_config).await?;
 
     match signal::ctrl_c().await {
         Ok(()) => {
             Term::stderr().write_line("Shutting down gracefully. Please wait...")?;
             tangler.suspend_actor().await?;
             Term::stdout().show_cursor()?;
-            Term::stdout().write_line("Shutdown complete. All operations halted safely.");
+            Term::stdout().write_line("Shutdown complete. All operations halted safely.")?;
         }
         Err(err) => {
             Term::stderr().write_line(&format!(
@@ -82,6 +77,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 fn check_openai_api_key() -> bool {
     env::var("OPENAI_API_KEY").is_ok()
 }
+
 fn find_config_path(
     app_name: &str,
     config_file: &str,
@@ -120,6 +116,7 @@ fn create_log_path(config_path: &Path) -> PathBuf {
     new_path.set_file_name(new_file_name);
     new_path
 }
+
 static INIT: Once = Once::new();
 
 pub fn setup_tracing(app_name: &str, config_file: &str) {
@@ -130,9 +127,6 @@ pub fn setup_tracing(app_name: &str, config_file: &str) {
 
         let config_path =
             find_config_path(app_name, config_file).expect("Unable to find config file path");
-        let config_dir = config_path
-            .parent()
-            .expect("Config path has no parent directory");
 
         let log_config_path = create_log_path(&config_path);
         // Read initial log configuration directives
@@ -147,7 +141,7 @@ pub fn setup_tracing(app_name: &str, config_file: &str) {
             filter.add_directive(Level::TRACE.into())
         };
 
-        let mut filter = create_filter(&log_config);
+        let filter = create_filter(&log_config);
 
         // Set global log level to TRACE and direct logs to the file appender
         let subscriber = FmtSubscriber::builder()
@@ -168,11 +162,13 @@ pub fn setup_tracing(app_name: &str, config_file: &str) {
 mod tests {
     use std::fs;
 
-    use super::*;
+    use akton::prelude::ActorContext;
+
     use crate::actors::Tangler;
     use crate::models::config::RepositoryConfig;
     use crate::models::config::TanglerConfig;
-    use akton::prelude::ActorContext;
+
+    use super::*;
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn test_main() -> anyhow::Result<()> {
@@ -183,7 +179,7 @@ mod tests {
 
         let (tangler_actor, _broker) = Tangler::initialize(tangler_config).await?;
 
-        tangler_actor.suspend().await?;
+        tangler_actor.suspend_actor().await?;
         Ok(())
     }
 
