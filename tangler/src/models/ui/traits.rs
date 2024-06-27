@@ -24,10 +24,12 @@ pub(crate) trait ConsoleStyle: Display{
     }
 }
 
-pub(crate) trait RepositoryEvent {
+pub(crate) trait RepositoryEvent: Send + Sync + 'static{
     fn get_repo_info(&self) -> TangledRepository;
     // fn get_commit_step(&self) -> CommitStep;
     fn get_commit(&self) -> &TangledCommit;
+    fn get_id(&self) -> &str;
+    fn display(&self) -> &str;
 }
 
 pub(crate) trait TanglerCommit {
