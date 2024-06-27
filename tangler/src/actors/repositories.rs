@@ -257,7 +257,7 @@ impl GitRepository {
 
         let modified_files: Vec<String> = statuses
             .iter()
-            .filter(|f| f.status() != Status::INDEX_DELETED)
+            .filter(|f| f.status() != (Status::INDEX_DELETED | Status::WT_DELETED))
             .map(|entry| entry.path().unwrap().to_string())
             .collect::<HashSet<_>>()
             .into_iter()
