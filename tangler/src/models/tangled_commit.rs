@@ -1,9 +1,9 @@
-use git2::Signature;
+use crate::models::signature::TangledSignature;
 use crate::models::{Oid, TanglerCommit};
 use derive_more::*;
-use crate::models::signature::TangledSignature;
+use git2::Signature;
 
-#[derive(Clone, Debug, )]
+#[derive(Clone, Debug)]
 pub(crate) struct TangledCommit {
     oid: Oid,
     signature: TangledSignature,
@@ -30,8 +30,18 @@ impl TanglerCommit for TangledCommit {
 }
 
 impl TangledCommit {
-    pub fn new(oid: Oid, signature: TangledSignature, summary: Option<String>, body: Option<String>) -> Self {
-        TangledCommit { oid, signature, summary, body }
+    pub fn new(
+        oid: Oid,
+        signature: TangledSignature,
+        summary: Option<String>,
+        body: Option<String>,
+    ) -> Self {
+        TangledCommit {
+            oid,
+            signature,
+            summary,
+            body,
+        }
     }
 
     // Additional methods for developing the commit through CommitSteps
