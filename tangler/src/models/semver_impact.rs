@@ -1,6 +1,3 @@
-use crate::models::traits::TanglerModel;
-use crate::models::Scope;
-use crate::models::COLUMN_HEADING_FOUR_LENGTH;
 use std::fmt;
 
 #[derive(Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
@@ -11,7 +8,7 @@ pub(crate) enum SemVerImpact {
     Minor,
     Major,
 }
-impl TanglerModel for SemVerImpact {}
+
 impl fmt::Display for SemVerImpact {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let symbol = match self {

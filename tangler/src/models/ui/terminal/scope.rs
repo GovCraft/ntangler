@@ -1,23 +1,19 @@
-use console::style;
-use owo_colors::colors::*;
-use owo_colors::{OwoColorize, Style};
 use std::default::Default;
 use std::fmt;
-use std::io::Write;
 use std::ops::Deref;
 
-use crate::models::{
-    ConsoleStyle, DimStatic, OptionalScope, Scope, AMBER_12, GRAY_10, GRAY_11, GRAY_12, GRAY_3,
-    GRAY_9, SCOPE_COLOR, TEAL_11, TEAL_12, TEAL_9, WHITE_PURE,
-};
+use owo_colors::OwoColorize;
 use serde::Deserialize;
-use termcolor::{BufferWriter, Color, ColorChoice, ColorSpec, StandardStream, WriteColor};
-use tracing::{info, instrument};
+use tracing::{error, info, instrument};
+
+use crate::models::{
+    Scope,
+    SCOPE_COLOR,
+};
 
 #[derive(Debug, Default, Clone, Deserialize)]
 pub(crate) struct ScopeTerminal(Scope);
 
-impl ConsoleStyle for ScopeTerminal {}
 
 impl Deref for ScopeTerminal {
     type Target = Scope;
@@ -30,8 +26,9 @@ impl Deref for ScopeTerminal {
 impl fmt::Display for ScopeTerminal {
     #[instrument(level = "trace", skip(self, f))]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.0.style(*SCOPE_COLOR));
-
+        if let Err(e) = write!(f, "{}", self.0.style(*SCOPE_COLOR)) {
+            error!("{:?}", e);
+        }
         Ok(())
     }
 }

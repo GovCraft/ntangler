@@ -1,24 +1,12 @@
-use console::style;
-use derive_more::*;
-use serde::Deserialize;
 use std::fmt;
 use std::ops::Deref;
-use termcolor::{Color, ColorSpec, StandardStream, WriteColor};
-use tracing::{info, instrument, trace};
 
-use crate::models::traits::TanglerModel;
-use crate::models::{ConsoleStyle, TimeStamp};
+use serde::Deserialize;
+use tracing::{instrument, trace};
 
 #[derive(Clone, Default, Debug, PartialEq, Eq, PartialOrd, Ord, Deserialize)]
 pub(crate) struct Description(String);
 
-impl TanglerModel for Description {}
-
-impl Description {
-    pub(crate) fn new(description: &str) -> Description {
-        Description(description.to_string())
-    }
-}
 
 impl Deref for Description {
     type Target = str;

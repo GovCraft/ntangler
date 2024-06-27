@@ -1,38 +1,27 @@
-use crate::messages::{
-    CommitMessageGenerated, CommitPosted, DiffCalculated, DiffQueued, FileChangeDetected,
-    FinalizedCommit, NotifyChange, RepositoryPollRequested, SubscribeBroker, SystemStarted,
-};
-use crate::models::config::RepositoryConfig;
-use crate::models::config::TanglerConfig;
-use crate::models::{
-    CommitType, CommittedCommit, Description, Filename, Oid, RepositoryEvent, Scope, TangledCommit,
-    TangledRepository, TangledSignature, TimeStamp,
-};
-use akton::prelude::*;
-use anyhow::anyhow;
-use futures::future::join_all;
-use futures::stream::FuturesUnordered;
-use futures::StreamExt;
-use git2::{DiffOptions, Error, IndexAddOption, Repository, Status as GitStatus, StatusOptions};
-use rand::distributions::Alphanumeric;
-use rand::prelude::SliceRandom;
-use rand::{thread_rng, Rng};
-use std::any::TypeId;
 use std::collections::HashSet;
 use std::future::Future;
-use std::path::PathBuf;
 use std::pin::Pin;
-use std::sync::atomic::AtomicBool;
-use std::sync::{Arc, Mutex};
-use std::time::Duration;
-use tracing::{debug, error, info, instrument, trace, warn};
+
+use akton::prelude::*;
+use futures::stream::FuturesUnordered;
+use futures::StreamExt;
+use git2::{
+    DiffOptions, Repository, Status, StatusOptions,
+};
+use tracing::*;
+
+use crate::messages::{
+    CommitMessageGenerated, DiffQueued, FileChangeDetected, FinalizedCommit,
+    RepositoryPollRequested, SystemStarted,
+};
+use crate::models::{
+    TangledRepository, TimeStamp,
+};
 
 #[akton_actor]
 pub(crate) struct GitRepository {
     repo_info: TangledRepository,
     broker: Context,
-    watching: AtomicBool,
-    pending: Vec<CommittedCommit>,
 }
 
 impl GitRepository {
@@ -50,7 +39,7 @@ impl GitRepository {
         system: &mut AktonReady,
     ) -> anyhow::Result<Context> {
         // Define the default behavior as an async closure that takes a reference to the repository configuration.
-        let mut system = system.clone();
+        let system = system.clone();
         let default_behavior = |config: TangledRepository, system: AktonReady| async move {
             GitRepository::default_behavior(&config, system).await
         };
@@ -66,7 +55,7 @@ impl GitRepository {
     ) -> anyhow::Result<Context>
     where
         F: Fn(TangledRepository, AktonReady) -> Fut + Send + Sync + 'static,
-        Fut: Future<Output = anyhow::Result<Context>> + Send,
+        Fut: Future<Output=anyhow::Result<Context>> + Send,
     {
         // Execute the custom behavior and await its result
         custom_behavior(config, system).await
@@ -77,7 +66,6 @@ impl GitRepository {
         tangled_repository: &TangledRepository,
         mut system: AktonReady,
     ) -> anyhow::Result<Context> {
-        let akton = system.clone();
         let actor_name = Arn::with_account("repository")?
             .add_part(tangled_repository.akton_arn.root.to_string())?;
 
@@ -87,9 +75,7 @@ impl GitRepository {
             .create_actor_with_config::<GitRepository>(actor_config)
             .await;
         actor.broker = system.get_broker().clone();
-        // debug!(path = &tangled_repository.path, "Open repo '{}' at", &tangled_repository.nickname);
-        let repo = Repository::open(&tangled_repository.path)?;
-
+        trace!(path = &tangled_repository.path.display().to_string(), "Open repo '{}' at", &tangled_repository.nickname);
         actor.state.repo_info = tangled_repository.clone();
 
         actor
@@ -98,18 +84,15 @@ impl GitRepository {
                 actor.state.broker = actor.akton.get_broker().clone();
             })
             .act_on_async::<RepositoryPollRequested>(|actor, event| {
-                debug!(
+                trace!(
                     sender = event.return_address.sender,
                     "Poll changes received for"
                 );
                 let reply_to = event.return_address.clone();
-                let broker = actor.akton.get_broker().clone();
-                let mut futures = actor.state.handle_poll_request(reply_to);
+                let futures = actor.state.handle_poll_request(reply_to);
                 actor.state.broadcast_futures(futures)
             })
             .act_on_async::<FileChangeDetected>(|actor, event| {
-                let actor_context = actor.context.clone();
-                let reply_to = event.return_address.clone();
                 let repository_path = &actor.state.repo_info.path;
                 let target_file = &event.message.path;
 
@@ -130,11 +113,9 @@ impl GitRepository {
                     diff_text.extend_from_slice(line.content());
                     true
                 })
-                .expect("Failed to print diff");
+                    .expect("Failed to print diff");
                 let changes = String::from_utf8_lossy(&diff_text).to_string();
 
-                // let tangled_commit = message.get_commit().clone();
-                // let repository_event = GitRepositoryEvent::new(message.get_repo_info(), CommitStep::DiffQueued(path), tangled_commit);
                 let repository_event = BrokerRequest::new(DiffQueued::new(
                     changes,
                     target_file.clone(),
@@ -192,7 +173,7 @@ impl GitRepository {
 
                 let commit_message = commit_message.clone();
                 Context::wrap_future(async move {
-                    debug!("Local commit: {:?}", &target_file);
+                    trace!("Local commit: {:?}", &target_file);
                     let broker = broker.clone();
                     let msg = FinalizedCommit::new(
                         when,
@@ -217,8 +198,8 @@ impl GitRepository {
     #[instrument(skip(self, futures))]
     fn broadcast_futures<T>(
         &self,
-        mut futures: FuturesUnordered<impl Future<Output = T> + Sized>,
-    ) -> Pin<Box<impl Future<Output = ()> + Sized>> {
+        mut futures: FuturesUnordered<impl Future<Output=T> + Sized>,
+    ) -> Pin<Box<impl Future<Output=()> + Sized>> {
         // Event: Broadcasting Futures
         // Description: Broadcasting futures to be processed.
         // Context: Number of futures.
@@ -235,22 +216,23 @@ impl GitRepository {
             // Event: Futures Broadcast Completed
             // Description: All futures have been processed.
             // Context: None
-            debug!("{i} future(s) sent");
+            trace!("{i} future(s) sent");
         })
     }
+    #[instrument(skip(self, outbound_envelope))]
     pub(crate) fn handle_poll_request(
         &self,
         outbound_envelope: OutboundEnvelope,
-    ) -> FuturesUnordered<impl Future<Output = ()> + 'static> {
-        let self_key = &self.repo_info.akton_arn;
-        debug!(self = self.repo_info.nickname, "Received Poll request");
-        let mut futures = FuturesUnordered::new();
+    ) -> FuturesUnordered<impl Future<Output=()> + 'static> {
+        trace!(self = self.repo_info.nickname, "Received Poll request");
+        let futures = FuturesUnordered::new();
         let repository_path = &self.repo_info.path;
         let repo = Repository::open(repository_path).expect("Failed to open repository");
 
         let mut status_options = StatusOptions::new();
         status_options.include_untracked(true);
         status_options.recurse_untracked_dirs(true);
+        status_options.include_unreadable_as_untracked(true);
 
         let statuses = repo
             .statuses(Some(&mut status_options))
@@ -258,37 +240,35 @@ impl GitRepository {
 
         let modified_files: Vec<String> = statuses
             .iter()
-            .map(|entry| entry.path().unwrap().to_string())
+            .filter(|f| {
+                let status = f.status();
+                !status.is_index_deleted()
+                    && !status.is_wt_deleted()
+                    && status != (Status::INDEX_DELETED | Status::WT_NEW)
+            })
+            .map(|entry| {
+                debug!("index_deleted:{}", entry.status().is_index_deleted());
+                error!("worktree_deleted:{}", entry.status().is_wt_deleted());
+                entry.path().unwrap().to_string()
+            })
             .collect::<HashSet<_>>()
             .into_iter()
             .collect();
 
-        debug!("modified files vec {:?}", &modified_files);
-
-        let signature = repo
-            .signature()
-            .expect("Obtaining a signature from the repo failed");
-        let repository = self.repo_info.clone();
+        trace!("modified files vec {:?}", &modified_files);
+        debug!("*");
         let id = self.repo_info.nickname.clone();
 
-        let signature: TangledSignature = signature.into();
-        let broker = self.broker.clone();
         for file in modified_files {
-            let broker = broker.clone();
             let outbound_envelope = outbound_envelope.clone();
-            let signature = signature.clone();
-            let oid = file.as_str().into();
-            let repository = repository.clone();
-            let actor_context = outbound_envelope.clone();
             let path = file.clone();
             let trace_id = id.clone();
-            let tangled_commit = TangledCommit::new(oid, signature, None, None);
             let repository_event = FileChangeDetected::new(file.into());
             futures.push(async move {
                 outbound_envelope.reply_async(repository_event, None).await;
             });
 
-            debug!(
+            trace!(
                 repo_id = trace_id,
                 path = path,
                 "Submitted initializing event to broker."
