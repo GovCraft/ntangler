@@ -15,11 +15,11 @@ use git2::{DiffOptions, Error, IndexAddOption, Repository, StatusOptions, Status
 use rand::distributions::Alphanumeric;
 use rand::prelude::SliceRandom;
 use rand::{thread_rng, Rng};
-use tracing::{debug, error, info, trace, warn};
-use crate::messages::{CommitMessageGenerated, CommitPosted, DiffCalculated, DiffQueued, FileChangeDetected, NotifyChange, RepositoryPollRequested, SubscribeBroker, SystemStarted};
+use tracing::{debug, error, info, instrument, trace, warn};
+use crate::messages::{CommitMessageGenerated, CommitPosted, DiffCalculated, DiffQueued, FileChangeDetected, FinalizedCommit, NotifyChange, RepositoryPollRequested, SubscribeBroker, SystemStarted};
 use crate::models::config::RepositoryConfig;
 use crate::models::config::TanglerConfig;
-use crate::models::{CommittedCommit, CommitType, Description, Filename, Oid, Scope, TangledRepository, TangledCommit, TangledSignature, RepositoryEvent};
+use crate::models::{CommittedCommit, CommitType, Description, Filename, Oid, Scope, TangledRepository, TangledCommit, TangledSignature, RepositoryEvent, TimeStamp};
 
 
 #[akton_actor]
@@ -106,8 +106,6 @@ impl GitRepository {
 
                 let mut diff_options = DiffOptions::new();
                 diff_options.pathspec(target_file.as_os_str());
-                // this is where we've been failing
-                // diff_options.pathspec(path.to_string().clone());
                 diff_options.include_untracked(true);
                 diff_options.recurse_untracked_dirs(true);
                 diff_options.disable_pathspec_match(true);
@@ -125,120 +123,18 @@ impl GitRepository {
                 // let repository_event = GitRepositoryEvent::new(message.get_repo_info(), CommitStep::DiffQueued(path), tangled_commit);
                 let repository_event = BrokerRequest::new(DiffQueued::new(changes, target_file.clone(), actor.state.repo_info.nickname.clone(), actor.context.clone()));
                 let broker = actor.akton.get_broker().clone();
-                Context::wrap_future(async move {
-                    // tokio::time::sleep(Duration::from_secs(90)).await;
-                    broker.emit_async(repository_event, None).await
-                })
+                Context::wrap_future(
+                    async move {
+                        broker.emit_async(repository_event, None).await;
+                    })
             })
-            // .act_on_async::<GitRepositoryEvent>(|actor, event| {
-            //     let message = &event.message;
-            //
-            //     //ensure this message is for this actor
-            //     debug_assert_eq!(message.get_repo_info().akton_arn.to_string(), actor.state.repo_info.akton_arn.to_string(), "never get here");
-            //
-            //     let actor_context = actor.context.clone();
-            //     let reply_to = event.return_address.clone();
-            //     let commit_step = message.get_commit_step();
-            //     let repository_path = &message.get_repo_info().path;
-            //     let repo = Repository::open(repository_path).expect("Failed to open repository");
-            //     match commit_step {
-            //         CommitStep::FileChangeDetected(path) => {
-            //             let mut diff_options = DiffOptions::new();
-            //             diff_options.pathspec(path.clone());
-            //             diff_options.include_untracked(true);
-            //             diff_options.recurse_untracked_dirs(true);
-            //
-            //             // Generate the diff
-            //             let diff = repo.diff_index_to_workdir(None, Some(&mut diff_options)).expect("nope");
-            //             let mut diff_text = Vec::new();
-            //             diff.print(git2::DiffFormat::Patch, |_, _, line| {
-            //                 diff_text.extend_from_slice(line.content());
-            //                 true
-            //             }).expect("Failed to print diff");
-            //             let changes = String::from_utf8_lossy(&diff_text).to_string();
-            //             let tangled_commit = message.get_commit().clone();
-            //             let repository_event = GitRepositoryEvent::new(message.get_repo_info(), CommitStep::DiffQueued(path), tangled_commit);
-            //
-            //             Context::wrap_future(async move {
-            //                 tokio::time::sleep(Duration::from_secs(90)).await;
-            //                 reply_to.reply_async(repository_event, None).await;
-            //             })
-            //         }
-            //         CommitStep::DiffQueued(path) => { Context::noop() }
-            //         CommitStep::CommitMessageGenerated(_) => { Context::noop() }
-            //         CommitStep::Finalized => { Context::noop() }
-            //         CommitStep::DiffGenerated(_) => { Context::noop() }
-            //     }
-            // actor.state.noop()
-
-            // match &event.message {
-            //     CommitEventCategory::FilePending(pending_commit) => {
-            //         //make sure this message is for this repo
-            //         if event.message.id != actor.state.config.akton_arn.to_string() {
-            //             // trace!(message_id=event.message.id,repo_id=actor.state.config.id,"Rejecting message meant for a different actor");
-            //             return Box::pin(async move {});
-            //         }
-            //         let mut rng = thread_rng();
-            //         let pending_commit = pending_commit.clone();
-            //         let pending_commit = pending_commit.clone();
-            //         let path = pending_commit.filename;
-            //         let broker = broker.clone();
-            //         let nickname = actor.state.config.nickname.clone();
-            //         let id = actor.state.config.akton_arn.clone();
-            //         if let Some(repo) = &actor.state.repository {
-            //             let repo = repo.lock().expect("Couldn't lock repository mutex");
-            //
-            //             debug!(change_file=?&path, "Unstaged files");
-            //
-            //             trace!(file=?path, "Generating a diff for repository");
-            //
-            //
-            //             // Get the relative path by stripping the repository root prefix
-            //             debug!(file_name=?path, "Adding file to pathspec");
-            //
-            //             // Set the pathspec to the relative path
-            //             // this is where we've been failing
-            //             let mut diff_options = DiffOptions::new();
-            //             diff_options.pathspec(path.to_string().clone());
-            //             diff_options.include_untracked(true);
-            //             diff_options.recurse_untracked_dirs(true);
-            //
-            //             let mut index = repo.index().unwrap();
-            //             debug!(path=?index.path().unwrap(), "Diffing against index:");
-            //             trace!(working_dir=?repo.workdir().unwrap(), "...in");
-            //
-            //             // Generate the diff
-            //             let diff = repo.diff_index_to_workdir(None, Some(&mut diff_options)).expect("nope");
-            //             let mut diff_text = Vec::new();
-            //             diff.print(git2::DiffFormat::Patch, |_, _, line| {
-            //                 diff_text.extend_from_slice(line.content());
-            //                 true
-            //             }).expect("Failed to print diff");
-            //
-            //             // trace!(raw_diff = ?diff_text, "Raw diff generated for the repository.");
-            //             let changes = String::from_utf8_lossy(&diff_text).to_string();
-            //             let diff_event = DiffGeneratedCommit::new(id.to_string(), changes, path.to_string(), nickname, CommitStep::GeneratingMessage);
-            //             // trace!(diff = changes, "Diff generated for the repository.");
-            //             Box::pin(async move {
-            //                 tokio::time::sleep(Duration::from_secs(4)).await; // Poll every 3 seconds
-            //
-            //                 let msg = CommitEvent::new(CommitEventCategory::DiffGenerated(diff_event));
-            //                 broker.emit_async(BrokerRequest::new(msg), None).await;
-            //             })
-            //         } else {
-            //             Box::pin(async move {})
-            //         }
-            //     }
-            //     _ => { Box::pin(async move {}) }
-            // }
-            // })
             .act_on_async::<CommitMessageGenerated>(|actor, event| {
 
                 // Event: Received Commit Response
                 // Description: Received a commit response and will commit changes to the repository.
                 // Context: Commit message details.
                 let message = &event.message;
-
+                let repository_nickname = actor.state.repo_info.nickname.clone();
                 let repository_path = &actor.state.repo_info.path;
                 let repo = Repository::open(repository_path).expect("Failed to open repository");
                 let broker = actor.akton.get_broker();
@@ -260,6 +156,7 @@ impl GitRepository {
                 let head = repo.head().expect("Failed to get HEAD");
                 let parent_commit = head.peel_to_commit().expect("Failed to get parent commit");
 
+                let when: TimeStamp = (&sig.when()).into();
                 let message_string = &commit_message.to_string();
                 // TODO: optionally sign commits
                 let hash = repo.commit(
@@ -276,8 +173,8 @@ impl GitRepository {
                 Context::wrap_future(async move {
                     debug!("Local commit: {:?}", &target_file);
                     let broker = broker.clone();
-                    // let msg = CommitMessageGenerated::new(target_file.clone(), commit_message);
-                    // broker.emit_async(BrokerRequest::new(msg), None).await;
+                    let msg = FinalizedCommit::new(when, target_file.clone(), repository_nickname, hash, commit_message);
+                    broker.emit_async(BrokerRequest::new(msg), None).await;
                 })
             });
 
@@ -290,49 +187,7 @@ impl GitRepository {
         Ok(actor.activate(None).await)
     }
 
-    /// Opens an existing repository and checks out a specific branch.
-    ///
-    /// # Arguments
-    ///
-    /// * `repo_path` - The path to the repository.
-    /// * `branch_name` - The name of the branch to checkout.
-    ///
-    /// # Returns
-    ///
-    /// * `Result<(), Error>` - An empty result indicating success or an error.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// let my_struct = MyStruct { repository: Some(Arc::new(Mutex::new(Repository::open("/path/to/repo").unwrap()))) };
-    /// my_struct.open_repository_to_branch("feature-branch").unwrap();
-    /// ```
-    // fn open_repository_to_branch(&self) -> anyhow::Result<()> {
-    //     // Check if the repository is available
-    //     if let Some(repository) = &self.repository {
-    //         // Lock the repository mutex
-    //         let repo = repository.lock().expect("Couldn't lock repository mutex");
-    //
-    //         // Find the branch reference
-    //         let branch_ref = repo
-    //             .find_branch(&self.repo_info.branch_name, git2::BranchType::Local)?
-    //             .into_reference();
-    //
-    //         // Set the HEAD to point to the branch reference
-    //         repo.set_head(branch_ref.name().unwrap())?;
-    //
-    //         // Checkout the branch
-    //
-    //         repo.checkout_head(Some(git2::build::CheckoutBuilder::new().force()))?;
-    //     }
-    //     Ok(())
-    // }
-
-    fn noop(&self
-    ) -> Pin<Box<impl Future<Output=()> + Sized>> {
-        Box::pin(async move {})
-    }
-
+    #[instrument(skip(self, futures))]
     fn broadcast_futures<T>(
         &self,
         mut futures: FuturesUnordered<impl Future<Output=T> + Sized>,
@@ -365,6 +220,7 @@ impl GitRepository {
 
         let mut status_options = StatusOptions::new();
         status_options.include_untracked(true);
+        status_options.recurse_untracked_dirs(true);
 
         let statuses = repo
             .statuses(Some(&mut status_options))
@@ -372,11 +228,9 @@ impl GitRepository {
 
         let modified_files: Vec<String> = statuses
             .iter()
-            // .filter(|entry| entry.status().is_all())
             .map(|entry| entry.path().unwrap().to_string())
             .collect::<HashSet<_>>()
             .into_iter()
-            .take(1)
             .collect();
 
 
@@ -387,21 +241,21 @@ impl GitRepository {
         let id = self.repo_info.nickname.clone();
 
         let signature: TangledSignature = signature.into();
-
+        let broker = self.broker.clone();
         for file in modified_files {
+            let broker = broker.clone();
             let outbound_envelope = outbound_envelope.clone();
             let signature = signature.clone();
             let oid = file.as_str().into();
             let repository = repository.clone();
-            let broker = outbound_envelope.clone();
+            let actor_context = outbound_envelope.clone();
             let path = file.clone();
             let trace_id = id.clone();
             let tangled_commit = TangledCommit::new(oid, signature, None, None);
-            // let repository_event = GitRepositoryEvent::new(repository, CommitStep::FileChangeDetected(file.into()), tangled_commit);
             let repository_event = FileChangeDetected::new(file.into());
             futures.push(async move { outbound_envelope.reply_async(repository_event, None).await; });
 
-            tracing::debug!(repo_id = trace_id, path = path, "Submitted initializing event to broker.");
+            debug!(repo_id = trace_id, path = path, "Submitted initializing event to broker.");
         }
         futures
     }
