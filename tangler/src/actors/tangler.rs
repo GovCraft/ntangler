@@ -100,26 +100,8 @@ impl Tangler {
                         debug!(actor = watcher.key, "init repository");
                     }
 
-                    // let pool_size = tangler_config.repositories.len() * 5;
-                    // let pool_builder = PoolBuilder::default().add_pool::<OpenAi>(
-                    //     "llm_pool",
-                    //     pool_size,
-                    //     LoadBalanceStrategy::RoundRobin,
-                    // );
 
                     actor.context.subscribe::<SystemStarted>().await;
-                    // actor.context.subscribe::<NotifyError>().await;
-                    // actor.context.subscribe::<DiffCalculated>().await;
-
-                    // let actor_context = actor.activate(Some(pool_builder)).await;
-                    //
-                    // for _ in 0..pool_size {
-                    //     trace!("Sending broker to LLM Pool.");
-                    //     let broker = broker.clone();
-                    //     actor_context
-                    //         .emit_async(AcceptBroker { broker }, Some("llm_pool"))
-                    //         .await;
-                    // }
                     actor.activate(None).await
                 })
             })
