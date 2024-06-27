@@ -2,9 +2,9 @@ use std::cmp::PartialEq;
 use std::collections::VecDeque;
 use std::fmt::Debug;
 use std::io::{stderr, Write};
+use std::sync::Arc;
 use std::time::Duration;
 use std::{any::TypeId, fmt::Display};
-use std::sync::Arc;
 
 use akton::prelude::*;
 use atty::is;
@@ -18,7 +18,10 @@ use tracing::*;
 use unicode_segmentation::UnicodeSegmentation;
 use unicode_width::UnicodeWidthStr;
 
-use crate::messages::{CommitPosted, DiffQueued, FinalizedCommit, GenerationStarted, NotifyError, SubscribeBroker, SystemStarted};
+use crate::messages::{
+    CommitPosted, DiffQueued, FinalizedCommit, GenerationStarted, NotifyError, SubscribeBroker,
+    SystemStarted,
+};
 use crate::models::CommittedCommit;
 use crate::models::*;
 use crate::models::{CommitTypeTerminal, MENU_COLOR};
@@ -117,11 +120,14 @@ impl Scribe {
         Scribe::print_headings(&actor);
     }
 
-
     fn handle_commit_event(scribe: &mut Scribe, event: &AppEvent) {
         let previous_events = scribe.events.clone();
         // Update events or add new ones
-        if let Some(existing_event) = scribe.events.iter_mut().find(|e| e.get_id() == event.get_id()) {
+        if let Some(existing_event) = scribe
+            .events
+            .iter_mut()
+            .find(|e| e.get_id() == event.get_id())
+        {
             *existing_event = event.clone();
         } else {
             scribe.events.push_front(event.clone());
