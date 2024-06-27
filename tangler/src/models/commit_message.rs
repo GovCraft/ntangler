@@ -1,14 +1,12 @@
 use std::fmt;
 
-use serde::de::{MapAccess, Visitor};
 use serde::{de, Deserialize, Deserializer};
+use serde::de::{MapAccess, Visitor};
 
-use crate::models::semver_impact::SemVerImpact;
-use crate::models::traits::TanglerModel;
 use crate::models::{
-    generate_id, CommitType, Description, Filename, Footer, Oid, Scope, TimeStamp,
+    CommitType, Description, Footer, Scope,
 };
-use derive_more::*;
+use crate::models::semver_impact::SemVerImpact;
 
 impl From<CommitMessage> for String {
     fn from(commit_details: CommitMessage) -> Self {
@@ -27,7 +25,6 @@ pub(crate) struct CommitMessage {
     pub(crate) semver_impact: SemVerImpact,
 }
 
-impl TanglerModel for CommitMessage {}
 
 impl From<&str> for CommitMessage {
     fn from(s: &str) -> Self {
@@ -41,16 +38,6 @@ impl<'de> Deserialize<'de> for CommitMessage {
     where
         D: Deserializer<'de>,
     {
-        #[derive(Deserialize)]
-        struct CommitHelper {
-            commit_type: String, // Adjusted to String
-            scope: Option<Scope>,
-            description: Description,
-            body: String,
-            is_breaking: bool,
-            footers: Vec<Footer>,
-        }
-
         struct CommitVisitor;
 
         impl<'de> Visitor<'de> for CommitVisitor {
@@ -132,7 +119,6 @@ impl<'de> Deserialize<'de> for CommitMessage {
                     is_breaking: breaking,
                     footers,
                     semver_impact,
-                    ..Default::default()
                 })
             }
         }

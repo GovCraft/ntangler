@@ -1,21 +1,17 @@
-use console::style;
-use owo_colors::OwoColorize;
 use std::fmt;
 
-use crate::models::{
-    CommitType, ConsoleStyle, COMMIT_TYPE_COLOR, GRAY_12, GRAY_3, GRAY_9, TEAL_11, TEAL_12, TEAL_9,
-    WHITE_PURE,
-};
+use owo_colors::OwoColorize;
 use serde::Deserialize;
-use termcolor::{Color, ColorSpec, StandardStream, WriteColor};
 use tracing::{info, instrument};
 
-use super::*;
+use crate::models::{
+    COMMIT_TYPE_COLOR, CommitType,
+};
 
 /// Represents the type of a commit.
 #[derive(Debug, Default, Clone, Deserialize, PartialEq)]
 pub(crate) struct CommitTypeTerminal(CommitType);
-impl ConsoleStyle for CommitTypeTerminal {}
+
 
 impl fmt::Display for CommitTypeTerminal {
     /// Formats the `CommitTypeTerminal` for display.

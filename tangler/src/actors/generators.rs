@@ -1,49 +1,22 @@
-use std::any::TypeId;
-use std::path::PathBuf;
-use std::sync::Arc;
-use std::thread;
-use std::time::Duration;
-
-use crate::messages::{CommitMessageGenerated, DiffQueued, GenerationStarted};
-use akton::prelude::async_trait::async_trait;
 use akton::prelude::*;
-use async_openai::config::OpenAIConfig;
-use async_openai::error::OpenAIError;
-use async_openai::types::AssistantsApiResponseFormatType::JsonObject;
-use async_openai::types::{
-    AssistantStreamEvent, AssistantsApiResponseFormat, AssistantsApiResponseFormatOption,
-    CreateMessageRequest, CreateMessageRequestContent, CreateRunRequest, CreateThreadRequest,
-    MessageDeltaContent, MessageRole, ThreadObject,
-};
 use async_openai::Client;
-use derive_more::*;
+use async_openai::error::OpenAIError;
+use async_openai::types::{
+    AssistantsApiResponseFormat, AssistantsApiResponseFormatOption, AssistantStreamEvent,
+    CreateMessageRequest, CreateMessageRequestContent, CreateRunRequest, CreateThreadRequest,
+    MessageDeltaContent, MessageRole,
+};
+use async_openai::types::AssistantsApiResponseFormatType::JsonObject;
 use futures::StreamExt;
-use serde::{Deserialize, Serialize};
 use tokio::runtime::Runtime;
 use tokio::sync::mpsc;
 use tokio::task;
-use tokio_retry::strategy::{jitter, ExponentialBackoff};
-use tracing::{debug, error, info, trace, warn};
-use vaultrs::client::{VaultClient, VaultClientSettingsBuilder};
-use vaultrs::kv2;
+use tracing::{error, trace};
 
-#[derive(Clone, Debug)]
-pub(crate) struct OpenAi {
-    client: Arc<Client<OpenAIConfig>>,
-    broker: Context,
-    token: String,
-}
+use crate::messages::{CommitMessageGenerated, DiffQueued, GenerationStarted};
 
-impl Default for OpenAi {
-    fn default() -> Self {
-        OpenAi {
-            client: Arc::new(Client::new()),
-
-            broker: Default::default(),
-            token: String::default(),
-        }
-    }
-}
+#[derive(Clone, Debug, Default)]
+pub(crate) struct OpenAi;
 
 impl OpenAi {
     pub(crate) async fn initialize(
@@ -51,7 +24,6 @@ impl OpenAi {
         system: &mut AktonReady,
     ) -> anyhow::Result<Context> {
         let mut actor = system.create_actor_with_config::<OpenAi>(config).await;
-        let broker = system.get_broker();
         // Event: Setting up SubmitDiff Handler
         // Description: Setting up an actor to handle the `SubmitDiff` event asynchronously.
         // Context: None
@@ -137,7 +109,7 @@ impl OpenAi {
 
                 // Step 3: Initiate a run and handle the event stream.
 
-                // TODO: the assistant id should be loaded remotely to accomodate easy updates
+                // TODO: the assistant id should be loaded remotely to accommodate easy updates
                 trace!("Step 3a: Initiate a run and handle the event stream.");
                 let mut event_stream = match client
                     .threads()
@@ -232,12 +204,6 @@ impl OpenAi {
                     Ok(commit) => {
                         let message = CommitMessageGenerated::new(target_file, commit);
                         return_address.emit_async(message, None).await;
-                        // broker
-                        //     .emit_async(
-                        //         BrokerRequest::new(message),
-                        //         None,
-                        //     )
-                        //     .await;
                         trace!("Emitted commit message to broker");
                     }
                     Err(e) => {

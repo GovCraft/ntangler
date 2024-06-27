@@ -1,10 +1,8 @@
-use crate::models::config::RepositoryConfig;
-use crate::models::Oid;
+use std::path::PathBuf;
+
 use akton::prelude::Arn;
-use derive_more;
-use git2::Signature;
-use serde::Deserialize;
-use std::path::{Path, PathBuf};
+
+use crate::models::config::RepositoryConfig;
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub(crate) struct TangledRepository {

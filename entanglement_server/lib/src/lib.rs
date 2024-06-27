@@ -39,7 +39,6 @@ pub async fn init() {
         "{:?}: {}",
         result.choices[0].message.role, result.choices[0].message.content
     );
-    assert!(client.is_ok());
 }
 
 #[cfg(test)]
@@ -152,7 +151,6 @@ index 1a2b3c4..5d6e7f8 100644
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn it_works() {
-        let diff = "This is a test diff.";
         let _ = init().await;
     }
 }

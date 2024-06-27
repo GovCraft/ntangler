@@ -1,18 +1,16 @@
 use std::fmt;
 
-use crate::models::traits::TanglerModel;
-use crate::models::Description;
-use derive_more::*;
 use regex::Regex;
 use serde::{Deserialize, Deserializer};
-use tracing::{info, instrument, trace};
+use tracing::{info, instrument};
+
 /// Represents a footer in a commit message, which consists of a token and a value.
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) struct Footer {
     pub(crate) token: String,
     pub(crate) value: String,
 }
-impl TanglerModel for Footer {}
+
 
 impl From<&str> for Footer {
     fn from(s: &str) -> Self {
@@ -24,6 +22,7 @@ impl From<&str> for Footer {
         Footer { token, value }
     }
 }
+
 impl AsRef<str> for Footer {
     fn as_ref(&self) -> &str {
         // Create a formatted string with token and value
