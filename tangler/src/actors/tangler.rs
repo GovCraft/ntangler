@@ -58,14 +58,6 @@ impl Tangler {
 
                     actor
                         .setup
-                        // .act_on_async::<DiffCalculated>(|actor, event| {
-                        //     let context = actor.context.clone();
-                        //     let message = event.message.clone();
-                        //     Box::pin(async move {
-                        //         trace!("Diff submitted for LLM pool");
-                        //         context.emit_async(message, Some("llm_pool")).await
-                        //     })
-                        // })
                         .act_on_async::<SystemStarted>(|actor, _event| {
                             let broker = actor.akton.get_broker().clone();
                             Box::pin(async move {
