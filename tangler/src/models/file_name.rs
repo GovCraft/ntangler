@@ -1,24 +1,12 @@
 use std::fmt;
 use std::ops::Deref;
 
-use console::style;
 use serde::Deserialize;
-use termcolor::{Color, ColorSpec, StandardStream, WriteColor};
-use tracing::{info, instrument, trace};
-
-use crate::models::traits::TanglerModel;
-use crate::models::{ConsoleStyle, TimeStamp};
+use tracing::{instrument, trace};
 
 #[derive(Debug, Default, Clone, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) struct Filename(String);
 
-impl TanglerModel for Filename {}
-
-impl Filename {
-    pub(crate) fn new(filename: &str) -> Filename {
-        Filename(filename.to_string())
-    }
-}
 
 impl Deref for Filename {
     type Target = str;
