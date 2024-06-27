@@ -105,7 +105,7 @@ pub fn setup_tracing(app_name: &str, config_file: &str) {
             .add_directive("akton_core::common::broker[broadcast]=error".parse().unwrap())
             .add_directive("akton_core::message=error".parse().unwrap())
             .add_directive("akton_core::message::outbound_envelope=error".parse().unwrap())
-            .add_directive("akton_core::actors=error".parse().unwrap())
+            .add_directive("akton_core::actors=trace".parse().unwrap())
             .add_directive("akton_core::actors::actor=error".parse().unwrap())
             .add_directive("akton_core::actors::idle=error".parse().unwrap())
             .add_directive("akton_core::message::outbound_envelope=error".parse().unwrap())
