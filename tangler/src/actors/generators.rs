@@ -2,6 +2,7 @@ use std::any::TypeId;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::thread;
+use std::time::Duration;
 
 use akton::prelude::*;
 use akton::prelude::async_trait::async_trait;
@@ -21,7 +22,7 @@ use tokio::task;
 use tokio_retry::strategy::{ExponentialBackoff, jitter};
 use tracing::{debug, error, info, trace, warn};
 use derive_more::*;
-use crate::messages::{ CommitMessageGenerated,DiffQueued};
+use crate::messages::{CommitMessageGenerated, DiffQueued, GenerationStarted};
 use serde::{Deserialize, Serialize};
 use vaultrs::client::{VaultClient, VaultClientSettingsBuilder};
 use vaultrs::kv2;
@@ -45,8 +46,6 @@ impl Default for OpenAi {
 }
 
 
-
-
 impl OpenAi {
     pub(crate) async fn initialize(config: ActorConfig, system: &mut AktonReady) -> anyhow::Result<Context> {
         let mut actor = system.create_actor_with_config::<OpenAi>(config).await;
@@ -61,8 +60,14 @@ impl OpenAi {
                 let diff = event.message.diff.clone();
                 let reply_address = event.message.reply_address.clone();
                 let target_file = event.message.target_file.clone();
-
-                Context::wrap_future(Self::handle_diff_received(target_file, diff, reply_address))
+                let broker = actor.akton.get_broker().clone();
+                let repository_nickname = event.message.repository_nickname.clone();
+                Context::wrap_future(async move {
+                    tokio::time::sleep(Duration::from_secs(5)).await;
+                    let msg = BrokerRequest::new(GenerationStarted::new(target_file.clone(), repository_nickname.clone()));
+                    broker.emit_async(msg, None).await;
+                    Self::handle_diff_received(target_file, diff, reply_address).await;
+                })
             });
 
         actor.context.subscribe::<DiffQueued>().await;
@@ -77,7 +82,7 @@ impl OpenAi {
 
     async fn handle_diff_received(target_file: PathBuf, diff: String, return_address: Context) {
         let (tx, mut rx) = mpsc::channel(32);
-        let broker = return_address.clone();
+        let return_address = return_address.clone();
 
         task::spawn_blocking(move || {
             let rt = Runtime::new().unwrap();
