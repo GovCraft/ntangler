@@ -123,10 +123,10 @@ impl GitRepository {
 
                 // let tangled_commit = message.get_commit().clone();
                 // let repository_event = GitRepositoryEvent::new(message.get_repo_info(), CommitStep::DiffQueued(path), tangled_commit);
-                let repository_event = BrokerRequest::new(DiffQueued::new(changes, target_file.clone(), actor.context.clone()));
+                let repository_event = BrokerRequest::new(DiffQueued::new(changes, target_file.clone(), actor.state.repo_info.nickname.clone(), actor.context.clone()));
                 let broker = actor.akton.get_broker().clone();
                 Context::wrap_future(async move {
-                    tokio::time::sleep(Duration::from_secs(90)).await;
+                    // tokio::time::sleep(Duration::from_secs(90)).await;
                     broker.emit_async(repository_event, None).await
                 })
             })
