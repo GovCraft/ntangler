@@ -1,5 +1,5 @@
 use crate::messages::{
-    CommitMessageGenerated, CommitPosted, DiffCalculated, DiffQueued, FileChangeDetected,
+    CommitMessageGenerated, CommitPosted,  DiffQueued, FileChangeDetected,
     FinalizedCommit, RepositoryPollRequested, SystemStarted,
 };
 use crate::models::config::RepositoryConfig;
