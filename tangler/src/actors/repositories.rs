@@ -1,6 +1,6 @@
 use crate::messages::{
     CommitMessageGenerated, CommitPosted, DiffCalculated, DiffQueued, FileChangeDetected,
-    FinalizedCommit, NotifyChange, RepositoryPollRequested, SystemStarted,
+    FinalizedCommit, RepositoryPollRequested, SystemStarted,
 };
 use crate::models::config::RepositoryConfig;
 use crate::models::config::TanglerConfig;
