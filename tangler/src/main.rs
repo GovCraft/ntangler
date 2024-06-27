@@ -17,7 +17,7 @@ use tracing::{error, Level};
 use tracing_appender::rolling::{RollingFileAppender, Rotation};
 use tracing_subscriber::fmt::format::FmtSpan;
 use tracing_subscriber::{EnvFilter, FmtSubscriber,layer::SubscriberExt};
-use notify::{Watcher, watcher, DebouncedEvent};
+use notify::{Watcher, watcher, DebouncedEvent, recommended_watcher};
 use notify::DebouncedEvent::Write;
 use notify::event::AccessMode::Write;
 use crate::actors::Tangler;
@@ -114,7 +114,14 @@ pub fn setup_tracing(app_name: &str, config_file: &str) {
         let log_config = read_log_config(&config_path);
 
         let (tx, rx) = channel();
-        let mut watcher = watcher(tx, Duration::from_secs(10)).unwrap();
+        let mut watcher = recommended_watcher(|res|{
+            match res{
+                Ok(_) => {
+                    tx, Duration::from_secs(10)
+                }
+                Err(_) => {}
+            }
+        }).unwrap();
         watcher.watch(&config_path, notify::RecursiveMode::NonRecursive).unwrap();
 
         // Closure to create the filter from the log configuration
