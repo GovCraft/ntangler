@@ -7,19 +7,19 @@ use indicatif::ProgressBar;
 use serde::Deserialize;
 
 #[derive(Clone, Default, Debug, PartialEq, Eq, PartialOrd, Ord, Deserialize)]
-pub(crate) enum CommitStep {
+pub(crate) enum Status {
     #[default]
-    Queued,
-    GeneratingMessage,
-    Finalizing,
+    Pending,
+    Thinking,
+    Committing,
 }
 
-impl fmt::Display for CommitStep {
+impl fmt::Display for Status {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let symbol = match self {
-            CommitStep::Queued => "QUEUED",
-            CommitStep::GeneratingMessage => "GENERATING",
-            CommitStep::Finalizing => "FINALIZING",
+       let symbol = match self {
+           Status::Pending => { "PENDING" }
+           Status::Thinking => { "WRITING" }
+            Status::Committing => { "STAGING" }
         };
         write!(f, "{:8}", symbol)
     }
