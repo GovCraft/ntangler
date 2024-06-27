@@ -68,6 +68,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 fn check_openai_api_key() -> bool {
     env::var("OPENAI_API_KEY").is_ok()
 }
+
 fn find_config_file_path(
     app_name: &str,
     config_file: &str,
@@ -84,50 +85,6 @@ fn find_config_file_path(
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use std::fs;
-
-    use akton::prelude::ActorContext;
-
-    use crate::actors::Tangler;
-    use crate::init_tracing;
-    use crate::models::config::RepositoryConfig;
-    use crate::models::config::TanglerConfig;
-
-    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-    async fn test_main() -> anyhow::Result<()> {
-        setup_tracing();
-
-        // Read and parse the configuration file
-        let tangler_config: TanglerConfig = toml::from_str(&fs::read_to_string("/config.toml")?)?;
-
-        let (tangler_actor, _broker) = Tangler::initialize(tangler_config).await?;
-
-        tangler_actor.suspend().await?;
-        Ok(())
-    }
-
-    #[test]
-    fn test_finder() {
-        let repository_config = RepositoryConfig {
-            path: "./tmp".to_string().parse().unwrap(),
-            ..Default::default()
-        };
-        let config_clone = TanglerConfig {
-            repositories: vec![repository_config],
-        };
-        let event_path = "./tmp/tmp.txt";
-        // let config_clone = Some(repository_config);
-        let repository = config_clone
-            .repositories
-            .iter()
-            .find(|repo| event_path.starts_with(&repo.path.display().to_string()));
-        assert!(repository.is_some());
-        let repository = repository.unwrap();
-        println!("{:?}", repository);
-    }
-}
 
 static INIT: Once = Once::new();
 
@@ -199,4 +156,49 @@ pub fn setup_tracing() {
         tracing::subscriber::set_global_default(subscriber)
             .expect("setting default subscriber failed");
     });
+}
+
+
+#[cfg(test)]
+mod tests {
+    use std::fs;
+
+    use akton::prelude::ActorContext;
+    use super::*;
+    use crate::actors::Tangler;
+    use crate::models::config::RepositoryConfig;
+    use crate::models::config::TanglerConfig;
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn test_main() -> anyhow::Result<()> {
+        setup_tracing();
+
+        // Read and parse the configuration file
+        let tangler_config: TanglerConfig = toml::from_str(&fs::read_to_string("/config.toml")?)?;
+
+        let (tangler_actor, _broker) = Tangler::initialize(tangler_config).await?;
+
+        tangler_actor.suspend().await?;
+        Ok(())
+    }
+
+    #[test]
+    fn test_finder() {
+        let repository_config = RepositoryConfig {
+            path: "./tmp".to_string().parse().unwrap(),
+            ..Default::default()
+        };
+        let config_clone = TanglerConfig {
+            repositories: vec![repository_config],
+        };
+        let event_path = "./tmp/tmp.txt";
+        // let config_clone = Some(repository_config);
+        let repository = config_clone
+            .repositories
+            .iter()
+            .find(|repo| event_path.starts_with(&repo.path.display().to_string()));
+        assert!(repository.is_some());
+        let repository = repository.unwrap();
+        println!("{:?}", repository);
+    }
 }
