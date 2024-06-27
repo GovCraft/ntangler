@@ -25,13 +25,12 @@ mod traits;
 mod ui;
 // mod pending_commit;
 // mod diff_generated_commit;
-mod tangled_commit;
 mod commit_message;
+mod tangled_commit;
 pub(crate) use commit_message::CommitMessage;
 
 mod signature;
 mod tangled_repository;
-
 
 pub(crate) use signature::TangledSignature;
 pub(crate) use tangled_repository::TangledRepository;
