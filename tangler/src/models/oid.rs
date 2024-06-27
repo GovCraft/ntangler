@@ -5,7 +5,7 @@ use crate::models::traits::TanglerModel;
 use crate::models::Footer;
 use derive_more::*;
 use serde::Deserialize;
-use tracing::{info, instrument};
+use tracing::*;
 
 #[derive(Clone, Default, Debug, PartialEq, Eq, PartialOrd, Ord, Deserialize)]
 pub(crate) struct Oid(String);
@@ -37,7 +37,7 @@ impl fmt::Display for Oid {
 impl From<&str> for Oid {
     #[instrument(level = "info", skip(s))]
     fn from(s: &str) -> Self {
-        info!(source = %s, "Oid instance created from &str");
+        trace!(source = %s, "Oid instance created from &str");
         Oid(s.to_string())
     }
 }
