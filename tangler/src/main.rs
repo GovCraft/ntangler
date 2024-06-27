@@ -79,13 +79,21 @@ fn find_config_path(app_name: &str, config_file: &str) -> Result<PathBuf, Box<dy
     }
 }
 
-
+fn find_logs_path(app_name: &str) -> Result<PathBuf, Box<dyn std::error::Error>> {
+    if let Ok(config_home) = env::var("XDG_CONFIG_HOME") {
+        Ok(PathBuf::from(config_home).join(app_name).join("logs"))
+    } else if let Ok(home_dir) = env::var("HOME") {
+        Ok(PathBuf::from(home_dir).join(".config").join(app_name).join("logs"))
+    } else {
+        Err("Could not determine the logs directory path.".into())
+    }
+}
 static INIT: Once = Once::new();
 
 pub fn setup_tracing(app_name: &str, config_file: &str) {
     INIT.call_once(|| {
         // Get the directory for logging using the configuration file path
-        let log_dir = find_config_path(app_name, config_file).expect("Unable to find config file path");
+        let log_dir = find_logs_path(app_name).expect("Unable to find logs directory path");
         let file_appender = RollingFileAppender::new(Rotation::DAILY, log_dir, "ntangler.log");
 
         // Define an environment filter to suppress logs from specific functions
