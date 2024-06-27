@@ -147,6 +147,7 @@ pub fn init_tracing() {
                     .unwrap(),
             )
             .add_directive("tangler::actors::repositories=error".parse().unwrap())
+            .add_directive("tangler::actors::repositories[broadcast_futures]=error".parse().unwrap())
             .add_directive("tangler::actors::repositories[default_behavior]=error".parse().unwrap())
             .add_directive("tangler::actors::scribe=info".parse().unwrap())
             .add_directive("tangler::actors::scribe[print_hero_message]=error".parse().unwrap())
