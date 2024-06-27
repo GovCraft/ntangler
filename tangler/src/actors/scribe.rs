@@ -4,6 +4,7 @@ use std::fmt::Debug;
 use std::io::{stderr, Write};
 use std::time::Duration;
 use std::{any::TypeId, fmt::Display};
+use std::sync::Arc;
 
 use akton::prelude::*;
 use atty::is;
@@ -35,7 +36,7 @@ pub(crate) struct Scribe {
     stderr: Option<Term>,
     tab: String,
     half_tab: String,
-    // events: VecDeque<CommitEvent>,
+    events: VecDeque<AppEvent>,
     session_count: usize,
     session_recommendation: SemVerImpact,
 }
@@ -99,55 +100,56 @@ impl Scribe {
         Scribe::print_headings(&actor);
     }
 
-    // fn handle_commit_event(actor: &mut Scribe, event: &CommitEvent) {
-    //     let previous_events = actor.events.clone();
-    //
-    //     // Update events or add new ones
-    //     if let Some(existing_event) = actor.events.iter_mut().find(|e| e.id == event.id) {
-    //         *existing_event = event.clone();
-    //     } else {
-    //         actor.events.push_front(event.clone());
-    //     }
-    //
-    //     if let FileCommitted(commit) = &event.category {
-    //         actor.session_recommendation = std::cmp::max(
-    //             commit.semver_impact.clone(),
-    //             actor.session_recommendation.clone(),
-    //         );
-    //         // Update session_count to reflect the true number of Posted events
-    //         actor.session_count = actor.events.iter()
-    //             .filter(|event| matches!(event.category, CommitEventCategory::FileCommitted(_)))
-    //             .count();
-    //     }
-    //
-    //     actor.truncate_events();
-    //
-    //     // Update the display for changed events only
-    //     actor.update_changed_events(&previous_events, &actor.events);
-    //     actor.print_menu();
-    // }
-    //
-    // fn truncate_events(&mut self) {
-    //     while self.events.len() > DISPLAY_WINDOW {
-    //         self.events.pop_back();
-    //     }
-    // }
-    //
-    // fn update_changed_events(
-    //     &self,
-    //     previous_events: &VecDeque<CommitEvent>,
-    //     current_events: &VecDeque<CommitEvent>,
-    // ) {
-    //     if let Some(stderr) = &self.stderr {
-    //         for i in 0..current_events.len() {
-    //             if current_events.get(i) != previous_events.get(i) {
-    //                 stderr.move_cursor_to(0, LIST_ROW + i).unwrap();
-    //                 stderr.clear_line().unwrap();
-    //                 stderr.write_line(&current_events[i].to_string()).unwrap();
-    //             }
-    //         }
-    //     }
-    // }
+
+    fn handle_commit_event(actor: &mut Scribe, event: &AppEvent) {
+        let previous_events = actor.events.clone();
+
+        // Update events or add new ones
+        if let Some(existing_event) = actor.events.iter_mut().find(|e| e.get_id() == event.get_id()) {
+            *existing_event = event.clone();
+        } else {
+            actor.events.push_front(event.clone());
+        }
+
+        // if let FileCommitted(commit) = &event.category {
+        //     actor.session_recommendation = std::cmp::max(
+        //         commit.semver_impact.clone(),
+        //         actor.session_recommendation.clone(),
+        //     );
+        //     // Update session_count to reflect the true number of Posted events
+        //     actor.session_count = actor.events.iter()
+        //         .filter(|event| matches!(event.category, CommitEventCategory::FileCommitted(_)))
+        //         .count();
+        // }
+
+        actor.truncate_events();
+
+        // Update the display for changed events only
+        actor.update_changed_events(&previous_events, &actor.events);
+        actor.print_menu();
+    }
+
+    fn truncate_events(&mut self) {
+        while self.events.len() > DISPLAY_WINDOW {
+            self.events.pop_back();
+        }
+    }
+
+    fn update_changed_events(
+        &self,
+        previous_events: &VecDeque<AppEvent>,
+        current_events: &VecDeque<AppEvent>,
+    ) {
+        if let Some(stderr) = &self.stderr {
+            for i in 0..current_events.len() {
+                if current_events.get(i) != previous_events.get(i) {
+                    stderr.move_cursor_to(0, LIST_ROW + i).unwrap();
+                    stderr.clear_line().unwrap();
+                    stderr.write_line(&current_events[i].to_string()).unwrap();
+                }
+            }
+        }
+    }
 
     fn clear_console() {
         Term::stderr().clear_to_end_of_screen().unwrap();
