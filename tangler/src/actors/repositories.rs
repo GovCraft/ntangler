@@ -25,7 +25,7 @@ use std::pin::Pin;
 use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
-use tracing::{debug, error, info, instrument, trace, warn};
+use tracing::*;
 
 #[akton_actor]
 pub(crate) struct GitRepository {
@@ -87,7 +87,7 @@ impl GitRepository {
             .create_actor_with_config::<GitRepository>(actor_config)
             .await;
         actor.broker = system.get_broker().clone();
-        // debug!(path = &tangled_repository.path, "Open repo '{}' at", &tangled_repository.nickname);
+        // trace!(path = &tangled_repository.path, "Open repo '{}' at", &tangled_repository.nickname);
         let repo = Repository::open(&tangled_repository.path)?;
 
         actor.state.repo_info = tangled_repository.clone();
@@ -98,7 +98,7 @@ impl GitRepository {
                 actor.state.broker = actor.akton.get_broker().clone();
             })
             .act_on_async::<RepositoryPollRequested>(|actor, event| {
-                debug!(
+                trace!(
                     sender = event.return_address.sender,
                     "Poll changes received for"
                 );
@@ -190,7 +190,7 @@ impl GitRepository {
 
                 let commit_message = commit_message.clone();
                 Context::wrap_future(async move {
-                    debug!("Local commit: {:?}", &target_file);
+                    trace!("Local commit: {:?}", &target_file);
                     let broker = broker.clone();
                     let msg = FinalizedCommit::new(
                         when,
@@ -233,15 +233,16 @@ impl GitRepository {
             // Event: Futures Broadcast Completed
             // Description: All futures have been processed.
             // Context: None
-            debug!("{i} future(s) sent");
+            trace!("{i} future(s) sent");
         })
     }
+    #[instrument(skip(self, outbound_envelope))]
     pub(crate) fn handle_poll_request(
         &self,
         outbound_envelope: OutboundEnvelope,
     ) -> FuturesUnordered<impl Future<Output = ()> + 'static> {
         let self_key = &self.repo_info.akton_arn;
-        debug!(self = self.repo_info.nickname, "Received Poll request");
+        trace!(self = self.repo_info.nickname, "Received Poll request");
         let mut futures = FuturesUnordered::new();
         let repository_path = &self.repo_info.path;
         let repo = Repository::open(repository_path).expect("Failed to open repository");
@@ -257,14 +258,22 @@ impl GitRepository {
 
         let modified_files: Vec<String> = statuses
             .iter()
-            .filter(|f| f.status() != (Status::INDEX_DELETED | Status::WT_DELETED))
-            .map(|entry| entry.path().unwrap().to_string())
+            .filter(|f| {
+                let status = f.status();
+                !status.is_index_deleted() && !status.is_wt_deleted() && status != (Status::INDEX_DELETED | Status::WT_NEW)
+            })
+            .map(|entry| {
+                debug!("index_deleted:{}", entry.status().is_index_deleted());
+                error!("worktree_deleted:{}", entry.status().is_wt_deleted());
+                entry.path().unwrap().to_string()
+            })
             .collect::<HashSet<_>>()
             .into_iter()
             .collect();
 
-        debug!("modified files vec {:?}", &modified_files);
-
+        trace!("modified files vec {:?}", &modified_files);
+let len = modified_files.len();
+debug!("*");
         let signature = repo
             .signature()
             .expect("Obtaining a signature from the repo failed");
@@ -288,7 +297,7 @@ impl GitRepository {
                 outbound_envelope.reply_async(repository_event, None).await;
             });
 
-            debug!(
+            trace!(
                 repo_id = trace_id,
                 path = path,
                 "Submitted initializing event to broker."
