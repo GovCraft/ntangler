@@ -63,7 +63,7 @@ impl Tangler {
                                 loop {
                                     let broker = broker.clone();
                                     broker.emit_async(BrokerRequest::new(RepositoryPollRequested), None).await;
-                                    tokio::time::sleep(Duration::from_secs(5000)).await; // Poll every 3 seconds
+                                    tokio::time::sleep(Duration::from_secs(180)).await; // Poll every 3 seconds
                                 }
                             });
                         })
