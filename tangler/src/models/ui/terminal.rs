@@ -2,7 +2,7 @@ pub(crate) use app_event::AppEvent;
 pub(crate) use commit_heading::CommitHeadingTerminal;
 pub(crate) use commit_type::CommitTypeTerminal;
 pub(crate) use description::DescriptionTerminal;
-
+pub(crate) use dim::DimStatic;
 pub(crate) use filename::FilenameTerminal;
 pub(crate) use is_breaking::IsBreakingTerminal;
 pub(crate) use oid::OidTerminal;
@@ -20,7 +20,7 @@ mod time_stamp;
 
 mod app_event;
 mod commit_heading;
-
+mod dim;
 mod filename;
 mod is_breaking;
 mod repository;
