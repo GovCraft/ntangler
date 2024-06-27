@@ -12,7 +12,7 @@ use crate::actors::scribe::Scribe;
 use crate::actors::OpenAi;
 use crate::messages::{
     AcceptBroker, DiffCalculated, NotifyChange, NotifyError, RepositoryPollRequested,
-    SubscribeBroker, SystemStarted,
+    SystemStarted,
 };
 use crate::models::config::RepositoryConfig;
 use crate::models::config::TanglerConfig;
