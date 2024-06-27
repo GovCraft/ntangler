@@ -229,7 +229,9 @@ impl Scribe {
         let copyright_text = format!(
             "\u{00A9} Govcraft 2024 Tangler v{}",
             env!("CARGO_PKG_VERSION")
-        ).style(*PALETTE_NEUTRAL_9).to_string();
+        )
+        .style(*PALETTE_NEUTRAL_9)
+        .to_string();
 
         let canvas_width = screen_width as usize - TAB_WIDTH;
         let instructions_width = self.calculate_instructions_width(
