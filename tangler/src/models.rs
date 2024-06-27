@@ -26,12 +26,11 @@ mod ui;
 // mod pending_commit;
 // mod diff_generated_commit;
 mod tangled_commit;
-// mod commit_step;
-mod commit_message;
+
 mod signature;
 mod tangled_repository;
 
-pub(crate) use commit_message::CommitMessage;
+
 pub(crate) use signature::TangledSignature;
 pub(crate) use tangled_repository::TangledRepository;
 // pub(crate) use commit_step::CommitStep;
