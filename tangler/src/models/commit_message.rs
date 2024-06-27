@@ -1,11 +1,13 @@
 use std::fmt;
 
-use serde::{de, Deserialize, Deserializer};
 use serde::de::{MapAccess, Visitor};
+use serde::{de, Deserialize, Deserializer};
 
-use crate::models::{CommitType, Description, Filename, Footer, generate_id, Oid, Scope, TimeStamp};
 use crate::models::semver_impact::SemVerImpact;
 use crate::models::traits::TanglerModel;
+use crate::models::{
+    generate_id, CommitType, Description, Filename, Footer, Oid, Scope, TimeStamp,
+};
 use derive_more::*;
 
 impl From<CommitMessage> for String {
@@ -110,9 +112,11 @@ impl<'de> Deserialize<'de> for CommitMessage {
                     }
                 }
 
-                let commit_type: CommitType = commit_type.ok_or_else(|| de::Error::missing_field("type"))?;
+                let commit_type: CommitType =
+                    commit_type.ok_or_else(|| de::Error::missing_field("type"))?;
                 let scope = scope.unwrap_or(None);
-                let description = description.ok_or_else(|| de::Error::missing_field("description"))?;
+                let description =
+                    description.ok_or_else(|| de::Error::missing_field("description"))?;
                 let body = body.ok_or_else(|| de::Error::missing_field("body"))?;
                 let breaking = breaking.ok_or_else(|| de::Error::missing_field("breaking"))?;
 
@@ -134,16 +138,28 @@ impl<'de> Deserialize<'de> for CommitMessage {
         }
 
         const FIELDS: &[&str] = &[
-            "type", "scope", "description", "body", "breaking", "footers",
+            "type",
+            "scope",
+            "description",
+            "body",
+            "breaking",
+            "footers",
         ];
         deserializer.deserialize_struct("Commit", FIELDS, CommitVisitor)
     }
 }
 
 impl CommitMessage {
-    pub(crate) fn calculate_footers(footers: &mut Vec<Footer>, commit_type: &CommitType, breaking: bool) {
+    pub(crate) fn calculate_footers(
+        footers: &mut Vec<Footer>,
+        commit_type: &CommitType,
+        breaking: bool,
+    ) {
         if breaking {
-            if !footers.iter().any(|footer| footer.token == "BREAKING CHANGES") {
+            if !footers
+                .iter()
+                .any(|footer| footer.token == "BREAKING CHANGES")
+            {
                 footers.push(Footer {
                     token: "BREAKING CHANGES".to_string(),
                     value: "You have made changes that may break backward compatibility. According to Semantic Versioning (SemVer), this requires a major version update. Please verify and update your version number accordingly.".to_string(),
@@ -168,17 +184,16 @@ impl CommitMessage {
         };
     }
 
-    pub(crate) fn calculate_semver_impact(commit_type: &CommitType, breaking: bool) -> SemVerImpact {
+    pub(crate) fn calculate_semver_impact(
+        commit_type: &CommitType,
+        breaking: bool,
+    ) -> SemVerImpact {
         if breaking {
             SemVerImpact::Major
         } else {
             match commit_type.to_string().as_str() {
-                "fix" => {
-                    SemVerImpact::Patch
-                }
-                "feat" => {
-                    SemVerImpact::Minor
-                }
+                "fix" => SemVerImpact::Patch,
+                "feat" => SemVerImpact::Minor,
                 _ => SemVerImpact::NoImpact,
             }
         }
@@ -187,9 +202,17 @@ impl CommitMessage {
 
 impl fmt::Display for CommitMessage {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let scope_display = self.scope.as_deref().map_or_else(String::new, |s| format!("({})", s));
+        let scope_display = self
+            .scope
+            .as_deref()
+            .map_or_else(String::new, |s| format!("({})", s));
         let breaking_marker = if self.is_breaking { "!" } else { "" };
-        let footers = self.footers.iter().map(ToString::to_string).collect::<Vec<_>>().join("\n");
+        let footers = self
+            .footers
+            .iter()
+            .map(ToString::to_string)
+            .collect::<Vec<_>>()
+            .join("\n");
 
         write!(
             f,
@@ -247,7 +270,6 @@ mod tests {
             ..Default::default()
         };
 
-
         let expected_output = "🩹 fix(api): prevent racing of requests\n\nIntroduce a request id and a reference to latest request. Dismiss incoming responses other than from latest request.\n\nReviewed-by: Z\nRefs: #123";
         assert_eq!(format!("{}", &commit_details), expected_output);
     }
@@ -289,7 +311,10 @@ mod tests {
 
         assert_eq!(commit_details.commit_type, "fix".into());
         assert_eq!(commit_details.scope, None);
-        assert_eq!(commit_details.description, "prevent racing of requests".into());
+        assert_eq!(
+            commit_details.description,
+            "prevent racing of requests".into()
+        );
         assert_eq!(commit_details.body, "Introduce a request id and a reference to latest request. Dismiss incoming responses other than from latest request.");
         assert_eq!(commit_details.footers.len(), 3); //2 plus one more because the "fix" commit type would generate a BUG FIX semver footer
         assert_eq!(commit_details.footers[0].token, "Reviewed-by");
