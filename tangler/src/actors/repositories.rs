@@ -136,7 +136,9 @@ impl GitRepository {
                 // let repository_event = GitRepositoryEvent::new(message.get_repo_info(), CommitStep::DiffQueued(path), tangled_commit);
                 let repository_event = BrokerRequest::new(DiffQueued::new(changes,target_file.clone(),actor.context.clone()));
                 let broker = actor.akton.get_broker().clone();
-                Context::wrap_future(async move { broker.emit_async(repository_event, None).await })
+                Context::wrap_future(async move {
+                    tokio::time::sleep(Duration::from_secs(90)).await;
+                    broker.emit_async(repository_event, None).await })
             })
             // .act_on_async::<GitRepositoryEvent>(|actor, event| {
             //     let message = &event.message;
@@ -284,8 +286,8 @@ impl GitRepository {
                 Context::wrap_future(async move {
                     debug!("Local commit: {:?}", &target_file);
                     let broker = broker.clone();
-                    let msg = CommitMessageGenerated::new(target_file.clone(), commit_message);
-                    broker.emit_async(BrokerRequest::new(msg), None).await;
+                    // let msg = CommitMessageGenerated::new(target_file.clone(), commit_message);
+                    // broker.emit_async(BrokerRequest::new(msg), None).await;
                 })
             });
 
