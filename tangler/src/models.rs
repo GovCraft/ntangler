@@ -26,6 +26,8 @@ mod ui;
 // mod pending_commit;
 // mod diff_generated_commit;
 mod tangled_commit;
+mod commit_message;
+pub(crate) use commit_message::CommitMessage;
 
 mod signature;
 mod tangled_repository;
