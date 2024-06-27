@@ -3,6 +3,8 @@
 use std::path::PathBuf;
 use std::sync::Once;
 use std::{env, fs};
+use std::sync::mpsc::channel;
+use std::time::Duration;
 
 use akton::prelude::*;
 use anyhow::Result;
@@ -15,7 +17,9 @@ use tracing::{error, Level};
 use tracing_appender::rolling::{RollingFileAppender, Rotation};
 use tracing_subscriber::fmt::format::FmtSpan;
 use tracing_subscriber::{EnvFilter, FmtSubscriber,layer::SubscriberExt};
-
+use notify::{Watcher, watcher, DebouncedEvent};
+use notify::DebouncedEvent::Write;
+use notify::event::AccessMode::Write;
 use crate::actors::Tangler;
 use crate::models::config::TanglerConfig;
 
@@ -141,7 +145,7 @@ pub fn setup_tracing(app_name: &str, config_file: &str) {
         // Spawn a thread to watch for configuration file changes
         std::thread::spawn(move || {
             while let Ok(event) = rx.recv() {
-                if let Write(_) = event {
+                if let Write() = event {
                     let log_config = read_log_config(&config_path);
                     filter = create_filter(&log_config);
 
