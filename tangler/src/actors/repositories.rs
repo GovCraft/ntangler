@@ -1,3 +1,22 @@
+use crate::messages::{
+    CommitMessageGenerated, CommitPosted, DiffCalculated, DiffQueued, FileChangeDetected,
+    FinalizedCommit, NotifyChange, RepositoryPollRequested, SubscribeBroker, SystemStarted,
+};
+use crate::models::config::RepositoryConfig;
+use crate::models::config::TanglerConfig;
+use crate::models::{
+    CommitType, CommittedCommit, Description, Filename, Oid, RepositoryEvent, Scope, TangledCommit,
+    TangledRepository, TangledSignature, TimeStamp,
+};
+use akton::prelude::*;
+use anyhow::anyhow;
+use futures::future::join_all;
+use futures::stream::FuturesUnordered;
+use futures::StreamExt;
+use git2::{DiffOptions, Error, IndexAddOption, Repository, Status as GitStatus, StatusOptions};
+use rand::distributions::Alphanumeric;
+use rand::prelude::SliceRandom;
+use rand::{thread_rng, Rng};
 use std::any::TypeId;
 use std::collections::HashSet;
 use std::future::Future;
@@ -6,21 +25,7 @@ use std::pin::Pin;
 use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
-use futures::future::join_all;
-use akton::prelude::*;
-use anyhow::anyhow;
-use futures::StreamExt;
-use futures::stream::FuturesUnordered;
-use git2::{DiffOptions, Error, IndexAddOption, Repository, StatusOptions, Status as GitStatus};
-use rand::distributions::Alphanumeric;
-use rand::prelude::SliceRandom;
-use rand::{thread_rng, Rng};
 use tracing::{debug, error, info, instrument, trace, warn};
-use crate::messages::{CommitMessageGenerated, CommitPosted, DiffCalculated, DiffQueued, FileChangeDetected, FinalizedCommit, NotifyChange, RepositoryPollRequested, SubscribeBroker, SystemStarted};
-use crate::models::config::RepositoryConfig;
-use crate::models::config::TanglerConfig;
-use crate::models::{CommittedCommit, CommitType, Description, Filename, Oid, Scope, TangledRepository, TangledCommit, TangledSignature, RepositoryEvent, TimeStamp};
-
 
 #[akton_actor]
 pub(crate) struct GitRepository {
@@ -61,7 +66,7 @@ impl GitRepository {
     ) -> anyhow::Result<Context>
     where
         F: Fn(TangledRepository, AktonReady) -> Fut + Send + Sync + 'static,
-        Fut: Future<Output=anyhow::Result<Context>> + Send,
+        Fut: Future<Output = anyhow::Result<Context>> + Send,
     {
         // Execute the custom behavior and await its result
         custom_behavior(config, system).await
@@ -73,7 +78,8 @@ impl GitRepository {
         mut system: AktonReady,
     ) -> anyhow::Result<Context> {
         let akton = system.clone();
-        let actor_name = Arn::with_account("repository")?.add_part(tangled_repository.akton_arn.root.to_string())?;
+        let actor_name = Arn::with_account("repository")?
+            .add_part(tangled_repository.akton_arn.root.to_string())?;
 
         let actor_config = ActorConfig::new(actor_name, None, Some(system.clone().get_broker()))
             .expect("Failed to build repository config");
@@ -86,11 +92,16 @@ impl GitRepository {
 
         actor.state.repo_info = tangled_repository.clone();
 
-        actor.setup.act_on::<SystemStarted>(|actor, _event| {
-            actor.state.broker = actor.akton.get_broker().clone();
-        })
+        actor
+            .setup
+            .act_on::<SystemStarted>(|actor, _event| {
+                actor.state.broker = actor.akton.get_broker().clone();
+            })
             .act_on_async::<RepositoryPollRequested>(|actor, event| {
-                debug!(sender=event.return_address.sender,"Poll changes received for");
+                debug!(
+                    sender = event.return_address.sender,
+                    "Poll changes received for"
+                );
                 let reply_to = event.return_address.clone();
                 let broker = actor.akton.get_broker().clone();
                 let mut futures = actor.state.handle_poll_request(reply_to);
@@ -111,25 +122,31 @@ impl GitRepository {
                 diff_options.disable_pathspec_match(true);
 
                 // Generate the diff
-                let diff = repo.diff_index_to_workdir(None, Some(&mut diff_options)).expect("nope");
+                let diff = repo
+                    .diff_index_to_workdir(None, Some(&mut diff_options))
+                    .expect("nope");
                 let mut diff_text = Vec::new();
                 diff.print(git2::DiffFormat::Patch, |_, _, line| {
                     diff_text.extend_from_slice(line.content());
                     true
-                }).expect("Failed to print diff");
+                })
+                .expect("Failed to print diff");
                 let changes = String::from_utf8_lossy(&diff_text).to_string();
 
                 // let tangled_commit = message.get_commit().clone();
                 // let repository_event = GitRepositoryEvent::new(message.get_repo_info(), CommitStep::DiffQueued(path), tangled_commit);
-                let repository_event = BrokerRequest::new(DiffQueued::new(changes, target_file.clone(), actor.state.repo_info.nickname.clone(), actor.context.clone()));
+                let repository_event = BrokerRequest::new(DiffQueued::new(
+                    changes,
+                    target_file.clone(),
+                    actor.state.repo_info.nickname.clone(),
+                    actor.context.clone(),
+                ));
                 let broker = actor.akton.get_broker().clone();
-                Context::wrap_future(
-                    async move {
-                        broker.emit_async(repository_event, None).await;
-                    })
+                Context::wrap_future(async move {
+                    broker.emit_async(repository_event, None).await;
+                })
             })
             .act_on_async::<CommitMessageGenerated>(|actor, event| {
-
                 // Event: Received Commit Response
                 // Description: Received a commit response and will commit changes to the repository.
                 // Context: Commit message details.
@@ -148,7 +165,9 @@ impl GitRepository {
                 // Stage all modified files
                 let mut index = repo.index().expect("Failed to get index");
                 trace!(file=?target_file, "Repo index add");
-                index.add_path(target_file.as_ref()).expect("Failed to add files to index");
+                index
+                    .add_path(target_file.as_ref())
+                    .expect("Failed to add files to index");
                 index.write().expect("Failed to write index");
 
                 let tree_id = index.write_tree().expect("Failed to write tree");
@@ -159,21 +178,29 @@ impl GitRepository {
                 let when: TimeStamp = (&sig.when()).into();
                 let message_string = &commit_message.to_string();
                 // TODO: optionally sign commits
-                let hash = repo.commit(
-                    Some("HEAD"),
-                    &sig,
-                    &sig,
-                    message_string,
-                    &tree,
-                    &[&parent_commit],
-                ).expect("Failed to commit");
+                let hash = repo
+                    .commit(
+                        Some("HEAD"),
+                        &sig,
+                        &sig,
+                        message_string,
+                        &tree,
+                        &[&parent_commit],
+                    )
+                    .expect("Failed to commit");
                 let hash = hash.to_string();
 
                 let commit_message = commit_message.clone();
                 Context::wrap_future(async move {
                     debug!("Local commit: {:?}", &target_file);
                     let broker = broker.clone();
-                    let msg = FinalizedCommit::new(when, target_file.clone(), repository_nickname, hash, commit_message);
+                    let msg = FinalizedCommit::new(
+                        when,
+                        target_file.clone(),
+                        repository_nickname,
+                        hash,
+                        commit_message,
+                    );
                     broker.emit_async(BrokerRequest::new(msg), None).await;
                 })
             });
@@ -190,8 +217,8 @@ impl GitRepository {
     #[instrument(skip(self, futures))]
     fn broadcast_futures<T>(
         &self,
-        mut futures: FuturesUnordered<impl Future<Output=T> + Sized>,
-    ) -> Pin<Box<impl Future<Output=()> + Sized>> {
+        mut futures: FuturesUnordered<impl Future<Output = T> + Sized>,
+    ) -> Pin<Box<impl Future<Output = ()> + Sized>> {
         // Event: Broadcasting Futures
         // Description: Broadcasting futures to be processed.
         // Context: Number of futures.
@@ -211,7 +238,10 @@ impl GitRepository {
             debug!("{i} future(s) sent");
         })
     }
-    pub(crate) fn handle_poll_request(&self, outbound_envelope: OutboundEnvelope) -> FuturesUnordered<impl Future<Output=()> + 'static> {
+    pub(crate) fn handle_poll_request(
+        &self,
+        outbound_envelope: OutboundEnvelope,
+    ) -> FuturesUnordered<impl Future<Output = ()> + 'static> {
         let self_key = &self.repo_info.akton_arn;
         debug!(self = self.repo_info.nickname, "Received Poll request");
         let mut futures = FuturesUnordered::new();
@@ -233,10 +263,11 @@ impl GitRepository {
             .into_iter()
             .collect();
 
-
         debug!("modified files vec {:?}", &modified_files);
 
-        let signature = repo.signature().expect("Obtaining a signature from the repo failed");
+        let signature = repo
+            .signature()
+            .expect("Obtaining a signature from the repo failed");
         let repository = self.repo_info.clone();
         let id = self.repo_info.nickname.clone();
 
@@ -253,11 +284,16 @@ impl GitRepository {
             let trace_id = id.clone();
             let tangled_commit = TangledCommit::new(oid, signature, None, None);
             let repository_event = FileChangeDetected::new(file.into());
-            futures.push(async move { outbound_envelope.reply_async(repository_event, None).await; });
+            futures.push(async move {
+                outbound_envelope.reply_async(repository_event, None).await;
+            });
 
-            debug!(repo_id = trace_id, path = path, "Submitted initializing event to broker.");
+            debug!(
+                repo_id = trace_id,
+                path = path,
+                "Submitted initializing event to broker."
+            );
         }
         futures
     }
 }
-
