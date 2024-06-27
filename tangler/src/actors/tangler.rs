@@ -11,7 +11,7 @@ use crate::actors::repositories::GitRepository;
 use crate::actors::scribe::Scribe;
 use crate::actors::OpenAi;
 use crate::messages::{
-    AcceptBroker, DiffCalculated, NotifyError, RepositoryPollRequested,
+    AcceptBroker,  NotifyError, RepositoryPollRequested,
     SystemStarted,
 };
 use crate::models::config::RepositoryConfig;
@@ -58,14 +58,14 @@ impl Tangler {
 
                     actor
                         .setup
-                        .act_on_async::<DiffCalculated>(|actor, event| {
-                            let context = actor.context.clone();
-                            let message = event.message.clone();
-                            Box::pin(async move {
-                                trace!("Diff submitted for LLM pool");
-                                context.emit_async(message, Some("llm_pool")).await
-                            })
-                        })
+                        // .act_on_async::<DiffCalculated>(|actor, event| {
+                        //     let context = actor.context.clone();
+                        //     let message = event.message.clone();
+                        //     Box::pin(async move {
+                        //         trace!("Diff submitted for LLM pool");
+                        //         context.emit_async(message, Some("llm_pool")).await
+                        //     })
+                        // })
                         .act_on_async::<SystemStarted>(|actor, _event| {
                             let broker = actor.akton.get_broker().clone();
                             Box::pin(async move {
@@ -117,7 +117,7 @@ impl Tangler {
 
                     actor.context.subscribe::<SystemStarted>().await;
                     actor.context.subscribe::<NotifyError>().await;
-                    actor.context.subscribe::<DiffCalculated>().await;
+                    // actor.context.subscribe::<DiffCalculated>().await;
 
                     // let actor_context = actor.activate(Some(pool_builder)).await;
                     //
