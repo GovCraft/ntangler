@@ -8,7 +8,7 @@ use termcolor::{Color, ColorSpec, StandardStream, WriteColor};
 use tracing::{info, instrument, trace};
 
 use crate::models::{
-    ConsoleStyle, DimStatic, ALERT_COLOR, BG_DARK, GRAY_10, GRAY_11, GRAY_12, GRAY_9,
+    ConsoleStyle,  ALERT_COLOR, BG_DARK, GRAY_10, GRAY_11, GRAY_12, GRAY_9,
     PUNCTUATION_COLOR, SCOPE_PUNCTUATION_COLOR, TEAL_11, TEAL_12, TIME_PUNCTUATION_COLOR,
     WHITE_PURE,
 };
