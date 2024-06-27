@@ -183,7 +183,7 @@ impl Scribe {
                 COLUMN_HEADING_THREE,
                 COLUMN_HEADING_FOUR,
                 COLUMN_HEADING_FIVE,
-                COLUMN_HEADING_SIX.style(*PALETTE_PRIMARY_12),
+                COLUMN_HEADING_SIX.style(*PALETTE_PRIMARY_11),
                 COLUMN_HEADING_SEVEN
             );
             stderr.write_line(display.as_str()).unwrap();
