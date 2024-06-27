@@ -1,10 +1,10 @@
-use console::{colors_enabled_stderr, Term};
+use console::colors_enabled_stderr;
 use lazy_static::lazy_static;
-use owo_colors::{OwoColorize, Style};
-use termcolor::Color;
+use owo_colors::Style;
 
 pub(crate) const TAB_WIDTH: usize = 8; // You can set this to any number of spaces you want
 pub(crate) const LIST_ROW: usize = 3;
+pub(crate) const DISPLAY_WINDOW: usize = 11;
 
 lazy_static! {
 pub static ref has_true_colors : bool = colors_enabled_stderr();
