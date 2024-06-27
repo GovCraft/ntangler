@@ -1,17 +1,12 @@
-use console::style;
-use derive_more::*;
 use std::fmt;
 
-use crate::models::traits::TanglerModel;
 use serde::Deserialize;
 use tracing::{info, instrument};
-
-use super::*;
 
 /// Represents the type of a commit.
 #[derive(Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Deserialize)]
 pub(crate) struct CommitType(String);
-impl TanglerModel for CommitType {}
+
 impl fmt::Display for CommitType {
     /// Formats the `CommitType` for display.
     ///

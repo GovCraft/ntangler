@@ -1,15 +1,13 @@
-use console::style;
 use std::fmt;
 use std::ops::Deref;
 
-use crate::models::traits::TanglerModel;
-use crate::models::Oid;
-use derive_more::*;
 use serde::Deserialize;
 use tracing::{info, instrument};
+
 #[derive(Clone, Default, Debug, PartialEq, Eq, PartialOrd, Ord, Deserialize)]
 pub(crate) struct Scope(String);
-impl TanglerModel for Scope {}
+
+
 impl Deref for Scope {
     type Target = str;
 

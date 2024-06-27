@@ -1,11 +1,11 @@
 [package]
-name = "tangler"
-version = "2.0.3"
+name = "ntangler"
+version = "2.4.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [[bin]]
-name = "tangler"
+name = "ntangler"
 path = "src/main.rs"
 
 [features]
@@ -52,6 +52,7 @@ indicatif = { version = "0.17.8", features = ["futures", "tokio", "in_memory"] }
 derive_more = "0.99.18"
 derive-new = "0.6.0"
 uuid = { version = "1.9.1", features = ["v3"] }
+tracing-appender = "0.2.3"
 
 [dev-dependencies]
 lazy_static = "1.4.0"

@@ -1,8 +1,8 @@
-use crate::models::{CommitMessage, CommittedCommit, Oid, TimeStamp};
-use akton::prelude::*;
-use derive_more::*;
-use derive_new::new;
 use std::path::PathBuf;
+
+use derive_new::new;
+
+use crate::models::{CommitMessage, TimeStamp};
 
 /// Represents a successful commit message with its details.
 #[derive(new, Default, Debug, Clone)]

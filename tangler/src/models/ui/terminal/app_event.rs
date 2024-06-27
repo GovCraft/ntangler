@@ -1,15 +1,13 @@
-// use crate::messages::commit_authoring::CommitAuthoring;
-// use crate::messages::CommitPosted;
-use crate::messages::{DiffQueued, FinalizedCommit, GenerationStarted};
-use crate::models::*;
-use akton::prelude::*;
-use console::{pad_str, Alignment};
-use derive_more::*;
-use derive_new::new;
-use owo_colors::OwoColorize;
 use std::fmt;
 use std::fmt::{Display, Formatter};
+
+use console::{Alignment, pad_str};
+use derive_new::new;
+use owo_colors::OwoColorize;
 use uuid::Uuid;
+
+use crate::messages::{DiffQueued, FinalizedCommit, GenerationStarted};
+use crate::models::*;
 
 /// Represents a successful commit message with its details.
 #[derive(new, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -35,7 +33,7 @@ impl From<FinalizedCommit> for AppEvent {
         let namespace = Uuid::NAMESPACE_OID;
 
         let simple_urn = format!("{}://{:?}", &value.repository_nickname, value.target_file);
-        let event_id = Uuid::new_v3(&namespace, (&simple_urn).as_ref()).to_string();
+        let event_id = Uuid::new_v3(&namespace, simple_urn.as_ref()).to_string();
 
         let timestamp = &value.when.style(*TIME_COLOR);
         let oid = Oid::new(&value.hash);
@@ -79,7 +77,7 @@ impl From<GenerationStarted> for AppEvent {
         let namespace = Uuid::NAMESPACE_OID;
 
         let simple_urn = format!("{}://{:?}", &value.repository_nickname, value.target_file);
-        let event_id = Uuid::new_v3(&namespace, (&simple_urn).as_ref()).to_string();
+        let event_id = Uuid::new_v3(&namespace, simple_urn.as_ref()).to_string();
         let time_stamp = "\u{2014}\u{2014}".style(*ALERT_COLOR);
         let binding = &value.target_file.display();
         let filename = &binding.style(*ALERT_COLOR);
@@ -105,7 +103,7 @@ impl From<DiffQueued> for AppEvent {
         let namespace = Uuid::NAMESPACE_OID;
 
         let simple_urn = format!("{}://{:?}", &value.repository_nickname, value.target_file);
-        let event_id = Uuid::new_v3(&namespace, (&simple_urn).as_ref()).to_string();
+        let event_id = Uuid::new_v3(&namespace, simple_urn.as_ref()).to_string();
         let time_stamp = "\u{2014}\u{2014}".style(*STATUS_PENDING);
         let binding = &value.target_file.display();
         let filename = &binding.style(*FILENAME_PENDING);

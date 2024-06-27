@@ -1,34 +1,12 @@
-use std::cmp::PartialEq;
 use std::collections::VecDeque;
-use std::fmt::Debug;
-use std::io::{stderr, Write};
-use std::sync::Arc;
-use std::time::Duration;
-use std::{any::TypeId, fmt::Display};
 
 use akton::prelude::*;
-use atty::is;
-use chrono::{DateTime, Local, TimeZone, Utc};
-use console::{pad_str, style, Alignment, Term};
-use indicatif::{ProgressBar, ProgressStyle, TermLike};
+use console::{Alignment, pad_str, Term};
 use owo_colors::OwoColorize;
-use termcolor::{BufferWriter, Color, ColorChoice, ColorSpec, StandardStream, WriteColor};
-use tokio::sync::mpsc;
 use tracing::*;
-use unicode_segmentation::UnicodeSegmentation;
-use unicode_width::UnicodeWidthStr;
 
-use crate::messages::{
-    CommitPosted, DiffQueued, FinalizedCommit, GenerationStarted, NotifyError, SubscribeBroker,
-    SystemStarted,
-};
-use crate::models::CommittedCommit;
+use crate::messages::{DiffQueued, FinalizedCommit, GenerationStarted, SystemStarted};
 use crate::models::*;
-use crate::models::{CommitTypeTerminal, MENU_COLOR};
-
-const TAB_WIDTH: usize = 8;
-const LIST_ROW: usize = 3;
-const DISPLAY_WINDOW: usize = 11;
 
 #[akton_actor]
 #[derive(Clone)]
@@ -51,7 +29,7 @@ impl Scribe {
             .expect("Failed to create Scribe config");
         let term = Term::stdout();
         term.set_title("Tangler Ai Commits");
-        term.hide_cursor();
+        let _ = term.hide_cursor();
 
         let mut actor = system
             .create_actor_with_config::<Scribe>(actor_config)
@@ -63,9 +41,6 @@ impl Scribe {
 
         actor
             .setup
-            .act_on::<NotifyError>(|actor, event| {
-                Scribe::handle_notify_error(&mut actor.state, &event.message.error_message);
-            })
             .act_on::<DiffQueued>(|actor, event| {
                 let msg = event.message.clone();
                 let app_event: AppEvent = msg.into();
@@ -108,16 +83,9 @@ impl Scribe {
         actor.activate(None).await
     }
 
-    fn handle_notify_error(actor: &mut Scribe, error_message: &str) {
-        warn!("Displayed user error: {:?}", error_message);
-        if let Some(stderr) = &actor.stderr {
-            stderr.write_line(error_message).unwrap();
-        }
-    }
-
     fn handle_system_started(actor: &mut Scribe) {
-        Term::stdout().clear_screen();
-        Scribe::print_headings(&actor);
+        let _ = Term::stdout().clear_screen();
+        Scribe::print_headings(actor);
     }
 
     fn handle_commit_event(scribe: &mut Scribe, event: &AppEvent) {
@@ -162,10 +130,6 @@ impl Scribe {
         }
     }
 
-    fn clear_console() {
-        Term::stderr().clear_to_end_of_screen().unwrap();
-    }
-
     fn print_headings(&self) {
         if let Some(stderr) = &self.stderr {
             stderr.move_cursor_to(0, LIST_ROW - 2).unwrap();
@@ -178,12 +142,12 @@ impl Scribe {
                 {:^COLUMN_HEADING_SIX_LENGTH$} \
                 {:^COLUMN_HEADING_SEVEN_LENGTH$}",
                 self.half_tab,
-                COLUMN_HEADING_ONE,
+                COLUMN_HEADING_ONE.style(*PALETTE_PRIMARY_11),
                 COLUMN_HEADING_TWO,
                 COLUMN_HEADING_THREE,
                 COLUMN_HEADING_FOUR,
                 COLUMN_HEADING_FIVE,
-                COLUMN_HEADING_SIX.style(*PALETTE_PRIMARY_12),
+                COLUMN_HEADING_SIX.style(*PALETTE_PRIMARY_11),
                 COLUMN_HEADING_SEVEN
             );
             stderr.write_line(display.as_str()).unwrap();
@@ -204,7 +168,7 @@ impl Scribe {
 
     fn print_menu(&self) {
         if let Some(stderr) = &self.stderr {
-            stderr.move_cursor_to(0, 2 + DISPLAY_WINDOW);
+            let _ = stderr.move_cursor_to(0, 2 + DISPLAY_WINDOW);
             self.print_horizontal_rule();
             stderr.write_line(&self.format_footer()).unwrap();
             stderr.clear_to_end_of_screen().unwrap()
@@ -229,16 +193,16 @@ impl Scribe {
         let copyright_text = format!(
             "\u{00A9} Govcraft 2024 Tangler v{}",
             env!("CARGO_PKG_VERSION")
-        ).style(*PALETTE_NEUTRAL_9).to_string();
+        )
+            .style(*PALETTE_NEUTRAL_9)
+            .to_string();
 
         let canvas_width = screen_width as usize - TAB_WIDTH;
         let instructions_width = self.calculate_instructions_width(
             canvas_width,
             &session_commits_label_text,
             &session_commits_text,
-            &copyright_text,
             &semver_label_text,
-            &semver_recommendation_text,
         );
         let instructions_text = pad_str(
             &instructions_text,
@@ -277,9 +241,7 @@ impl Scribe {
         canvas_width: usize,
         session_commits_label_text: &str,
         session_commits_text: &str,
-        copyright_text: &str,
         semver_label_text: &str,
-        semver_recommendation_text: &str,
     ) -> usize {
         // Calculate total text length and remaining width
         let remaining_width = self.calculate_remaining_width(

@@ -1,20 +1,14 @@
-use std::any::TypeId;
 use std::fmt::Debug;
 use std::time::Duration;
 
-use akton::prelude::Subscribable;
 use akton::prelude::*;
-use futures::FutureExt;
-use tracing::{debug, error, info, instrument, trace, warn};
+use akton::prelude::Subscribable;
+use tracing::{debug, instrument, trace};
 
+use crate::actors::OpenAi;
 use crate::actors::repositories::GitRepository;
 use crate::actors::scribe::Scribe;
-use crate::actors::OpenAi;
-use crate::messages::{
-    AcceptBroker, DiffCalculated, NotifyChange, NotifyError, RepositoryPollRequested,
-    SubscribeBroker, SystemStarted,
-};
-use crate::models::config::RepositoryConfig;
+use crate::messages::{RepositoryPollRequested, SystemStarted};
 use crate::models::config::TanglerConfig;
 use crate::models::TangledRepository;
 
@@ -22,15 +16,15 @@ use crate::models::TangledRepository;
 #[derive(Default, Debug, Clone)]
 pub(crate) struct Tangler {
     git_repositories: Vec<Context>,
-    diff_watchers: Vec<Context>,
-    llm_pool: Vec<Context>,
     scribe: Context,
     generator: Context,
 }
 
 impl Tangler {
     #[instrument(skip(tangler_config))]
-    pub(crate) async fn initialize(tangler_config: TanglerConfig) -> anyhow::Result<(Context, Context)> {
+    pub(crate) async fn initialize(
+        tangler_config: TanglerConfig,
+    ) -> anyhow::Result<(Context, Context)> {
         let mut akton: AktonReady = Akton::launch().into();
         let broker = akton.get_broker();
         let actor_config =
@@ -49,21 +43,13 @@ impl Tangler {
                         None,
                         Some(broker.clone()),
                     )
-                    .expect("Failed to create generator config");
+                        .expect("Failed to create generator config");
                     actor.state.generator = OpenAi::initialize(generator_config, &mut actor.akton)
                         .await
                         .expect("Failed to initialize generator actor");
 
                     actor
                         .setup
-                        .act_on_async::<DiffCalculated>(|actor, event| {
-                            let context = actor.context.clone();
-                            let message = event.message.clone();
-                            Box::pin(async move {
-                                trace!("Diff submitted for LLM pool");
-                                context.emit_async(message, Some("llm_pool")).await
-                            })
-                        })
                         .act_on_async::<SystemStarted>(|actor, _event| {
                             let broker = actor.akton.get_broker().clone();
                             Box::pin(async move {
@@ -97,7 +83,7 @@ impl Tangler {
                     for repo in &tangler_config.repositories {
                         let akton = &mut actor.akton.clone();
                         trace!(repo = ?repo, "Initializing a repository actor.");
-                        let broker = broker.clone();
+
                         let tangled_repository: TangledRepository = repo.clone().into();
                         let watcher = GitRepository::init(tangled_repository, akton)
                             .await
@@ -106,27 +92,7 @@ impl Tangler {
                         debug!(actor = watcher.key, "init repository");
                     }
 
-                    // let pool_size = tangler_config.repositories.len() * 5;
-                    // let pool_builder = PoolBuilder::default().add_pool::<OpenAi>(
-                    //     "llm_pool",
-                    //     pool_size,
-                    //     LoadBalanceStrategy::RoundRobin,
-                    // );
-
                     actor.context.subscribe::<SystemStarted>().await;
-                    actor.context.subscribe::<NotifyError>().await;
-                    actor.context.subscribe::<NotifyChange>().await;
-                    actor.context.subscribe::<DiffCalculated>().await;
-
-                    // let actor_context = actor.activate(Some(pool_builder)).await;
-                    //
-                    // for _ in 0..pool_size {
-                    //     trace!("Sending broker to LLM Pool.");
-                    //     let broker = broker.clone();
-                    //     actor_context
-                    //         .emit_async(AcceptBroker { broker }, Some("llm_pool"))
-                    //         .await;
-                    // }
                     actor.activate(None).await
                 })
             })

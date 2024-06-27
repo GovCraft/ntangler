@@ -1,22 +1,17 @@
 use std::fmt;
-use std::io::Write;
 use std::ops::Deref;
 
-use console::style;
 use owo_colors::OwoColorize;
-use serde::Deserialize;
-use termcolor::{Color, ColorSpec, StandardStream, WriteColor};
-use tracing::{info, instrument, trace};
+use tracing::{error, instrument};
 
 use crate::models::{
-    CommitType, CommitTypeTerminal, ConsoleStyle, IsBreakingTerminal, Scope, ScopeTerminal,
-    GRAY_11, GRAY_12, SCOPE_PUNCTUATION_COLOR, TEAL_11, TEAL_12,
+    CommitTypeTerminal, IsBreakingTerminal, SCOPE_PUNCTUATION_COLOR,
+    ScopeTerminal,
 };
 
 #[derive(Debug, Clone)]
 pub(crate) struct CommitHeadingTerminal((CommitTypeTerminal, ScopeTerminal, IsBreakingTerminal));
 
-impl ConsoleStyle for CommitHeadingTerminal {}
 
 impl Deref for CommitHeadingTerminal {
     type Target = (CommitTypeTerminal, ScopeTerminal, IsBreakingTerminal);
@@ -32,10 +27,13 @@ impl fmt::Display for CommitHeadingTerminal {
         let (commit_type, scope, warning) = &self.0;
         let left_parens = "(".style(*SCOPE_PUNCTUATION_COLOR);
         let right_parens = ")".style(*SCOPE_PUNCTUATION_COLOR);
-        write!(
+        if let Err(e) = write!(
             f,
-            "{commit_type}{left_parens}{scope}{right_parens}{warning}"
-        );
+            "{}{}{}{}{}",
+            commit_type, left_parens, scope, right_parens, warning
+        ) {
+            error!("{:?}", e);
+        }
         Ok(())
     }
 }
