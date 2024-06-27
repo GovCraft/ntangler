@@ -35,7 +35,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         std::process::exit(1);
     }
 
-    let config_path = find_config_file_path("tangler", "config.toml")?;
+    let config_path = find_config_path("tangler", "config.toml")?;
     let config_content = fs::read_to_string(&config_path)?;
 
     let tangler_config: TanglerConfig = toml::from_str(&config_content)?;
@@ -69,8 +69,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 fn check_openai_api_key() -> bool {
     env::var("OPENAI_API_KEY").is_ok()
 }
-
-fn find_config_file_path(app_name: &str, config_file: &str) -> Result<PathBuf, Box<dyn std::error::Error>> {
+fn find_config_path(app_name: &str, config_file: &str) -> Result<PathBuf, Box<dyn std::error::Error>> {
     if let Ok(config_home) = env::var("XDG_CONFIG_HOME") {
         Ok(PathBuf::from(config_home).join(app_name).join(config_file))
     } else if let Ok(home_dir) = env::var("HOME") {
@@ -86,7 +85,7 @@ static INIT: Once = Once::new();
 pub fn setup_tracing(app_name: &str, config_file: &str) {
     INIT.call_once(|| {
         // Get the directory for logging using the configuration file path
-        let log_dir = find_config_file_path(app_name, config_file).expect("Unable to find config file path");
+        let log_dir = find_config_path(app_name, config_file).expect("Unable to find config file path");
         let file_appender = RollingFileAppender::new(Rotation::DAILY, log_dir, "ntangler.log");
 
         // Define an environment filter to suppress logs from specific functions
