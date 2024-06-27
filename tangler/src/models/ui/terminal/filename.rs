@@ -1,18 +1,15 @@
 use std::fmt;
 use std::ops::Deref;
 
-use console::style;
 use owo_colors::OwoColorize;
 use serde::Deserialize;
-use termcolor::{Color, ColorSpec, StandardStream, WriteColor};
-use tracing::{info, instrument, trace};
+use tracing::{error, instrument, trace};
 
-use crate::models::{ConsoleStyle, Filename, FILENAME, GRAY_11, GRAY_12, TEAL_11, TEAL_12};
+use crate::models::{Filename, FILENAME};
 
 #[derive(Debug, Default, Clone, Deserialize, PartialEq)]
 pub(crate) struct FilenameTerminal(Filename);
 
-impl ConsoleStyle for FilenameTerminal {}
 
 impl Deref for FilenameTerminal {
     type Target = str;
@@ -25,8 +22,9 @@ impl Deref for FilenameTerminal {
 impl fmt::Display for FilenameTerminal {
     #[instrument(level = "trace", skip(self, f))]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        //        write!(f, "{:>10}", self.0.style(REPO_COLOR.clone()));
-        write!(f, "{:>15}", &self.0.style(*FILENAME));
+        if let Err(e) = write!(f, "{:>15}", self.0.style(*FILENAME)) {
+            error!("{:?}", e);
+        }
         Ok(())
     }
 }
