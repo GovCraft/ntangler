@@ -9,6 +9,7 @@ use crate::models::{CommittedCommit, Oid, TimeStamp};
 pub(crate) struct DiffQueued {
     pub(crate) diff: String,
     pub(crate) target_file: PathBuf,
+    pub(crate) repository_nickname: String,
     pub(crate) reply_address: Context,
 }
 
