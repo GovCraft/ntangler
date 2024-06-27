@@ -92,10 +92,10 @@ fn find_config_path(app_name: &str, config_file: &str) -> Result<PathBuf, Box<dy
 }
 
 fn find_logs_path(app_name: &str) -> Result<PathBuf, Box<dyn std::error::Error>> {
-    if let Ok(config_home) = env::var("XDG_CONFIG_HOME") {
+    if let Ok(config_home) = env::var("XDG_CACHE_HOME") {
         Ok(PathBuf::from(config_home).join(app_name).join("logs"))
     } else if let Ok(home_dir) = env::var("HOME") {
-        Ok(PathBuf::from(home_dir).join(".config").join(app_name).join("logs"))
+        Ok(PathBuf::from(home_dir).join(".cache").join(app_name).join("logs"))
     } else {
         Err("Could not determine the logs directory path.".into())
     }
