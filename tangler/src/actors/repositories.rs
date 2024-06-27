@@ -1,6 +1,6 @@
 use crate::messages::{
-    CommitMessageGenerated, CommitPosted,  DiffQueued, FileChangeDetected,
-    FinalizedCommit, RepositoryPollRequested, SystemStarted,
+    CommitMessageGenerated, CommitPosted, DiffQueued, FileChangeDetected, FinalizedCommit,
+    RepositoryPollRequested, SystemStarted,
 };
 use crate::models::config::RepositoryConfig;
 use crate::models::config::TanglerConfig;
@@ -13,7 +13,9 @@ use anyhow::anyhow;
 use futures::future::join_all;
 use futures::stream::FuturesUnordered;
 use futures::StreamExt;
-use git2::{DiffOptions, Error, IndexAddOption, Repository, Status as GitStatus, Status, StatusOptions};
+use git2::{
+    DiffOptions, Error, IndexAddOption, Repository, Status as GitStatus, Status, StatusOptions,
+};
 use rand::distributions::Alphanumeric;
 use rand::prelude::SliceRandom;
 use rand::{thread_rng, Rng};
@@ -260,7 +262,9 @@ impl GitRepository {
             .iter()
             .filter(|f| {
                 let status = f.status();
-                !status.is_index_deleted() && !status.is_wt_deleted() && status != (Status::INDEX_DELETED | Status::WT_NEW)
+                !status.is_index_deleted()
+                    && !status.is_wt_deleted()
+                    && status != (Status::INDEX_DELETED | Status::WT_NEW)
             })
             .map(|entry| {
                 debug!("index_deleted:{}", entry.status().is_index_deleted());
@@ -272,8 +276,8 @@ impl GitRepository {
             .collect();
 
         trace!("modified files vec {:?}", &modified_files);
-let len = modified_files.len();
-debug!("*");
+        let len = modified_files.len();
+        debug!("*");
         let signature = repo
             .signature()
             .expect("Obtaining a signature from the repo failed");
