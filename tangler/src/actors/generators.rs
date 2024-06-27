@@ -61,7 +61,7 @@ impl OpenAi {
                 let broker = actor.akton.get_broker().clone();
                 let message = event.message.clone();
                 Context::wrap_future(async move {
-                    Self::handle_diff_received(message,broker, reply_address).await;
+                    Self::handle_diff_received(message, broker, reply_address).await;
                 })
             });
 
