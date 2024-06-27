@@ -118,9 +118,8 @@ impl Scribe {
     }
 
 
-    fn handle_commit_event(scribe:&mut Scribe, event: &AppEvent) {
+    fn handle_commit_event(scribe: &mut Scribe, event: &AppEvent) {
         let previous_events = scribe.events.clone();
-        scribe.session_count += 1;
         // Update events or add new ones
         if let Some(existing_event) = scribe.events.iter_mut().find(|e| e.get_id() == event.get_id()) {
             *existing_event = event.clone();
