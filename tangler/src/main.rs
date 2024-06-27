@@ -1,8 +1,8 @@
 #![allow(unused)]
 
-use std::{env, fs};
 use std::path::PathBuf;
 use std::sync::Once;
+use std::{env, fs};
 
 use akton::prelude::*;
 use anyhow::Result;
@@ -10,8 +10,8 @@ use futures::StreamExt;
 use serde::{Deserialize, Serialize};
 use tokio::signal;
 use tracing::{error, Level};
-use tracing_subscriber::{EnvFilter, FmtSubscriber};
 use tracing_subscriber::fmt::format::FmtSpan;
+use tracing_subscriber::{EnvFilter, FmtSubscriber};
 
 use crate::actors::Tangler;
 use crate::models::config::TanglerConfig;
@@ -40,7 +40,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let (tangler, broker) = Tangler::init(tangler_config).await?;
 
-
     // Handle shutdown signal
     // need to move this to an actor
     match signal::ctrl_c().await {
@@ -59,11 +58,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 // Function to get the configuration file path following the XDG Base Directory Specification
-fn get_config_file_path(app_name: &str, config_file: &str) -> Result<PathBuf, Box<dyn std::error::Error>> {
+fn get_config_file_path(
+    app_name: &str,
+    config_file: &str,
+) -> Result<PathBuf, Box<dyn std::error::Error>> {
     if let Ok(config_home) = env::var("XDG_CONFIG_HOME") {
         Ok(PathBuf::from(config_home).join(app_name).join(config_file))
     } else if let Ok(home) = env::var("HOME") {
-        Ok(PathBuf::from(home).join(".config").join(app_name).join(config_file))
+        Ok(PathBuf::from(home)
+            .join(".config")
+            .join(app_name)
+            .join(config_file))
     } else {
         Err("Could not determine configuration file path".into())
     }
@@ -85,8 +90,7 @@ mod tests {
         init_tracing();
 
         // Read and parse the configuration file
-        let tangler_config: TanglerConfig =
-            toml::from_str(&fs::read_to_string("/config.toml")?)?;
+        let tangler_config: TanglerConfig = toml::from_str(&fs::read_to_string("/config.toml")?)?;
 
         let (tangler_actor, _broker) = Tangler::init(tangler_config).await?;
 
@@ -136,9 +140,17 @@ pub fn init_tracing() {
             .add_directive("akton_core::common::system=error".parse().unwrap())
             .add_directive("akton_core::common::supervisor=error".parse().unwrap())
             .add_directive("akton_core::common::broker=error".parse().unwrap())
-            .add_directive("akton_core::common::broker[broadcast]=error".parse().unwrap())
+            .add_directive(
+                "akton_core::common::broker[broadcast]=error"
+                    .parse()
+                    .unwrap(),
+            )
             .add_directive("akton_core::message=error".parse().unwrap())
-            .add_directive("akton_core::message::outbound_envelope=error".parse().unwrap())
+            .add_directive(
+                "akton_core::message::outbound_envelope=error"
+                    .parse()
+                    .unwrap(),
+            )
             .add_directive("akton_core::actors::actor=error".parse().unwrap())
             .add_directive("akton_core::actors::idle=error".parse().unwrap())
             .add_directive(
@@ -147,10 +159,22 @@ pub fn init_tracing() {
                     .unwrap(),
             )
             .add_directive("tangler::actors::repositories=error".parse().unwrap())
-            .add_directive("tangler::actors::repositories[broadcast_futures]=error".parse().unwrap())
-            .add_directive("tangler::actors::repositories[default_behavior]=error".parse().unwrap())
+            .add_directive(
+                "tangler::actors::repositories[broadcast_futures]=error"
+                    .parse()
+                    .unwrap(),
+            )
+            .add_directive(
+                "tangler::actors::repositories[default_behavior]=error"
+                    .parse()
+                    .unwrap(),
+            )
             .add_directive("tangler::actors::scribe=info".parse().unwrap())
-            .add_directive("tangler::actors::scribe[print_hero_message]=error".parse().unwrap())
+            .add_directive(
+                "tangler::actors::scribe[print_hero_message]=error"
+                    .parse()
+                    .unwrap(),
+            )
             .add_directive("tangler::actors::tangler=error".parse().unwrap())
             .add_directive("tangler::models=error".parse().unwrap())
             .add_directive("tangler::actors::generators=error".parse().unwrap())
