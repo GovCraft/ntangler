@@ -33,7 +33,7 @@ pub(crate) use notify_error::NotifyError;
 pub(crate) use poll_changes::RepositoryPollRequested;
 pub(crate) use subscribe_broker::SubscribeBroker;
 pub(crate) use system_started::SystemStarted;
-pub(crate) use unsubscribe_broker::UnsubscribeBroker;
+
 
 // pub(crate) use commit_authoring::CommitAuthoring;
 pub(crate) use diff_queued::DiffQueued;
