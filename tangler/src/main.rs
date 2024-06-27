@@ -27,7 +27,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     setup_tracing();
 
     if check_openai_api_key() {
-        Term::stderr().write_line("API Key Detected: The OPENAI_API_KEY environment variable is set.")?;
+        Term::stderr()
+            .write_line("API Key Detected: The OPENAI_API_KEY environment variable is set.")?;
     } else {
         Term::stderr().write_line("Startup Error: The OPENAI_API_KEY environment variable is not set. Please set it to proceed. Consult the documentation to set the API key.")?;
         std::process::exit(1);
@@ -37,7 +38,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let config_content = fs::read_to_string(&config_path)?;
 
     let tangler_config: TanglerConfig = toml::from_str(&config_content)?;
-    Term::stderr().write_line(&format!("Configuration Loaded: Config found at {}. Initializing...", config_path.display()))?;
+    Term::stderr().write_line(&format!(
+        "Configuration Loaded: Config found at {}. Initializing...",
+        config_path.display()
+    ))?;
 
     let (tangler, broker) = Tangler::initialize(tangler_config).await?;
 
@@ -49,7 +53,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             Term::stdout().write_line("Shutdown complete. All operations halted safely.");
         }
         Err(err) => {
-            Term::stderr().write_line(&format!("Error capturing shutdown signal: {}. Terminating safely...", err))?;
+            Term::stderr().write_line(&format!(
+                "Error capturing shutdown signal: {}. Terminating safely...",
+                err
+            ))?;
             tangler.suspend_actor().await?;
             Term::stdout().show_cursor()?;
         }
@@ -70,11 +77,17 @@ fn setup_tracing() {
     tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
 }
 
-fn find_config_file_path(app_name: &str, config_file: &str) -> Result<PathBuf, Box<dyn std::error::Error>> {
+fn find_config_file_path(
+    app_name: &str,
+    config_file: &str,
+) -> Result<PathBuf, Box<dyn std::error::Error>> {
     if let Ok(config_home) = env::var("XDG_CONFIG_HOME") {
         Ok(PathBuf::from(config_home).join(app_name).join(config_file))
     } else if let Ok(home_dir) = env::var("HOME") {
-        Ok(PathBuf::from(home_dir).join(".config").join(app_name).join(config_file))
+        Ok(PathBuf::from(home_dir)
+            .join(".config")
+            .join(app_name)
+            .join(config_file))
     } else {
         Err("Could not determine the configuration file path.".into())
     }
