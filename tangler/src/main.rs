@@ -12,6 +12,7 @@ use indicatif::TermLike;
 use serde::{Deserialize, Serialize};
 use tokio::signal;
 use tracing::{error, Level};
+use tracing_appender::rolling::{RollingFileAppender, Rotation};
 use tracing_subscriber::fmt::format::FmtSpan;
 use tracing_subscriber::{EnvFilter, FmtSubscriber};
 
@@ -24,7 +25,7 @@ mod models;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    setup_tracing();
+    setup_tracing("ntangler", "config.toml");
 
     if check_openai_api_key() {
         Term::stderr()
@@ -69,17 +70,11 @@ fn check_openai_api_key() -> bool {
     env::var("OPENAI_API_KEY").is_ok()
 }
 
-fn find_config_file_path(
-    app_name: &str,
-    config_file: &str,
-) -> Result<PathBuf, Box<dyn std::error::Error>> {
+fn find_config_file_path(app_name: &str, config_file: &str) -> Result<PathBuf, Box<dyn std::error::Error>> {
     if let Ok(config_home) = env::var("XDG_CONFIG_HOME") {
         Ok(PathBuf::from(config_home).join(app_name).join(config_file))
     } else if let Ok(home_dir) = env::var("HOME") {
-        Ok(PathBuf::from(home_dir)
-            .join(".config")
-            .join(app_name)
-            .join(config_file))
+        Ok(PathBuf::from(home_dir).join(".config").join(app_name).join(config_file))
     } else {
         Err("Could not determine the configuration file path.".into())
     }
@@ -92,7 +87,7 @@ pub fn setup_tracing(app_name: &str, config_file: &str) {
     INIT.call_once(|| {
         // Get the directory for logging using the configuration file path
         let log_dir = find_config_file_path(app_name, config_file).expect("Unable to find config file path");
-        let file_appender = RollingFileAppender::new(Rotation::DAILY, log_dir, "app.log");
+        let file_appender = RollingFileAppender::new(Rotation::DAILY, log_dir, "ntangler.log");
 
         // Define an environment filter to suppress logs from specific functions
         let filter = EnvFilter::new("")
@@ -157,7 +152,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn test_main() -> anyhow::Result<()> {
-        setup_tracing();
+        setup_tracing("ntanger_test", "config.toml");
 
         // Read and parse the configuration file
         let tangler_config: TanglerConfig = toml::from_str(&fs::read_to_string("/config.toml")?)?;
