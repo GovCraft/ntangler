@@ -11,7 +11,7 @@ use crate::actors::repositories::GitRepository;
 use crate::actors::scribe::Scribe;
 use crate::actors::OpenAi;
 use crate::messages::{
-    AcceptBroker, DiffCalculated, NotifyChange, NotifyError, RepositoryPollRequested,
+    AcceptBroker, DiffCalculated, NotifyError, RepositoryPollRequested,
     SystemStarted,
 };
 use crate::models::config::RepositoryConfig;
@@ -117,7 +117,6 @@ impl Tangler {
 
                     actor.context.subscribe::<SystemStarted>().await;
                     actor.context.subscribe::<NotifyError>().await;
-                    actor.context.subscribe::<NotifyChange>().await;
                     actor.context.subscribe::<DiffCalculated>().await;
 
                     // let actor_context = actor.activate(Some(pool_builder)).await;
