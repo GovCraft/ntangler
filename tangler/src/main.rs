@@ -22,7 +22,14 @@ use crate::models::config::TanglerConfig;
 mod actors;
 mod messages;
 mod models;
-
+#[derive(Debug, Deserialize)]
+struct LogConfig {
+    log_directives: Vec<String>,
+}
+fn read_log_config(config_path: &PathBuf) -> LogConfig {
+    let config_content = fs::read_to_string(config_path).expect("Unable to read log configuration file");
+    toml::from_str(&config_content).expect("Invalid configuration format")
+}
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     setup_tracing("ntangler", "config.toml");
@@ -35,7 +42,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         std::process::exit(1);
     }
 
-    let config_path = find_config_path("tangler", "config.toml")?;
+    let config_path = find_config_path("ntangler", "config.toml")?;
     let config_content = fs::read_to_string(&config_path)?;
 
     let tangler_config: TanglerConfig = toml::from_str(&config_content)?;
@@ -92,44 +99,32 @@ static INIT: Once = Once::new();
 
 pub fn setup_tracing(app_name: &str, config_file: &str) {
     INIT.call_once(|| {
-        // Get the directory for logging using the configuration file path
+        // Get the directory for logging using the logs path function
         let log_dir = find_logs_path(app_name).expect("Unable to find logs directory path");
-        let file_appender = RollingFileAppender::new(Rotation::DAILY, log_dir, "ntangler.log");
+        let file_appender = RollingFileAppender::new(Rotation::DAILY, log_dir, "app.log");
 
-        // Define an environment filter to suppress logs from specific functions
-        let filter = EnvFilter::new("")
-            .add_directive("akton_core::common::context=error".parse().unwrap())
-            .add_directive("akton_core::common::context[emit_pool]=error".parse().unwrap())
-            .add_directive("akton_core::traits=off".parse().unwrap())
-            .add_directive("akton_core::traits::actor_context=off".parse().unwrap())
-            .add_directive("akton_core::pool::builder=error".parse().unwrap())
-            .add_directive("akton_core::actors::awake=error".parse().unwrap())
-            .add_directive("akton_core::common::akton=error".parse().unwrap())
-            .add_directive("akton_core::common::pool_builder=error".parse().unwrap())
-            .add_directive("akton_core::common::system=error".parse().unwrap())
-            .add_directive("akton_core::common::supervisor=error".parse().unwrap())
-            .add_directive("akton_core::common::broker=error".parse().unwrap())
-            .add_directive("akton_core::common::broker[broadcast]=error".parse().unwrap())
-            .add_directive("akton_core::message=error".parse().unwrap())
-            .add_directive("akton_core::message::outbound_envelope=error".parse().unwrap())
-            .add_directive("akton_core::actors=trace".parse().unwrap())
-            .add_directive("akton_core::actors::actor=error".parse().unwrap())
-            .add_directive("akton_core::actors::idle=error".parse().unwrap())
-            .add_directive("akton_core::message::outbound_envelope=error".parse().unwrap())
-            .add_directive("ntangler::actors=trace".parse().unwrap())
-            .add_directive("ntangler::actors::repositories[handle_poll_request]=off".parse().unwrap())
-            .add_directive("ntangler::actors::scribe=off".parse().unwrap())
-            .add_directive("ntangler::actors::scribe[print_hero_message]=off".parse().unwrap())
-            .add_directive("ntangler::actors::tangler=off".parse().unwrap())
-            .add_directive("ntangler::models=off".parse().unwrap())
-            .add_directive("ntangler::actors::generators=off".parse().unwrap())
-            .add_directive("ntangler::tangler_config=off".parse().unwrap())
-            .add_directive("ntangler::repository_config=off".parse().unwrap())
-            .add_directive("hyper_util=off".parse().unwrap())
-            .add_directive("async_openai=off".parse().unwrap())
-            .add_directive(Level::TRACE.into());
+        let config_path = find_config_path(app_name, config_file).expect("Unable to find config file path");
+        let config_dir = config_path.parent().expect("Config path has no parent directory");
 
-        // Set global log level to TRACE
+        // Read initial log configuration directives
+        let log_config = read_log_config(&config_path);
+
+        let (tx, rx) = channel();
+        let mut watcher = watcher(tx, Duration::from_secs(10)).unwrap();
+        watcher.watch(&config_path, notify::RecursiveMode::NonRecursive).unwrap();
+
+        // Closure to create the filter from the log configuration
+        let create_filter = |log_config: &LogConfig| {
+            let mut filter = EnvFilter::new("");
+            for directive in &log_config.log_directives {
+                filter = filter.add_directive(directive.parse().unwrap());
+            }
+            filter.add_directive(Level::TRACE.into())
+        };
+
+        let mut filter = create_filter(&log_config);
+
+        // Set global log level to TRACE and direct logs to the file appender
         let subscriber = FmtSubscriber::builder()
             .with_span_events(FmtSpan::NONE)
             .with_max_level(Level::TRACE)
@@ -137,12 +132,34 @@ pub fn setup_tracing(app_name: &str, config_file: &str) {
             .pretty()
             .with_line_number(true)
             .without_time()
-            .with_env_filter(filter)
-            .with_writer(file_appender)
+            .with_env_filter(filter.clone())
+            .with_writer(file_appender) // Set the writer to the file appender
             .finish();
 
-        tracing::subscriber::set_global_default(subscriber)
-            .expect("setting default subscriber failed");
+        tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
+
+        // Spawn a thread to watch for configuration file changes
+        std::thread::spawn(move || {
+            while let Ok(event) = rx.recv() {
+                if let Write(_) = event {
+                    let log_config = read_log_config(&config_path);
+                    filter = create_filter(&log_config);
+
+                    let subscriber = FmtSubscriber::builder()
+                        .with_span_events(FmtSpan::NONE)
+                        .with_max_level(Level::TRACE)
+                        .compact()
+                        .pretty()
+                        .with_line_number(true)
+                        .without_time()
+                        .with_env_filter(filter.clone())
+                        .with_writer(file_appender.clone())
+                        .finish();
+
+                    tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
+                }
+            }
+        });
     });
 }
 
