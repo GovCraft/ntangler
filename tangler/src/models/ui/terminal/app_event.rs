@@ -14,15 +14,12 @@ use crate::messages::{DiffQueued, FinalizedCommit, GenerationStarted};
 /// Represents a successful commit message with its details.
 #[derive(new, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) struct AppEvent {
-    event_id: Uuid,
+    event_id: String,
     display_string: String,
-    // DiffGenerated(DiffGeneratedCommit),
-    // CommitMessageGenerated(CommitMessageGeneratedCommit),
-    // FileCommitted(CommittedCommit),
 }
 
 impl AppEvent {
-    pub(crate) fn get_id(&self) -> &Uuid {
+    pub(crate) fn get_id(&self) -> &String {
         &self.event_id
     }
 }
@@ -38,7 +35,7 @@ impl From<FinalizedCommit> for AppEvent {
         let namespace = Uuid::NAMESPACE_OID;
 
         let simple_urn = format!("{}://{:?}", &value.repository_nickname, value.target_file);
-        let event_id = Uuid::new_v3(&namespace, (&value.repository_nickname).as_ref());
+        let event_id = Uuid::new_v3(&namespace, (&simple_urn).as_ref()).to_string();
 
         let timestamp = &value.when.style(*TIME_COLOR);
         let oid = Oid::new(&value.hash);
@@ -47,7 +44,7 @@ impl From<FinalizedCommit> for AppEvent {
         let semver_impact: SemVerImpactTerminal = (&value.commit_message.semver_impact).into();
         let semver_impact = semver_impact.to_string();
         let semver_impact = pad_str(&semver_impact, *COLUMN_HEADING_FOUR_LENGTH, Alignment::Center, None);
-// ok
+
         let commit_heading: CommitHeadingTerminal = (
             (&value.commit_message.commit_type).into(),
             (&value.commit_message.scope).into(),
@@ -78,7 +75,7 @@ impl From<GenerationStarted> for AppEvent {
         let namespace = Uuid::NAMESPACE_OID;
 
         let simple_urn = format!("{}://{:?}", &value.repository_nickname, value.target_file);
-        let event_id = Uuid::new_v3(&namespace, (&value.repository_nickname).as_ref());
+        let event_id = Uuid::new_v3(&namespace, (&simple_urn).as_ref()).to_string();
         let time_stamp = "\u{2014}\u{2014}".style(*STATUS);
         let binding = &value.target_file.display();
         let filename = &binding.style(*FILENAME_PENDING);
@@ -104,7 +101,7 @@ impl From<DiffQueued> for AppEvent {
         let namespace = Uuid::NAMESPACE_OID;
 
         let simple_urn = format!("{}://{:?}", &value.repository_nickname, value.target_file);
-        let event_id = Uuid::new_v3(&namespace, (&value.repository_nickname).as_ref());
+        let event_id = Uuid::new_v3(&namespace, (&simple_urn).as_ref()).to_string();
         let time_stamp = "\u{2014}\u{2014}".style(*STATUS_PENDING);
         let binding = &value.target_file.display();
         let filename = &binding.style(*FILENAME_PENDING);
@@ -124,33 +121,3 @@ impl From<DiffQueued> for AppEvent {
         AppEvent::new(event_id, display_string)
     }
 }
-
-// impl From<&mut AppEvent> for Box<dyn RepositoryEvent> {
-//     fn from(value: &mut AppEvent) -> Self {
-//         match value {
-//             AppEvent::FilePending => {Box::new(FilePendingEvent{})}
-//         }
-//     }
-// }
-//
-// pub struct FilePendingEvent{
-//
-// }
-//
-// impl RepositoryEvent for FilePendingEvent {
-//     fn get_repo_info(&self) -> TangledRepository {
-//         todo!()
-//     }
-//
-//     fn get_commit(&self) -> &TangledCommit {
-//         todo!()
-//     }
-//
-//     fn get_id(&self) -> &str {
-//         todo!()
-//     }
-//
-//     fn display(&self) -> &str {
-//         todo!()
-//     }
-// }
