@@ -6,7 +6,9 @@ use std::{env, fs};
 
 use akton::prelude::*;
 use anyhow::Result;
+use console::Term;
 use futures::StreamExt;
+use indicatif::TermLike;
 use serde::{Deserialize, Serialize};
 use tokio::signal;
 use tracing::{error, Level};
@@ -17,60 +19,64 @@ use crate::actors::Tangler;
 use crate::models::config::TanglerConfig;
 
 mod actors;
-
 mod messages;
 mod models;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    init_tracing();
+    setup_tracing();
 
-    // TODO: this needs to move to an actor that reloads the config dynamically
-    // Determine configuration file path according to XDG spec
-    let config_path = get_config_file_path("tangler", "config.toml")?;
-
-    // Read and parse the configuration file
-    let config_content = fs::read_to_string(&config_path);
-    if config_content.is_err() {
-        error!("Configuration file not found at {:?}. Please create a configuration file at this location with the necessary settings.", config_path);
-        return Err("Configuration file not found".into());
+    if check_openai_api_key() {
+        Term::stderr().write_line("API Key Detected: The OPENAI_API_KEY environment variable is set.")?;
+    } else {
+        Term::stderr().write_line("Startup Error: The OPENAI_API_KEY environment variable is not set. Please set it to proceed. Consult the documentation to set the API key.")?;
+        std::process::exit(1);
     }
 
-    let tangler_config: TanglerConfig = toml::from_str(&config_content.unwrap())?;
+    let config_path = find_config_file_path("tangler", "config.toml")?;
+    let config_content = fs::read_to_string(&config_path)?;
 
-    let (tangler, broker) = Tangler::init(tangler_config).await?;
+    let tangler_config: TanglerConfig = toml::from_str(&config_content)?;
+    Term::stderr().write_line(&format!("Configuration Loaded: Config found at {}. Initializing...", config_path.display()))?;
 
-    // Handle shutdown signal
-    // need to move this to an actor
+    let (tangler, broker) = Tangler::initialize(tangler_config).await?;
+
     match signal::ctrl_c().await {
         Ok(()) => {
-            println!("Shutting down gracefully. Your code is safe! Please wait a moment.");
+            Term::stderr().write_line("Shutting down gracefully. Please wait...")?;
             tangler.suspend_actor().await?;
-            println!("All done! Tangler has shut down safely. Happy coding!");
+            Term::stdout().show_cursor()?;
+            Term::stdout().write_line("Shutdown complete. All operations halted safely.");
         }
         Err(err) => {
-            eprintln!("Oops! Couldn't catch the shutdown signal: {}. Don't worry, your code is safe! Wrapping things up... Please wait a moment.", err);
-            tangler.suspend_actor().await?; // Shut down in case of error
+            Term::stderr().write_line(&format!("Error capturing shutdown signal: {}. Terminating safely...", err))?;
+            tangler.suspend_actor().await?;
+            Term::stdout().show_cursor()?;
         }
     }
 
     Ok(())
 }
 
-// Function to get the configuration file path following the XDG Base Directory Specification
-fn get_config_file_path(
-    app_name: &str,
-    config_file: &str,
-) -> Result<PathBuf, Box<dyn std::error::Error>> {
+fn check_openai_api_key() -> bool {
+    env::var("OPENAI_API_KEY").is_ok()
+}
+
+fn setup_tracing() {
+    let subscriber = FmtSubscriber::builder()
+        .with_env_filter(EnvFilter::from_default_env())
+        .with_span_events(FmtSpan::FULL)
+        .finish();
+    tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
+}
+
+fn find_config_file_path(app_name: &str, config_file: &str) -> Result<PathBuf, Box<dyn std::error::Error>> {
     if let Ok(config_home) = env::var("XDG_CONFIG_HOME") {
         Ok(PathBuf::from(config_home).join(app_name).join(config_file))
-    } else if let Ok(home) = env::var("HOME") {
-        Ok(PathBuf::from(home)
-            .join(".config")
-            .join(app_name)
-            .join(config_file))
+    } else if let Ok(home_dir) = env::var("HOME") {
+        Ok(PathBuf::from(home_dir).join(".config").join(app_name).join(config_file))
     } else {
-        Err("Could not determine configuration file path".into())
+        Err("Could not determine the configuration file path.".into())
     }
 }
 
@@ -92,7 +98,7 @@ mod tests {
         // Read and parse the configuration file
         let tangler_config: TanglerConfig = toml::from_str(&fs::read_to_string("/config.toml")?)?;
 
-        let (tangler_actor, _broker) = Tangler::init(tangler_config).await?;
+        let (tangler_actor, _broker) = Tangler::initialize(tangler_config).await?;
 
         tangler_actor.suspend().await?;
         Ok(())
@@ -101,7 +107,7 @@ mod tests {
     #[test]
     fn test_finder() {
         let repository_config = RepositoryConfig {
-            path: "./tmp".to_string(),
+            path: "./tmp".to_string().parse().unwrap(),
             ..Default::default()
         };
         let config_clone = TanglerConfig {
@@ -112,7 +118,7 @@ mod tests {
         let repository = config_clone
             .repositories
             .iter()
-            .find(|repo| event_path.starts_with(&repo.path));
+            .find(|repo| event_path.starts_with(&repo.path.display().to_string()));
         assert!(repository.is_some());
         let repository = repository.unwrap();
         println!("{:?}", repository);

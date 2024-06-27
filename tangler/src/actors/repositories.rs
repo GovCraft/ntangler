@@ -133,8 +133,6 @@ impl GitRepository {
                 .expect("Failed to print diff");
                 let changes = String::from_utf8_lossy(&diff_text).to_string();
 
-                // let tangled_commit = message.get_commit().clone();
-                // let repository_event = GitRepositoryEvent::new(message.get_repo_info(), CommitStep::DiffQueued(path), tangled_commit);
                 let repository_event = BrokerRequest::new(DiffQueued::new(
                     changes,
                     target_file.clone(),

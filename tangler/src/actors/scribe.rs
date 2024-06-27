@@ -116,7 +116,7 @@ impl Scribe {
     }
 
     fn handle_system_started(actor: &mut Scribe) {
-        Scribe::clear_console();
+        Term::stdout().clear_screen();
         Scribe::print_headings(&actor);
     }
 
@@ -170,7 +170,7 @@ impl Scribe {
         if let Some(stderr) = &self.stderr {
             stderr.move_cursor_to(0, LIST_ROW - 2).unwrap();
             let display = format!(
-                "{}{:^COLUMN_HEADING_ONE_LENGTH$} \
+                "{}{:<COLUMN_HEADING_ONE_LENGTH$} \
                 {:^COLUMN_HEADING_TWO_LENGTH$} \
                 {:^COLUMN_HEADING_THREE_LENGTH$}\
                 {:^COLUMN_HEADING_FOUR_LENGTH$} \
@@ -183,7 +183,7 @@ impl Scribe {
                 COLUMN_HEADING_THREE,
                 COLUMN_HEADING_FOUR,
                 COLUMN_HEADING_FIVE,
-                COLUMN_HEADING_SIX,
+                COLUMN_HEADING_SIX.style(*PALETTE_PRIMARY_12),
                 COLUMN_HEADING_SEVEN
             );
             stderr.write_line(display.as_str()).unwrap();
@@ -223,13 +223,13 @@ impl Scribe {
             Alignment::Center,
             None,
         );
-        let semver_label_text = "Max SemVer:".style(*PALETTE_NEUTRAL_11).to_string();
+        let semver_label_text = "Max SemVers:".style(*PALETTE_NEUTRAL_11).to_string();
         let session_commits_label_text = "Session commits:".style(*PALETTE_NEUTRAL_11).to_string();
         let session_commits_text = format!("{:<5}", self.session_count.style(*COMMIT_COUNT));
         let copyright_text = format!(
             "\u{00A9} Govcraft 2024 Tangler v{}",
             env!("CARGO_PKG_VERSION")
-        );
+        ).style(*PALETTE_NEUTRAL_9).to_string();
 
         let canvas_width = screen_width as usize - TAB_WIDTH;
         let instructions_width = self.calculate_instructions_width(
@@ -249,7 +249,7 @@ impl Scribe {
 
         format!(
             "{}{semver_label_text}{semver_recommendation_text} {session_commits_label_text} {session_commits_text} {instructions_text}{copyright_text}",
-            self.half_tab
+            *HALFTAB
         )
     }
 

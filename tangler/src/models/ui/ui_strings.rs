@@ -13,7 +13,7 @@ pub(crate) const EMDASH: &str = "\u{2022}";
 lazy_static! {
     pub static ref TAB: String = " ".repeat(TAB_WIDTH);
     pub static ref HALFTAB: String = " ".repeat(TAB_WIDTH / 2);
-    pub static ref COLUMN_HEADING_ONE_LENGTH: usize = COLUMN_HEADING_ONE.len();
+    pub static ref COLUMN_HEADING_ONE_LENGTH: usize = COLUMN_HEADING_ONE.len()+5;
     pub static ref COLUMN_HEADING_TWO_LENGTH: usize = COLUMN_HEADING_TWO.len() + 4;
     pub static ref COLUMN_HEADING_THREE_LENGTH: usize = COLUMN_HEADING_THREE.len() + 5;
     pub static ref COLUMN_HEADING_FOUR_LENGTH: usize = COLUMN_HEADING_FOUR.len();
