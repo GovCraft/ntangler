@@ -4,30 +4,30 @@ use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
 
-use akton::prelude::*;
+use crate::messages::{CommitMessageGenerated, DiffQueued, GenerationStarted};
 use akton::prelude::async_trait::async_trait;
-use async_openai::Client;
+use akton::prelude::*;
 use async_openai::config::OpenAIConfig;
 use async_openai::error::OpenAIError;
+use async_openai::types::AssistantsApiResponseFormatType::JsonObject;
 use async_openai::types::{
-    AssistantsApiResponseFormat, AssistantsApiResponseFormatOption, AssistantStreamEvent,
+    AssistantStreamEvent, AssistantsApiResponseFormat, AssistantsApiResponseFormatOption,
     CreateMessageRequest, CreateMessageRequestContent, CreateRunRequest, CreateThreadRequest,
     MessageDeltaContent, MessageRole, ThreadObject,
 };
-use async_openai::types::AssistantsApiResponseFormatType::JsonObject;
+use async_openai::Client;
+use derive_more::*;
 use futures::StreamExt;
+use serde::{Deserialize, Serialize};
 use tokio::runtime::Runtime;
 use tokio::sync::mpsc;
 use tokio::task;
-use tokio_retry::strategy::{ExponentialBackoff, jitter};
+use tokio_retry::strategy::{jitter, ExponentialBackoff};
 use tracing::{debug, error, info, trace, warn};
-use derive_more::*;
-use crate::messages::{CommitMessageGenerated, DiffQueued, GenerationStarted};
-use serde::{Deserialize, Serialize};
 use vaultrs::client::{VaultClient, VaultClientSettingsBuilder};
 use vaultrs::kv2;
 
-#[derive(Clone, Debug, )]
+#[derive(Clone, Debug)]
 pub(crate) struct OpenAi {
     client: Arc<Client<OpenAIConfig>>,
     broker: Context,
@@ -45,25 +45,25 @@ impl Default for OpenAi {
     }
 }
 
-
 impl OpenAi {
-    pub(crate) async fn initialize(config: ActorConfig, system: &mut AktonReady) -> anyhow::Result<Context> {
+    pub(crate) async fn initialize(
+        config: ActorConfig,
+        system: &mut AktonReady,
+    ) -> anyhow::Result<Context> {
         let mut actor = system.create_actor_with_config::<OpenAi>(config).await;
         let broker = system.get_broker();
         // Event: Setting up SubmitDiff Handler
         // Description: Setting up an actor to handle the `SubmitDiff` event asynchronously.
         // Context: None
         trace!("Setting up an actor to handle the `SubmitDiff` event asynchronously.");
-        actor
-            .setup
-            .act_on_async::<DiffQueued>(|actor, event| {
-                let reply_address = event.message.reply_address.clone();
-                let broker = actor.akton.get_broker().clone();
-                let message = event.message.clone();
-                Context::wrap_future(async move {
-                    Self::handle_diff_received(message, broker, reply_address).await;
-                })
-            });
+        actor.setup.act_on_async::<DiffQueued>(|actor, event| {
+            let reply_address = event.message.reply_address.clone();
+            let broker = actor.akton.get_broker().clone();
+            let message = event.message.clone();
+            Context::wrap_future(async move {
+                Self::handle_diff_received(message, broker, reply_address).await;
+            })
+        });
 
         actor.context.subscribe::<DiffQueued>().await;
         let context = actor.activate(None).await;
@@ -87,7 +87,10 @@ impl OpenAi {
             let rt = Runtime::new().unwrap();
             rt.block_on(async move {
                 let target_file_clone = target_file_clone.clone();
-                let msg = BrokerRequest::new(GenerationStarted::new(target_file_clone.clone(), repository_nickname.clone()));
+                let msg = BrokerRequest::new(GenerationStarted::new(
+                    target_file_clone.clone(),
+                    repository_nickname.clone(),
+                ));
                 broker.emit_async(msg, None).await;
                 // Step 1: Create a new LLM thread via the API.
                 trace!("Step 1a: Create a new LLM thread via the API");
@@ -143,9 +146,7 @@ impl OpenAi {
                         assistant_id: "asst_xiaBOCpksCenAMJSL2F0qqFL".to_string(),
                         stream: Some(true),
                         parallel_tool_calls: Some(true),
-                        response_format: Some(
-                            AssistantsApiResponseFormatOption::Format(format),
-                        ),
+                        response_format: Some(AssistantsApiResponseFormatOption::Format(format)),
                         ..Default::default()
                     })
                     .await
