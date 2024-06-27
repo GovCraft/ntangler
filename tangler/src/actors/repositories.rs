@@ -13,7 +13,7 @@ use anyhow::anyhow;
 use futures::future::join_all;
 use futures::stream::FuturesUnordered;
 use futures::StreamExt;
-use git2::{DiffOptions, Error, IndexAddOption, Repository, Status as GitStatus, StatusOptions};
+use git2::{DiffOptions, Error, IndexAddOption, Repository, Status as GitStatus, Status, StatusOptions};
 use rand::distributions::Alphanumeric;
 use rand::prelude::SliceRandom;
 use rand::{thread_rng, Rng};
@@ -257,6 +257,7 @@ impl GitRepository {
 
         let modified_files: Vec<String> = statuses
             .iter()
+            .filter(|f| f.status() != Status::INDEX_DELETED)
             .map(|entry| entry.path().unwrap().to_string())
             .collect::<HashSet<_>>()
             .into_iter()
