@@ -428,6 +428,7 @@ impl GitRepository {
                 .take(1)
                 .collect();
 
+
             debug!("modified files vec {:?}", &modified_files);
 
             let signature = repo.signature().expect("Obtaining a signature from the repo failed");
