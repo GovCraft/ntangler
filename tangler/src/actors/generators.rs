@@ -5,7 +5,6 @@ use std::thread;
 use std::time::Duration;
 
 use crate::messages::{CommitMessageGenerated, DiffQueued, GenerationStarted};
-use akton::prelude::async_trait::async_trait;
 use akton::prelude::*;
 use async_openai::config::OpenAIConfig;
 use async_openai::error::OpenAIError;
@@ -232,12 +231,6 @@ impl OpenAi {
                     Ok(commit) => {
                         let message = CommitMessageGenerated::new(target_file, commit);
                         return_address.emit_async(message, None).await;
-                        // broker
-                        //     .emit_async(
-                        //         BrokerRequest::new(message),
-                        //         None,
-                        //     )
-                        //     .await;
                         trace!("Emitted commit message to broker");
                     }
                     Err(e) => {
