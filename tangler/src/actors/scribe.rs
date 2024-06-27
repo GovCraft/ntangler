@@ -178,7 +178,7 @@ impl Scribe {
                 {:^COLUMN_HEADING_SIX_LENGTH$} \
                 {:^COLUMN_HEADING_SEVEN_LENGTH$}",
                 self.half_tab,
-                COLUMN_HEADING_ONE,
+                COLUMN_HEADING_ONE.style(*PALETTE_PRIMARY_11),
                 COLUMN_HEADING_TWO,
                 COLUMN_HEADING_THREE,
                 COLUMN_HEADING_FOUR,
