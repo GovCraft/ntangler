@@ -13,7 +13,7 @@ impl CommitPosted {
         &self.commit
     }
     pub(crate) fn new(mut commit: CommittedCommit, hash: String) -> CommitPosted {
-        commit.timestamp = TimeStamp::new();
+        commit.timestamp = Default::default();
         commit.oid = Oid::new(&hash);
         CommitPosted { commit }
     }
