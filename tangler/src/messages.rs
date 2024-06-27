@@ -2,8 +2,7 @@ mod diff_calculated;
 mod notify_change;
 
 mod notify_error;
-mod subscribe_broker;
-mod unsubscribe_broker;
+
 
 mod accept_broker;
 mod commit_posted;
@@ -31,7 +30,7 @@ pub(crate) use diff_calculated::DiffCalculated;
 pub(crate) use notify_change::NotifyChange;
 pub(crate) use notify_error::NotifyError;
 pub(crate) use poll_changes::RepositoryPollRequested;
-pub(crate) use subscribe_broker::SubscribeBroker;
+
 pub(crate) use system_started::SystemStarted;
 
 
