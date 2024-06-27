@@ -88,16 +88,16 @@ fn find_config_file_path(
 
 static INIT: Once = Once::new();
 
-pub fn setup_tracing() {
+pub fn setup_tracing(app_name: &str, config_file: &str) {
     INIT.call_once(|| {
+        // Get the directory for logging using the configuration file path
+        let log_dir = find_config_file_path(app_name, config_file).expect("Unable to find config file path");
+        let file_appender = RollingFileAppender::new(Rotation::DAILY, log_dir, "app.log");
+
         // Define an environment filter to suppress logs from specific functions
         let filter = EnvFilter::new("")
             .add_directive("akton_core::common::context=error".parse().unwrap())
-            .add_directive(
-                "akton_core::common::context[emit_pool]=error"
-                    .parse()
-                    .unwrap(),
-            )
+            .add_directive("akton_core::common::context[emit_pool]=error".parse().unwrap())
             .add_directive("akton_core::traits=off".parse().unwrap())
             .add_directive("akton_core::traits::actor_context=off".parse().unwrap())
             .add_directive("akton_core::pool::builder=error".parse().unwrap())
@@ -107,33 +107,17 @@ pub fn setup_tracing() {
             .add_directive("akton_core::common::system=error".parse().unwrap())
             .add_directive("akton_core::common::supervisor=error".parse().unwrap())
             .add_directive("akton_core::common::broker=error".parse().unwrap())
-            .add_directive(
-                "akton_core::common::broker[broadcast]=error"
-                    .parse()
-                    .unwrap(),
-            )
+            .add_directive("akton_core::common::broker[broadcast]=error".parse().unwrap())
             .add_directive("akton_core::message=error".parse().unwrap())
-            .add_directive(
-                "akton_core::message::outbound_envelope=error"
-                    .parse()
-                    .unwrap(),
-            )
+            .add_directive("akton_core::message::outbound_envelope=error".parse().unwrap())
             .add_directive("akton_core::actors=error".parse().unwrap())
             .add_directive("akton_core::actors::actor=error".parse().unwrap())
             .add_directive("akton_core::actors::idle=error".parse().unwrap())
-            .add_directive(
-                "akton_core::message::outbound_envelope=error"
-                    .parse()
-                    .unwrap(),
-            )
+            .add_directive("akton_core::message::outbound_envelope=error".parse().unwrap())
             .add_directive("ntangler::actors=off".parse().unwrap())
             .add_directive("ntangler::actors::repositories[handle_poll_request]=off".parse().unwrap())
             .add_directive("ntangler::actors::scribe=off".parse().unwrap())
-            .add_directive(
-                "ntangler::actors::scribe[print_hero_message]=off"
-                    .parse()
-                    .unwrap(),
-            )
+            .add_directive("ntangler::actors::scribe[print_hero_message]=off".parse().unwrap())
             .add_directive("ntangler::actors::tangler=off".parse().unwrap())
             .add_directive("ntangler::models=off".parse().unwrap())
             .add_directive("ntangler::actors::generators=off".parse().unwrap())
@@ -142,6 +126,7 @@ pub fn setup_tracing() {
             .add_directive("hyper_util=off".parse().unwrap())
             .add_directive("async_openai=off".parse().unwrap())
             .add_directive(Level::TRACE.into());
+
         // Set global log level to TRACE
         let subscriber = FmtSubscriber::builder()
             .with_span_events(FmtSpan::NONE)
@@ -151,6 +136,7 @@ pub fn setup_tracing() {
             .with_line_number(true)
             .without_time()
             .with_env_filter(filter)
+            .with_writer(file_appender)
             .finish();
 
         tracing::subscriber::set_global_default(subscriber)
