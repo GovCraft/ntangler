@@ -249,6 +249,7 @@ impl GitRepository {
         let mut status_options = StatusOptions::new();
         status_options.include_untracked(true);
         status_options.recurse_untracked_dirs(true);
+        status_options.include_unreadable_as_untracked(true);
 
         let statuses = repo
             .statuses(Some(&mut status_options))
