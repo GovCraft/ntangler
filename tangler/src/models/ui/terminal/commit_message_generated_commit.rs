@@ -4,7 +4,7 @@ use std::hash::{DefaultHasher, Hash, Hasher};
 use serde::{de, Deserialize, Deserializer};
 use serde::de::{MapAccess, Visitor};
 use derive_more::*;
-use crate::models::{CommittedCommit, Description, DiffGeneratedCommit, Filename, FilenameTerminal, Footer, generate_id, Oid, PendingCommit, RepositoryTerminal, Scope, Status, TimeStamp, TimeStampTerminal};
+use crate::models::{CommitStep, CommittedCommit, Description, DiffGeneratedCommit, Filename, FilenameTerminal, Footer, generate_id, Oid, PendingCommit, RepositoryTerminal, Scope, TimeStamp, TimeStampTerminal};
 use crate::models::semver_impact::SemVerImpact;
 //use crate::models::traits::TanglerModel;
 use std::default::Default;
@@ -12,14 +12,14 @@ use std::default::Default;
 #[derive(Clone, Default, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) struct CommitMessageGeneratedCommit {
     pub(crate) commit: CommittedCommit,
-    pub(crate) status: Status,
+    pub(crate) status: CommitStep
 }
 
 impl CommitMessageGeneratedCommit {
     pub(crate) fn new(commit: CommittedCommit, message: String) -> Self {
         CommitMessageGeneratedCommit{
             commit,
-            status: Status::Committing,
+            status: CommitStep::Finalized,
         }
     }
 }

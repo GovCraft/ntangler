@@ -11,11 +11,12 @@ use crate::actors::OpenAi;
 use crate::actors::repositories::GitRepository;
 use crate::actors::scribe::Scribe;
 use crate::messages::{
-    AcceptBroker, DiffCalculated, NotifyChange, NotifyError, PollChanges, SubscribeBroker,
-    SystemStarted,
+    AcceptBroker, DiffCalculated, NotifyChange, NotifyError, RepositoryPollRequested, SubscribeBroker,
+    SystemStarted
 };
 use crate::models::config::RepositoryConfig;
 use crate::models::config::TanglerConfig;
+use crate::models::TangledRepository;
 
 /// Tangler is the name of the app and acts as the main orchestration point of this command line app and manages repository actors and a broker.
 #[derive(Default, Debug, Clone)]
@@ -61,8 +62,8 @@ impl Tangler {
                                 debug!(broker_id=&broker.key,"Initiating polling");
                                 loop {
                                     let broker = broker.clone();
-                                    broker.emit_async(BrokerRequest::new(PollChanges), None).await;
-                                    tokio::time::sleep(Duration::from_secs(5)).await; // Poll every 3 seconds
+                                    broker.emit_async(BrokerRequest::new(RepositoryPollRequested), None).await;
+                                    tokio::time::sleep(Duration::from_secs(5000)).await; // Poll every 3 seconds
                                 }
                             });
                         })
@@ -79,7 +80,8 @@ impl Tangler {
                     let akton = &mut actor.akton.clone();
                     trace!(repo = ?repo, "Initializing a repository actor.");
                     let broker = broker.clone();
-                    let watcher = GitRepository::init(repo, akton).await.expect("Failed to start repository watcher");
+                    let tangled_repository : TangledRepository = repo.clone().into();
+                    let watcher = GitRepository::init(tangled_repository, akton).await.expect("Failed to start repository watcher");
                     actor.state.git_repositories.push(watcher.clone());
                     debug!(actor = watcher.key, "init repository");
                 }

@@ -1,26 +1,35 @@
 use std::fmt;
+use std::path::PathBuf;
 use std::time::Duration;
-use owo_colors::OwoColorize;
 use crate::models::STATUS;
 
-use indicatif::ProgressBar;
 use serde::Deserialize;
 
 #[derive(Clone, Default, Debug, PartialEq, Eq, PartialOrd, Ord, Deserialize)]
-pub(crate) enum CommitStep {
+pub(crate) enum Status {
     #[default]
-    Queued,
-    GeneratingMessage,
-    Finalizing,
+    Pending,
+    Thinking,
+    Committing,
+}
+pub(crate) enum CommitStep {
+    FileChangeDetected(PathBuf),
+    DiffQueued(PathBuf),
+    DiffGenerated(String),
+    CommitMessageGenerated(String),
+    #[default]
+    Finalized,
 }
 
 impl fmt::Display for CommitStep {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let symbol = match self {
-            CommitStep::Queued => "QUEUED",
-            CommitStep::GeneratingMessage => "GENERATING",
-            CommitStep::Finalizing => "FINALIZING",
+            CommitStep::FileChangeDetected(_) => "DETECTED",
+            CommitStep::DiffQueued(_) => "QUEUED",
+            CommitStep::DiffGenerated(_) => "DIFFSUBMITTED",
+            CommitStep::CommitMessageGenerated(_) => "GENERATED",
+            CommitStep::Finalized => "FINALIZED",
         };
-        write!(f, "{:8}", symbol)
+        write!(f, "{}", symbol)
     }
 }

@@ -1,6 +1,6 @@
 use derive_more::*;
 use derive_new::new;
-use crate::models::Status;
+use crate::models::CommitStep;
 use std::default::Default;
 use serde::Deserialize;
 
@@ -10,5 +10,5 @@ pub(crate) struct DiffGeneratedCommit {
     pub(crate) diff: String,
     pub(crate) filename: String,
     pub(crate) repository: String,
-    pub(crate) status: Status,
+    pub(crate) status:
 }

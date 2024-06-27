@@ -49,8 +49,6 @@ impl<'de> Deserialize<'de> for CommittedCommit {
             #[serde(skip)]
             id: String,
             //            #[serde(rename = "type")]
-            #[serde(skip)]
-            repository: String, // Adjusted to String
             commit_type: String, // Adjusted to String
             scope: Option<Scope>,
             description: Description,

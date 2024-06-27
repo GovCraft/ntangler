@@ -59,10 +59,10 @@ impl OpenAi {
             .setup
             .act_on_async::<DiffQueued>(|actor, event| {
                 let diff = event.message.diff.clone();
-                let return_address = event.message.reply_address.clone();
+                let reply_address = event.message.reply_address.clone();
                 let target_file = event.message.target_file.clone();
 
-                Context::wrap_future(Self::handle_diff_received(target_file, diff, return_address))
+                Context::wrap_future(Self::handle_diff_received(target_file, diff, reply_address))
             });
 
         actor.context.subscribe::<DiffQueued>().await;
