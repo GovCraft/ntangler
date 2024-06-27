@@ -10,10 +10,7 @@ use tracing::{debug, error, info, instrument, trace, warn};
 use crate::actors::repositories::GitRepository;
 use crate::actors::scribe::Scribe;
 use crate::actors::OpenAi;
-use crate::messages::{
-    AcceptBroker,  RepositoryPollRequested,
-    SystemStarted,
-};
+use crate::messages::{AcceptBroker, RepositoryPollRequested, SystemStarted};
 use crate::models::config::RepositoryConfig;
 use crate::models::config::TanglerConfig;
 use crate::models::TangledRepository;
@@ -99,7 +96,6 @@ impl Tangler {
                         actor.state.git_repositories.push(watcher.clone());
                         debug!(actor = watcher.key, "init repository");
                     }
-
 
                     actor.context.subscribe::<SystemStarted>().await;
                     actor.activate(None).await
