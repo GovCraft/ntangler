@@ -57,16 +57,11 @@ impl OpenAi {
         actor
             .setup
             .act_on_async::<DiffQueued>(|actor, event| {
-                let diff = event.message.diff.clone();
                 let reply_address = event.message.reply_address.clone();
-                let target_file = event.message.target_file.clone();
                 let broker = actor.akton.get_broker().clone();
-                let repository_nickname = event.message.repository_nickname.clone();
+                let message = event.message.clone();
                 Context::wrap_future(async move {
-                    tokio::time::sleep(Duration::from_secs(5)).await;
-                    let msg = BrokerRequest::new(GenerationStarted::new(target_file.clone(), repository_nickname.clone()));
-                    broker.emit_async(msg, None).await;
-                    Self::handle_diff_received(target_file, diff, reply_address).await;
+                    Self::handle_diff_received(message,broker, reply_address).await;
                 })
             });
 
@@ -80,13 +75,20 @@ impl OpenAi {
         Ok(context)
     }
 
-    async fn handle_diff_received(target_file: PathBuf, diff: String, return_address: Context) {
+    async fn handle_diff_received(message: DiffQueued, broker: Context, return_address: Context) {
         let (tx, mut rx) = mpsc::channel(32);
         let return_address = return_address.clone();
+        let diff = message.diff.clone();
+        let target_file = message.target_file.clone();
+        let repository_nickname = message.repository_nickname.clone();
+        let target_file_clone = target_file.clone();
 
         task::spawn_blocking(move || {
             let rt = Runtime::new().unwrap();
             rt.block_on(async move {
+                let target_file_clone = target_file_clone.clone();
+                let msg = BrokerRequest::new(GenerationStarted::new(target_file_clone.clone(), repository_nickname.clone()));
+                broker.emit_async(msg, None).await;
                 // Step 1: Create a new LLM thread via the API.
                 trace!("Step 1a: Create a new LLM thread via the API");
                 let client = Client::new();
