@@ -1,13 +1,13 @@
 use std::fmt;
 use std::ops::Deref;
 
+use crate::models::traits::TanglerModel;
+use crate::models::Footer;
+use derive_more::*;
 use serde::Deserialize;
 use tracing::{info, instrument};
-use derive_more::*;
-use crate::models::Footer;
-use crate::models::traits::TanglerModel;
 
-#[derive(Clone,Default, Debug, PartialEq, Eq, PartialOrd, Ord, Deserialize)]
+#[derive(Clone, Default, Debug, PartialEq, Eq, PartialOrd, Ord, Deserialize)]
 pub(crate) struct Oid(String);
 
 impl TanglerModel for Oid {}

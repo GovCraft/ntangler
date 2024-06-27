@@ -1,18 +1,18 @@
 use std::fmt;
 
+use crate::models::traits::TanglerModel;
+use crate::models::Description;
+use derive_more::*;
 use regex::Regex;
 use serde::{Deserialize, Deserializer};
 use tracing::{info, instrument, trace};
-use crate::models::Description;
-use crate::models::traits::TanglerModel;
-use derive_more::*;
 /// Represents a footer in a commit message, which consists of a token and a value.
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) struct Footer {
     pub(crate) token: String,
     pub(crate) value: String,
 }
-impl TanglerModel for Footer{}
+impl TanglerModel for Footer {}
 
 impl From<&str> for Footer {
     fn from(s: &str) -> Self {
@@ -39,8 +39,8 @@ impl<'de> Deserialize<'de> for Footer {
     /// This method checks for specific terms in the token and modifies it if necessary.
     #[instrument(level = "info", skip(deserializer))]
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-        where
-            D: Deserializer<'de>,
+    where
+        D: Deserializer<'de>,
     {
         #[derive(Deserialize)]
         struct FooterData {
@@ -121,7 +121,10 @@ mod tests {
             token: String::from("BREAKING CHANGE"),
             value: String::from("This will break the API"),
         };
-        assert_eq!(format!("{}", footer), "BREAKING CHANGE: This will break the API");
+        assert_eq!(
+            format!("{}", footer),
+            "BREAKING CHANGE: This will break the API"
+        );
     }
 
     #[test]

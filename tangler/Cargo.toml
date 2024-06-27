@@ -1,6 +1,6 @@
 [package]
 name = "tangler"
-version = "1.0.0"
+version = "2.0.1"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -51,6 +51,7 @@ dotenv = { version = "0.15.0", features = ["clap"] }
 indicatif = { version = "0.17.8", features = ["futures", "tokio", "in_memory"] }
 derive_more = "0.99.18"
 derive-new = "0.6.0"
+uuid = { version = "1.9.1", features = ["v3"] }
 
 [dev-dependencies]
 lazy_static = "1.4.0"

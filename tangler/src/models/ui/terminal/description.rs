@@ -7,7 +7,9 @@ use serde::Deserialize;
 use termcolor::{Color, ColorSpec, StandardStream, WriteColor};
 use tracing::{info, instrument, trace};
 
-use crate::models::{TEAL_11, TEAL_12, ConsoleStyle, Description, GRAY_11, GRAY_12, DESCRIPTION_COLOR};
+use crate::models::{
+    ConsoleStyle, Description, DESCRIPTION_COLOR, GRAY_11, GRAY_12, TEAL_11, TEAL_12,
+};
 
 #[derive(Debug, Default, Clone, Deserialize, PartialEq)]
 pub(crate) struct DescriptionTerminal(Description);
@@ -25,7 +27,6 @@ impl Deref for DescriptionTerminal {
 impl fmt::Display for DescriptionTerminal {
     #[instrument(level = "trace", skip(self, f))]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-
         write!(f, "{}", &self.0.style(*DESCRIPTION_COLOR));
         Ok(())
     }

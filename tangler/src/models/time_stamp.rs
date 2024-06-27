@@ -1,34 +1,60 @@
 use std::cmp::Ordering;
 use std::fmt;
 
-use chrono::{DateTime, Utc};
-use chrono::format::StrftimeItems;
-use console::style;
-use serde::Deserialize;
-use tracing::{info, instrument};
 use crate::models::semver_impact::SemVerImpact;
 use crate::models::traits::TanglerModel;
-
+use chrono::format::StrftimeItems;
+use chrono::{DateTime, TimeZone, Utc};
+use console::style;
+use derive_new::new;
+use git2::Time;
+use serde::Deserialize;
+use tracing::{info, instrument};
 /// A struct representing a timestamp in UTC.
-#[derive(Clone, Default, Debug,Eq,  PartialEq)]
+#[derive(new, Clone, Default, Debug, Eq, PartialEq)]
 pub(crate) struct TimeStamp(DateTime<Utc>);
+
 impl TanglerModel for TimeStamp {}
-impl TimeStamp {
-    /// Creates a new `TimeStamp` instance with the current UTC time.
-    ///
-    /// This function captures the current time and logs the event.
-    #[instrument(level = "info")]
-    pub(crate) fn new() -> TimeStamp {
-        let now = Utc::now();
 
-        // Event: TimeStamp Created
-        // Description: Triggered when a new TimeStamp instance is created.
-        // Context: The current UTC time.
-        info!(timestamp = %now, "TimeStamp instance created");
+// impl TimeStamp {
+//     /// Creates a new `TimeStamp` instance with the current UTC time.
+//     ///
+//     /// This function captures the current time and logs the event.
+//     #[instrument(level = "info")]
+//     pub(crate) fn new() -> TimeStamp {
+//         let now = Utc::now();
+//
+//         // Event: TimeStamp Created
+//         // Description: Triggered when a new TimeStamp instance is created.
+//         // Context: The current UTC time.
+//         info!(timestamp = %now, "TimeStamp instance created");
+//
+//     }
+// }
 
-        TimeStamp(now)
+impl From<&Time> for TimeStamp {
+    fn from(value: &Time) -> Self {
+        let timestamp = value.seconds();
+        let offset_minutes = value.offset_minutes();
+
+        let datetime = Utc
+            .timestamp_opt(timestamp, 0)
+            .single()
+            .expect("Invalid timestamp")
+            + chrono::Duration::minutes(offset_minutes.into());
+        TimeStamp::new(datetime)
     }
 }
+
+fn convert_to_datetime(time: &Time) -> DateTime<Utc> {
+    let timestamp = time.seconds();
+    let offset_minutes = time.offset_minutes();
+    Utc.timestamp_opt(timestamp, 0)
+        .single()
+        .expect("Invalid timestamp")
+        + chrono::Duration::minutes(offset_minutes.into())
+}
+
 impl Ord for TimeStamp {
     fn cmp(&self, other: &Self) -> Ordering {
         self.0.cmp(&other.0)
@@ -56,7 +82,8 @@ impl fmt::Display for TimeStamp {
     /// This method converts the stored `DateTime<Utc>` to a string in the format "YYYY-MM-DD HH:MM:SS".
     #[instrument(level = "trace", skip(self, f))]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let when = self.0
+        let when = self
+            .0
             .format_with_items(StrftimeItems::new("%H:%M:%S"))
             .to_string();
         write!(f, "{}", when)
@@ -99,13 +126,19 @@ mod tests {
 
         // Use the captured time for the default timestamp.
         let diff = (Utc::now() - timestamp.0).num_seconds().abs();
-        assert!(diff <= 5, "Default timestamp is not within the expected range");
+        assert!(
+            diff <= 5,
+            "Default timestamp is not within the expected range"
+        );
     }
 
     #[test]
     #[traced_test]
     fn test_timestamp_precision() {
-        let naive_dt = NaiveDate::from_ymd_opt(2023, 1, 1).unwrap().and_hms_micro_opt(10, 0, 0, 500_000).unwrap();
+        let naive_dt = NaiveDate::from_ymd_opt(2023, 1, 1)
+            .unwrap()
+            .and_hms_micro_opt(10, 0, 0, 500_000)
+            .unwrap();
         let dt = DateTime::from_naive_utc_and_offset(naive_dt, Utc);
         let timestamp = TimeStamp(dt);
         let expected_output = "[10:00:00]";
@@ -116,7 +149,10 @@ mod tests {
     #[test]
     #[traced_test]
     fn test_display_timestamp_with_nanos() {
-        let naive_dt = NaiveDate::from_ymd_opt(2023, 1, 1).unwrap().and_hms_nano_opt(10, 0, 0, 1_000_000).unwrap();
+        let naive_dt = NaiveDate::from_ymd_opt(2023, 1, 1)
+            .unwrap()
+            .and_hms_nano_opt(10, 0, 0, 1_000_000)
+            .unwrap();
         let dt = DateTime::from_naive_utc_and_offset(naive_dt, Utc);
         let timestamp = TimeStamp(dt);
         let expected_output = "[10:00:00]";

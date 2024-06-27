@@ -1,13 +1,15 @@
 use std::fmt;
-use std::ops::Deref;
 use std::io::Write;
+use std::ops::Deref;
 
 use console::style;
 use owo_colors::{OwoColorize, Style};
 use serde::Deserialize;
 use tracing::{info, instrument, trace};
 
-use crate::models::{TEAL_11, TEAL_12, TEAL_7, ConsoleStyle, Description, GRAY_10, GRAY_11, GRAY_12, GRAY_9, RED_9};
+use crate::models::{
+    ConsoleStyle, Description, GRAY_10, GRAY_11, GRAY_12, GRAY_9, RED_9, TEAL_11, TEAL_12, TEAL_7,
+};
 
 #[derive(Debug, Clone)]
 pub(crate) struct DimStatic {
@@ -25,11 +27,9 @@ impl Deref for DimStatic {
     }
 }
 
-
 impl fmt::Display for DimStatic {
     #[instrument(level = "trace", skip(self, f))]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-
         // Create a ColorSpec with RGB values
         write!(f, "{}", &self.str.style(self.color)).unwrap();
         Ok(())
