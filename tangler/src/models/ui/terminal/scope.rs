@@ -7,7 +7,7 @@ use std::io::Write;
 use std::ops::Deref;
 
 use crate::models::{
-    ConsoleStyle, DimStatic, OptionalScope, Scope, AMBER_12, GRAY_10, GRAY_11, GRAY_12, GRAY_3,
+    ConsoleStyle, OptionalScope, Scope, AMBER_12, GRAY_10, GRAY_11, GRAY_12, GRAY_3,
     GRAY_9, SCOPE_COLOR, TEAL_11, TEAL_12, TEAL_9, WHITE_PURE,
 };
 use serde::Deserialize;
