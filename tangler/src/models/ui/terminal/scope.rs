@@ -7,8 +7,8 @@ use std::io::Write;
 use std::ops::Deref;
 
 use crate::models::{
-    ConsoleStyle, OptionalScope, Scope, AMBER_12, GRAY_10, GRAY_11, GRAY_12, GRAY_3,
-    GRAY_9, SCOPE_COLOR, TEAL_11, TEAL_12, TEAL_9, WHITE_PURE,
+    ConsoleStyle, OptionalScope, Scope, AMBER_12, GRAY_10, GRAY_11, GRAY_12, GRAY_3, GRAY_9,
+    SCOPE_COLOR, TEAL_11, TEAL_12, TEAL_9, WHITE_PURE,
 };
 use serde::Deserialize;
 use termcolor::{BufferWriter, Color, ColorChoice, ColorSpec, StandardStream, WriteColor};
