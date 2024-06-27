@@ -19,7 +19,7 @@ use unicode_segmentation::UnicodeSegmentation;
 use unicode_width::UnicodeWidthStr;
 
 use crate::messages::{
-    CommitPosted, DiffQueued, FinalizedCommit, GenerationStarted, NotifyError,
+    CommitPosted, DiffQueued, FinalizedCommit, GenerationStarted,
     SystemStarted,
 };
 use crate::models::CommittedCommit;

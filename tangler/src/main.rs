@@ -68,15 +68,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 fn check_openai_api_key() -> bool {
     env::var("OPENAI_API_KEY").is_ok()
 }
-
-fn setup_tracing() {
-    let subscriber = FmtSubscriber::builder()
-        .with_env_filter(EnvFilter::from_default_env())
-        .with_span_events(FmtSpan::FULL)
-        .finish();
-    tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
-}
-
 fn find_config_file_path(
     app_name: &str,
     config_file: &str,
@@ -106,7 +97,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn test_main() -> anyhow::Result<()> {
-        init_tracing();
+        setup_tracing();
 
         // Read and parse the configuration file
         let tangler_config: TanglerConfig = toml::from_str(&fs::read_to_string("/config.toml")?)?;
@@ -140,7 +131,7 @@ mod tests {
 
 static INIT: Once = Once::new();
 
-pub fn init_tracing() {
+pub fn setup_tracing() {
     INIT.call_once(|| {
         // Define an environment filter to suppress logs from specific functions
         let filter = EnvFilter::new("")
@@ -170,6 +161,7 @@ pub fn init_tracing() {
                     .parse()
                     .unwrap(),
             )
+            .add_directive("akton_core::actors=error".parse().unwrap())
             .add_directive("akton_core::actors::actor=error".parse().unwrap())
             .add_directive("akton_core::actors::idle=error".parse().unwrap())
             .add_directive(
@@ -177,28 +169,19 @@ pub fn init_tracing() {
                     .parse()
                     .unwrap(),
             )
-            .add_directive("tangler::actors::repositories=error".parse().unwrap())
+            .add_directive("ntangler::actors=off".parse().unwrap())
+            .add_directive("ntangler::actors::repositories[handle_poll_request]=off".parse().unwrap())
+            .add_directive("ntangler::actors::scribe=off".parse().unwrap())
             .add_directive(
-                "tangler::actors::repositories[broadcast_futures]=error"
+                "ntangler::actors::scribe[print_hero_message]=off"
                     .parse()
                     .unwrap(),
             )
-            .add_directive(
-                "tangler::actors::repositories[default_behavior]=error"
-                    .parse()
-                    .unwrap(),
-            )
-            .add_directive("tangler::actors::scribe=info".parse().unwrap())
-            .add_directive(
-                "tangler::actors::scribe[print_hero_message]=error"
-                    .parse()
-                    .unwrap(),
-            )
-            .add_directive("tangler::actors::tangler=error".parse().unwrap())
-            .add_directive("tangler::models=error".parse().unwrap())
-            .add_directive("tangler::actors::generators=error".parse().unwrap())
-            .add_directive("tangler::tangler_config=error".parse().unwrap())
-            .add_directive("tangler::repository_config=error".parse().unwrap())
+            .add_directive("ntangler::actors::tangler=off".parse().unwrap())
+            .add_directive("ntangler::models=off".parse().unwrap())
+            .add_directive("ntangler::actors::generators=off".parse().unwrap())
+            .add_directive("ntangler::tangler_config=off".parse().unwrap())
+            .add_directive("ntangler::repository_config=off".parse().unwrap())
             .add_directive("hyper_util=off".parse().unwrap())
             .add_directive("async_openai=off".parse().unwrap())
             .add_directive(Level::TRACE.into());
