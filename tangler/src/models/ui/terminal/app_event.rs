@@ -1,15 +1,15 @@
 // use crate::messages::commit_authoring::CommitAuthoring;
 // use crate::messages::CommitPosted;
+use crate::messages::{DiffQueued, FinalizedCommit, GenerationStarted};
 use crate::models::*;
 use akton::prelude::*;
+use console::{pad_str, Alignment};
+use derive_more::*;
+use derive_new::new;
 use owo_colors::OwoColorize;
 use std::fmt;
 use std::fmt::{Display, Formatter};
-use console::{Alignment, pad_str};
-use derive_more::*;
-use derive_new::new;
 use uuid::Uuid;
-use crate::messages::{DiffQueued, FinalizedCommit, GenerationStarted};
 
 /// Represents a successful commit message with its details.
 #[derive(new, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -43,7 +43,12 @@ impl From<FinalizedCommit> for AppEvent {
         let description: DescriptionTerminal = (&value.commit_message.description).into();
         let semver_impact: SemVerImpactTerminal = (&value.commit_message.semver_impact).into();
         let semver_impact = semver_impact.to_string();
-        let semver_impact = pad_str(&semver_impact, *COLUMN_HEADING_FOUR_LENGTH, Alignment::Center, None);
+        let semver_impact = pad_str(
+            &semver_impact,
+            *COLUMN_HEADING_FOUR_LENGTH,
+            Alignment::Center,
+            None,
+        );
 
         let commit_heading: CommitHeadingTerminal = (
             (&value.commit_message.commit_type).into(),
@@ -64,8 +69,7 @@ impl From<FinalizedCommit> for AppEvent {
                             {filename:<COLUMN_HEADING_FIVE_LENGTH$} \
                             {commit_heading:<COLUMN_HEADING_SIX_LENGTH$} \
                             {description:<COLUMN_HEADING_SEVEN_LENGTH$}"
-        )
-            ;
+        );
         AppEvent::new(event_id, display_string)
     }
 }
@@ -76,12 +80,12 @@ impl From<GenerationStarted> for AppEvent {
 
         let simple_urn = format!("{}://{:?}", &value.repository_nickname, value.target_file);
         let event_id = Uuid::new_v3(&namespace, (&simple_urn).as_ref()).to_string();
-        let time_stamp = "\u{2014}\u{2014}".style(*STATUS);
+        let time_stamp = "\u{2014}\u{2014}".style(*ALERT_COLOR);
         let binding = &value.target_file.display();
-        let filename = &binding.style(*FILENAME_PENDING);
-        let repository = &value.repository_nickname.style(*REPO_PENDING_COLOR);
-        let status = "THINKING".style(*STATUS_PENDING).to_string();
-        let emdash = EMDASH.style(*STATUS_PENDING);
+        let filename = &binding.style(*ALERT_COLOR);
+        let repository = &value.repository_nickname.style(*ALERT_COLOR);
+        let status = "WRITING".style(*ALERT_COLOR).to_string();
+        let emdash = EMDASH.style(*ALERT_COLOR);
         let halftab = &HALFTAB.clone();
         let display_string = format!(
             "\
