@@ -143,9 +143,7 @@ pub fn setup_tracing(app_name: &str, config_file: &str) {
             .with_span_events(FmtSpan::NONE)
             .with_max_level(Level::TRACE)
             .compact()
-            .pretty()
             .with_line_number(true)
-            .without_time()
             .with_env_filter(filter)
             .with_writer(file_appender) // Set the writer to the file appender
             .finish();
