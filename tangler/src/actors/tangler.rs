@@ -30,7 +30,7 @@ pub(crate) struct Tangler {
 
 impl Tangler {
     #[instrument(skip(tangler_config))]
-    pub(crate) async fn init(tangler_config: TanglerConfig) -> anyhow::Result<(Context, Context)> {
+    pub(crate) async fn initialize(tangler_config: TanglerConfig) -> anyhow::Result<(Context, Context)> {
         let mut akton: AktonReady = Akton::launch().into();
         let broker = akton.get_broker();
         let actor_config =
