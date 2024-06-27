@@ -18,10 +18,7 @@ use tracing::*;
 use unicode_segmentation::UnicodeSegmentation;
 use unicode_width::UnicodeWidthStr;
 
-use crate::messages::{
-    DiffQueued, FinalizedCommit, GenerationStarted,
-    SystemStarted,
-};
+use crate::messages::{DiffQueued, FinalizedCommit, GenerationStarted, SystemStarted};
 use crate::models::CommittedCommit;
 use crate::models::*;
 use crate::models::{CommitTypeTerminal, MENU_COLOR};
