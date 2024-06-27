@@ -1,10 +1,10 @@
-use std::fmt;
 use console::style;
 use derive_more::*;
+use std::fmt;
 
+use crate::models::traits::TanglerModel;
 use serde::Deserialize;
 use tracing::{info, instrument};
-use crate::models::traits::TanglerModel;
 
 use super::*;
 
