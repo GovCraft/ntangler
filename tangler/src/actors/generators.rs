@@ -136,7 +136,7 @@ impl OpenAi {
 
                 // Step 3: Initiate a run and handle the event stream.
 
-                // TODO: the assistant id should be loaded remotely to accomodate easy updates
+                // TODO: the assistant id should be loaded remotely to accommodate easy updates
                 trace!("Step 3a: Initiate a run and handle the event stream.");
                 let mut event_stream = match client
                     .threads()
