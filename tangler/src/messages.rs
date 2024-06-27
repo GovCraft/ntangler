@@ -1,5 +1,4 @@
 
-mod notify_error;
 
 
 mod accept_broker;
@@ -25,7 +24,6 @@ pub(crate) use accept_broker::AcceptBroker;
 pub(crate) use commit_message_generated::CommitMessageGenerated;
 pub(crate) use commit_posted::CommitPosted;
 
-pub(crate) use notify_error::NotifyError;
 pub(crate) use poll_changes::RepositoryPollRequested;
 
 pub(crate) use system_started::SystemStarted;
