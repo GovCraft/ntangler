@@ -1,8 +1,10 @@
 #![allow(unused)]
 
-use std::path::PathBuf;
-use std::sync::Once;
-use std::{env, fs};
+use std::path::{Path, PathBuf};
+use std::sync::{Arc, Mutex, Once};
+use std::{env, fs, io};
+use std::ffi::OsString;
+use std::io::Write;
 use std::sync::mpsc::channel;
 use std::time::Duration;
 
@@ -13,13 +15,12 @@ use futures::StreamExt;
 use indicatif::TermLike;
 use serde::{Deserialize, Serialize};
 use tokio::signal;
-use tracing::{error, Level};
+use tracing::{error, Level, trace};
 use tracing_appender::rolling::{RollingFileAppender, Rotation};
 use tracing_subscriber::fmt::format::FmtSpan;
 use tracing_subscriber::{EnvFilter, FmtSubscriber,layer::SubscriberExt};
-use notify::{Watcher, watcher, DebouncedEvent, recommended_watcher};
-use notify::DebouncedEvent::Write;
-use notify::event::AccessMode::Write;
+use notify::{Watcher, recommended_watcher, RecursiveMode};
+use notify_debouncer_mini::{DebouncedEvent, DebounceEventResult, new_debouncer};
 use crate::actors::Tangler;
 use crate::models::config::TanglerConfig;
 
@@ -99,6 +100,16 @@ fn find_logs_path(app_name: &str) -> Result<PathBuf, Box<dyn std::error::Error>>
         Err("Could not determine the logs directory path.".into())
     }
 }
+
+fn create_log_path(config_path: &Path) -> PathBuf {
+    let file_name = config_path.file_name().unwrap();
+    let mut new_file_name = OsString::from("log_");
+    new_file_name.push(file_name);
+
+    let mut new_path = config_path.to_path_buf();
+    new_path.set_file_name(new_file_name);
+    new_path
+}
 static INIT: Once = Once::new();
 
 pub fn setup_tracing(app_name: &str, config_file: &str) {
@@ -110,19 +121,11 @@ pub fn setup_tracing(app_name: &str, config_file: &str) {
         let config_path = find_config_path(app_name, config_file).expect("Unable to find config file path");
         let config_dir = config_path.parent().expect("Config path has no parent directory");
 
+        let log_config_path = create_log_path(&config_path);
         // Read initial log configuration directives
-        let log_config = read_log_config(&config_path);
+        let log_config = read_log_config(&log_config_path);
 
-        let (tx, rx) = channel();
-        let mut watcher = recommended_watcher(|res|{
-            match res{
-                Ok(_) => {
-                    tx, Duration::from_secs(10)
-                }
-                Err(_) => {}
-            }
-        }).unwrap();
-        watcher.watch(&config_path, notify::RecursiveMode::NonRecursive).unwrap();
+
 
         // Closure to create the filter from the log configuration
         let create_filter = |log_config: &LogConfig| {
@@ -143,37 +146,15 @@ pub fn setup_tracing(app_name: &str, config_file: &str) {
             .pretty()
             .with_line_number(true)
             .without_time()
-            .with_env_filter(filter.clone())
+            .with_env_filter(filter)
             .with_writer(file_appender) // Set the writer to the file appender
             .finish();
 
         tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
 
-        // Spawn a thread to watch for configuration file changes
-        std::thread::spawn(move || {
-            while let Ok(event) = rx.recv() {
-                if let Write() = event {
-                    let log_config = read_log_config(&config_path);
-                    filter = create_filter(&log_config);
 
-                    let subscriber = FmtSubscriber::builder()
-                        .with_span_events(FmtSpan::NONE)
-                        .with_max_level(Level::TRACE)
-                        .compact()
-                        .pretty()
-                        .with_line_number(true)
-                        .without_time()
-                        .with_env_filter(filter.clone())
-                        .with_writer(file_appender.clone())
-                        .finish();
-
-                    tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
-                }
-            }
-        });
     });
 }
-
 
 #[cfg(test)]
 mod tests {
