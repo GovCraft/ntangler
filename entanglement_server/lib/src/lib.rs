@@ -1,15 +1,15 @@
+use dotenv::dotenv;
 use futures_util::StreamExt;
+use mistralai_client::v1::chat::{ChatMessage, ChatMessageRole, ChatParams};
+use mistralai_client::v1::client::Client;
+use mistralai_client::v1::constants::Model;
 use ollama_rs;
 use ollama_rs::generation::completion::request::GenerationRequest;
 use ollama_rs::generation::options::GenerationOptions;
 use ollama_rs::Ollama;
+use std::env;
 use tokio::fs::read_to_string;
 use tokio::io::AsyncWriteExt;
-use dotenv::dotenv;
-use std::env;
-use mistralai_client::v1::chat::{ChatMessage, ChatMessageRole, ChatParams};
-use mistralai_client::v1::client::Client;
-use mistralai_client::v1::constants::Model;
 use tracing::{instrument, trace};
 
 pub async fn init() {
