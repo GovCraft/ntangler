@@ -1,10 +1,8 @@
-use chrono::{DateTime, TimeZone, Utc};
 use crate::models::TimeStamp;
+use chrono::{DateTime, TimeZone, Utc};
 use derive_more::*;
 use git2::{Signature, Time};
 use serde::Deserialize;
-
-
 
 #[derive(Clone, Default, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) struct TangledSignature {
@@ -16,8 +14,14 @@ pub(crate) struct TangledSignature {
 impl From<Signature<'_>> for TangledSignature {
     fn from(value: Signature<'_>) -> Self {
         TangledSignature {
-            name: value.name().expect("No available git signature name").to_string(),
-            email: value.email().expect("No available git signature email").to_string(),
+            name: value
+                .name()
+                .expect("No available git signature name")
+                .to_string(),
+            email: value
+                .email()
+                .expect("No available git signature email")
+                .to_string(),
             time: convert_to_datetime(&value.when()),
         }
     }
