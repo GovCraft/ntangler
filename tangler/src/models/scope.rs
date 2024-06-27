@@ -1,13 +1,13 @@
+use console::style;
 use std::fmt;
 use std::ops::Deref;
-use console::style;
 
+use crate::models::traits::TanglerModel;
+use crate::models::Oid;
+use derive_more::*;
 use serde::Deserialize;
 use tracing::{info, instrument};
-use crate::models::Oid;
-use crate::models::traits::TanglerModel;
-use derive_more::*;
-#[derive(Clone,Default, Debug, PartialEq, Eq, PartialOrd, Ord, Deserialize)]
+#[derive(Clone, Default, Debug, PartialEq, Eq, PartialOrd, Ord, Deserialize)]
 pub(crate) struct Scope(String);
 impl TanglerModel for Scope {}
 impl Deref for Scope {
@@ -138,7 +138,6 @@ mod tests {
         let commit: Scope = "something".into();
         assert_eq!(commit.to_string(), "(something)");
     }
-
 
     #[test]
     #[traced_test]
