@@ -1,17 +1,14 @@
-use std::any::TypeId;
 use std::fmt::Debug;
 use std::time::Duration;
 
-use akton::prelude::Subscribable;
 use akton::prelude::*;
-use futures::FutureExt;
-use tracing::{debug, error, info, instrument, trace, warn};
+use akton::prelude::Subscribable;
+use tracing::{debug, instrument, trace};
 
+use crate::actors::OpenAi;
 use crate::actors::repositories::GitRepository;
 use crate::actors::scribe::Scribe;
-use crate::actors::OpenAi;
-use crate::messages::{AcceptBroker, RepositoryPollRequested, SystemStarted};
-use crate::models::config::RepositoryConfig;
+use crate::messages::{RepositoryPollRequested, SystemStarted};
 use crate::models::config::TanglerConfig;
 use crate::models::TangledRepository;
 
@@ -19,8 +16,6 @@ use crate::models::TangledRepository;
 #[derive(Default, Debug, Clone)]
 pub(crate) struct Tangler {
     git_repositories: Vec<Context>,
-    diff_watchers: Vec<Context>,
-    llm_pool: Vec<Context>,
     scribe: Context,
     generator: Context,
 }
@@ -48,7 +43,7 @@ impl Tangler {
                         None,
                         Some(broker.clone()),
                     )
-                    .expect("Failed to create generator config");
+                        .expect("Failed to create generator config");
                     actor.state.generator = OpenAi::initialize(generator_config, &mut actor.akton)
                         .await
                         .expect("Failed to initialize generator actor");
@@ -88,7 +83,7 @@ impl Tangler {
                     for repo in &tangler_config.repositories {
                         let akton = &mut actor.akton.clone();
                         trace!(repo = ?repo, "Initializing a repository actor.");
-                        let broker = broker.clone();
+
                         let tangled_repository: TangledRepository = repo.clone().into();
                         let watcher = GitRepository::init(tangled_repository, akton)
                             .await
