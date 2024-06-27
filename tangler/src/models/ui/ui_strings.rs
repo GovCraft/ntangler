@@ -1,6 +1,6 @@
-use crate::models::{REPO_COLOR, TAB_WIDTH, TIME_COLOR};
 use lazy_static::lazy_static;
-use owo_colors::OwoColorize;
+
+use crate::models::TAB_WIDTH;
 
 pub(crate) const COLUMN_HEADING_ONE: &str = "REPOSITORY";
 pub(crate) const COLUMN_HEADING_TWO: &str = "TIME";
