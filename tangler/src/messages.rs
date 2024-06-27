@@ -18,6 +18,8 @@ mod diff_queued;
 mod commit_message_generated;
 mod commit_finalized;
 mod generation_started;
+mod finalized_commit;
+pub(crate) use finalized_commit::FinalizedCommit;
 pub(crate) use generation_started::GenerationStarted;
 // pub(crate) use git_repository_event::GitRepositoryEvent;
 // pub(crate) use commit_event::CommitEvent;
