@@ -1,28 +1,28 @@
 #![allow(unused)]
 
-use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex, Once};
-use std::{env, fs, io};
 use std::ffi::OsString;
 use std::io::Write;
+use std::path::{Path, PathBuf};
 use std::sync::mpsc::channel;
+use std::sync::{Arc, Mutex, Once};
 use std::time::Duration;
+use std::{env, fs, io};
 
+use crate::actors::Tangler;
+use crate::models::config::TanglerConfig;
 use akton::prelude::*;
 use anyhow::Result;
 use console::Term;
 use futures::StreamExt;
 use indicatif::TermLike;
+use notify::{recommended_watcher, RecursiveMode, Watcher};
+use notify_debouncer_mini::{new_debouncer, DebounceEventResult, DebouncedEvent};
 use serde::{Deserialize, Serialize};
 use tokio::signal;
-use tracing::{error, Level, trace};
+use tracing::{error, trace, Level};
 use tracing_appender::rolling::{RollingFileAppender, Rotation};
 use tracing_subscriber::fmt::format::FmtSpan;
-use tracing_subscriber::{EnvFilter, FmtSubscriber,layer::SubscriberExt};
-use notify::{Watcher, recommended_watcher, RecursiveMode};
-use notify_debouncer_mini::{DebouncedEvent, DebounceEventResult, new_debouncer};
-use crate::actors::Tangler;
-use crate::models::config::TanglerConfig;
+use tracing_subscriber::{layer::SubscriberExt, EnvFilter, FmtSubscriber};
 
 mod actors;
 mod messages;
@@ -32,7 +32,8 @@ struct LogConfig {
     log_directives: Vec<String>,
 }
 fn read_log_config(config_path: &PathBuf) -> LogConfig {
-    let config_content = fs::read_to_string(config_path).expect("Unable to read log configuration file");
+    let config_content =
+        fs::read_to_string(config_path).expect("Unable to read log configuration file");
     toml::from_str(&config_content).expect("Invalid configuration format")
 }
 #[tokio::main]
@@ -81,11 +82,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 fn check_openai_api_key() -> bool {
     env::var("OPENAI_API_KEY").is_ok()
 }
-fn find_config_path(app_name: &str, config_file: &str) -> Result<PathBuf, Box<dyn std::error::Error>> {
+fn find_config_path(
+    app_name: &str,
+    config_file: &str,
+) -> Result<PathBuf, Box<dyn std::error::Error>> {
     if let Ok(config_home) = env::var("XDG_CONFIG_HOME") {
         Ok(PathBuf::from(config_home).join(app_name).join(config_file))
     } else if let Ok(home_dir) = env::var("HOME") {
-        Ok(PathBuf::from(home_dir).join(".config").join(app_name).join(config_file))
+        Ok(PathBuf::from(home_dir)
+            .join(".config")
+            .join(app_name)
+            .join(config_file))
     } else {
         Err("Could not determine the configuration file path.".into())
     }
@@ -95,7 +102,10 @@ fn find_logs_path(app_name: &str) -> Result<PathBuf, Box<dyn std::error::Error>>
     if let Ok(config_home) = env::var("XDG_CACHE_HOME") {
         Ok(PathBuf::from(config_home).join(app_name).join("logs"))
     } else if let Ok(home_dir) = env::var("HOME") {
-        Ok(PathBuf::from(home_dir).join(".cache").join(app_name).join("logs"))
+        Ok(PathBuf::from(home_dir)
+            .join(".cache")
+            .join(app_name)
+            .join("logs"))
     } else {
         Err("Could not determine the logs directory path.".into())
     }
@@ -118,14 +128,15 @@ pub fn setup_tracing(app_name: &str, config_file: &str) {
         let log_dir = find_logs_path(app_name).expect("Unable to find logs directory path");
         let file_appender = RollingFileAppender::new(Rotation::DAILY, log_dir, "app.log");
 
-        let config_path = find_config_path(app_name, config_file).expect("Unable to find config file path");
-        let config_dir = config_path.parent().expect("Config path has no parent directory");
+        let config_path =
+            find_config_path(app_name, config_file).expect("Unable to find config file path");
+        let config_dir = config_path
+            .parent()
+            .expect("Config path has no parent directory");
 
         let log_config_path = create_log_path(&config_path);
         // Read initial log configuration directives
         let log_config = read_log_config(&log_config_path);
-
-
 
         // Closure to create the filter from the log configuration
         let create_filter = |log_config: &LogConfig| {
@@ -148,9 +159,8 @@ pub fn setup_tracing(app_name: &str, config_file: &str) {
             .with_writer(file_appender) // Set the writer to the file appender
             .finish();
 
-        tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
-
-
+        tracing::subscriber::set_global_default(subscriber)
+            .expect("setting default subscriber failed");
     });
 }
 
@@ -158,11 +168,11 @@ pub fn setup_tracing(app_name: &str, config_file: &str) {
 mod tests {
     use std::fs;
 
-    use akton::prelude::ActorContext;
     use super::*;
     use crate::actors::Tangler;
     use crate::models::config::RepositoryConfig;
     use crate::models::config::TanglerConfig;
+    use akton::prelude::ActorContext;
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn test_main() -> anyhow::Result<()> {
