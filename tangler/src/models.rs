@@ -1,35 +1,35 @@
 use std::hash::{DefaultHasher, Hash, Hasher};
 // pub(crate) use pending_commit::PendingCommit;
-pub(crate) use committed_commit::CommittedCommit;
 pub(crate) use commit_type::CommitType;
+pub(crate) use committed_commit::CommittedCommit;
 pub(crate) use description::Description;
+pub(crate) use file_name::Filename;
 pub(crate) use footer::Footer;
 pub(crate) use oid::Oid;
 pub(crate) use scope::{OptionalScope, Scope};
+pub(crate) use semver_impact::SemVerImpact;
 pub(crate) use time_stamp::TimeStamp;
 pub(crate) use ui::*;
-pub(crate) use file_name::Filename;
-pub(crate) use semver_impact::SemVerImpact;
 
-mod footer;
 mod commit_type;
-mod scope;
 mod committed_commit;
 pub(crate) mod config;
-mod time_stamp;
-mod oid;
 mod description;
-mod semver_impact;
-mod ui;
-mod traits;
 mod file_name;
+mod footer;
+mod oid;
+mod scope;
+mod semver_impact;
+mod time_stamp;
+mod traits;
+mod ui;
 // mod pending_commit;
 // mod diff_generated_commit;
 mod tangled_commit;
 // mod commit_step;
-mod tangled_repository;
-mod signature;
 mod commit_message;
+mod signature;
+mod tangled_repository;
 
 pub(crate) use commit_message::CommitMessage;
 pub(crate) use signature::TangledSignature;
@@ -49,5 +49,3 @@ pub(crate) fn generate_id(repository: &str, filename: Filename) -> String {
     filename.hash(&mut hasher);
     hasher.finish().to_string()
 }
-
-
