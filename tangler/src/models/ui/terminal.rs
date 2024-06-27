@@ -9,6 +9,7 @@ pub(crate) use dim::DimStatic;
 pub(crate) use is_breaking::IsBreakingTerminal;
 pub(crate) use commit_heading::CommitHeadingTerminal;
 pub(crate) use repository::RepositoryTerminal;
+pub(crate) use app_event::AppEvent;
 // pub(crate) use commit_message_generated_commit::CommitMessageGeneratedCommit;
 pub mod oid;
 mod scope;
@@ -22,5 +23,6 @@ mod repository;
 mod is_breaking;
 mod commit_heading;
 mod filename;
+mod app_event;
 // pub mod commit_message_generated_commit;
 
