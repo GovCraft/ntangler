@@ -193,6 +193,7 @@ impl OpenAi {
         let thread = match create_thread_with_circuit_breaker(&circuit_breaker, &client).await {
             Ok(thread) => thread,
             Err(e) => {
+                // TODO: impl fallback logic
                 error!("Error creating thread with circuit breaker: {:?}", e);
                 return; // Fail gracefully by returning early
             }
@@ -203,6 +204,7 @@ impl OpenAi {
         match create_message_with_circuit_breaker(&circuit_breaker, &client, &thread.id, diff).await {
             Ok(thread) => thread,
             Err(e) => {
+                // TODO: impl fallback logic
                 error!("Error creating message with circuit breaker: {:?}", e);
                 return; // Fail gracefully by returning early
             }
@@ -214,6 +216,7 @@ impl OpenAi {
         let mut event_stream = match create_run_stream_with_circuit_breaker(&circuit_breaker, &client, &thread.id, Some(Format(format))).await {
             Ok(event_stream) => event_stream,
             Err(e) => {
+                // TODO: impl fallback logic
                 error!("Error creating thread with circuit breaker: {:?}", e);
                 return; // Fail gracefully by returning early
             }
