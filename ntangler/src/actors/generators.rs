@@ -180,6 +180,7 @@ impl OpenAi {
         }
     }
 
+    #[instrument(skip(broker, tx, client))]
     async fn call_ai_endpoint(broker: Context, tx: Sender<String>, diff: String, repository_nickname: String, target_file_clone: PathBuf, client: Client<OpenAIConfig>) {
         let target_file_clone = target_file_clone.clone();
         let msg = BrokerRequest::new(GenerationStarted::new(
