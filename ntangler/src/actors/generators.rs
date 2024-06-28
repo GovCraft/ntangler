@@ -1,14 +1,15 @@
+use std::fmt::Debug;
 use std::sync::Arc;
 use std::time::Duration;
 
 use akton::prelude::*;
-use async_openai::Client;
+use async_openai::{Client, error};
 use async_openai::config::OpenAIConfig;
 use async_openai::error::OpenAIError;
 use async_openai::types::{
     AssistantsApiResponseFormat, AssistantsApiResponseFormatOption, AssistantStreamEvent,
     CreateMessageRequest, CreateMessageRequestContent, CreateRunRequest, CreateThreadRequest,
-    MessageDeltaContent, MessageRole, ThreadObject,
+    MessageDeltaContent, MessageRole, ThreadObject
 };
 use async_openai::types::AssistantsApiResponseFormatType::JsonObject;
 use failsafe::{backoff, Config, Error, failure_policy, StateMachine};
@@ -41,6 +42,22 @@ impl Default for OpenAi {
     }
 }
 
+#[instrument]
+async fn create_thread_with_circuit_breaker(circuit_breaker: &(impl CircuitBreaker + Debug), client: &Client<OpenAIConfig>) -> anyhow::Result<ThreadObject> {
+    match circuit_breaker.call(timeout(Duration::from_secs(10), client.threads().create(CreateThreadRequest::default()))).await {
+        Ok(result) => match result {
+            Ok(thread) => Ok(thread),
+            Err(e) => {
+                error!("Failed to create thread: {:?}", e);
+                Err(anyhow::Error::from(e).into())
+            }
+        },
+        Err(e) => {
+            error!("Circuit breaker call failed: {:?}", e);
+            Err(anyhow::Error::from(e))
+        }
+    }
+}
 impl OpenAi {
     pub(crate) async fn initialize(
         config: ActorConfig,
