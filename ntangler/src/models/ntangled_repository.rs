@@ -15,7 +15,7 @@ pub(crate) struct NtangledRepository {
 impl From<RepositoryConfig> for NtangledRepository {
     fn from(value: RepositoryConfig) -> Self {
         NtangledRepository {
-            akton_arn: Arn::with_root("tangled_repository").unwrap(),
+            akton_arn: Arn::with_root("ntangled_repository").unwrap(),
             nickname: value.nickname,
             path: value.path,
             branch_name: value.branch_name,
