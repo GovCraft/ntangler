@@ -132,7 +132,7 @@ impl OpenAi {
             let broker = actor.akton.get_broker().clone();
             let message = event.message.clone();
             let client = actor.state.client.clone();
-            tracing::info!("Received DiffQueued event: {:?}", event);
+            info!("Received DiffQueued event: {:?}", event);
 
             Context::wrap_future(async move {
                 Self::handle_diff_received(message, broker, reply_address, client).await;
@@ -218,7 +218,7 @@ impl OpenAi {
             Ok(message) => {
                 trace!("Message created successfully in thread id {} for repository: {}, file: {}", thread_id, repository_nickname, target_file_display);
                 message
-            },
+            }
             Err(e) => {
                 // TODO: impl fallback logic
                 error!("Error creating message with circuit breaker for thread id {} in repository: {}, file: {}: {:?}", thread_id, repository_nickname, target_file_display, e);
@@ -266,7 +266,7 @@ impl OpenAi {
                         trace!("Event stream completed for thread id {} in repository: {}, file: {}", thread_id, repository_nickname, target_file_display);
                     }
                     _ => {
-                        warn!("Unhandled event type in the stream for thread id {} in repository: {}, file: {}", thread_id, repository_nickname, target_file_clone.display());
+                        warn!("Unhandled event type in the stream for thread id {} in repository: {}, file: {}", thread_id, repository_nickname, target_file_display);
                     }
                 },
                 Err(e) => {
@@ -275,14 +275,14 @@ impl OpenAi {
                     // Context: Error details.
                     match e {
                         OpenAIError::Reqwest(s) => {
-                            error!("Reqwest error: {s}");
+                            error!("Reqwest error in event stream for thread id {} in repository: {}, file: {}: {}", thread_id, repository_nickname, target_file_display, s);
                         }
                         OpenAIError::ApiError(_) => {}
                         OpenAIError::JSONDeserialize(_) => {}
                         OpenAIError::FileSaveError(_) => {}
                         OpenAIError::FileReadError(_) => {}
                         OpenAIError::StreamError(s) => {
-                            error!("Stream error: {s}");
+                            error!("Stream error in event stream for thread id {} in repository: {}, file: {}: {}", thread_id, repository_nickname, target_file_display, s);
                         }
                         OpenAIError::InvalidArgument(_) => {}
                     }
@@ -290,12 +290,9 @@ impl OpenAi {
             }
         }
 
-        trace!("Step 4: Return commit msg: {}", &commit_message);
+        trace!("Returning commit message for repository: {}, file: {}", repository_nickname, target_file_display);
         if let Err(e) = tx.send(commit_message).await {
-            // Event: Failed to Send Commit Message
-            // Description: Failed to send the commit message through the channel.
-            // Context: Error details.
-            error!("Failed to send commit msg: {e}");
+            error!("Failed to send commit message for repository: {}, file: {}: {}", repository_nickname, target_file_display, e);
         }
     }
 }
