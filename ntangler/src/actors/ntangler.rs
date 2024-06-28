@@ -9,29 +9,29 @@ use crate::actors::OpenAi;
 use crate::actors::repositories::GitRepository;
 use crate::actors::scribe::Scribe;
 use crate::messages::{RepositoryPollRequested, SystemStarted};
-use crate::models::config::TanglerConfig;
-use crate::models::TangledRepository;
+use crate::models::config::NtanglerConfig;
+use crate::models::NtangledRepository;
 
 /// Tangler is the name of the app and acts as the main orchestration point of this command line app and manages repository actors and a broker.
 #[derive(Default, Debug, Clone)]
-pub(crate) struct Tangler {
+pub(crate) struct Ntangler {
     git_repositories: Vec<Context>,
     scribe: Context,
     generator: Context,
 }
 
-impl Tangler {
-    #[instrument(skip(tangler_config))]
+impl Ntangler {
+    #[instrument(skip(ntangler_config))]
     pub(crate) async fn initialize(
-        tangler_config: TanglerConfig,
+        ntangler_config: NtanglerConfig,
     ) -> anyhow::Result<(Context, Context)> {
         let mut akton: AktonReady = Akton::launch().into();
         let broker = akton.get_broker();
         let actor_config =
-            ActorConfig::new(Arn::with_root("tangler")?, None, Some(broker.clone()))?;
+            ActorConfig::new(Arn::with_root("ntangler")?, None, Some(broker.clone()))?;
 
         let actor_context = akton
-            .spawn_actor_with_setup::<Tangler>(actor_config, |mut actor| {
+            .spawn_actor_with_setup::<Ntangler>(actor_config, |mut actor| {
                 Box::pin(async move {
                     let broker = actor.akton.get_broker().clone();
 
@@ -80,12 +80,12 @@ impl Tangler {
                             })
                         });
 
-                    for repo in &tangler_config.repositories {
+                    for repo in &ntangler_config.repositories {
                         let akton = &mut actor.akton.clone();
                         trace!(repo = ?repo, "Initializing a repository actor.");
 
-                        let tangled_repository: TangledRepository = repo.clone().into();
-                        let watcher = GitRepository::init(tangled_repository, akton)
+                        let ntangled_repository: NtangledRepository = repo.clone().into();
+                        let watcher = GitRepository::init(ntangled_repository, akton)
                             .await
                             .expect("Failed to start repository watcher");
                         actor.state.git_repositories.push(watcher.clone());

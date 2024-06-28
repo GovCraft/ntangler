@@ -15,12 +15,12 @@ use crate::messages::{
     RepositoryPollRequested, SystemStarted,
 };
 use crate::models::{
-    TangledRepository, TimeStamp,
+    NtangledRepository, TimeStamp,
 };
 
 #[akton_actor]
 pub(crate) struct GitRepository {
-    repo_info: TangledRepository,
+    repo_info: NtangledRepository,
     broker: Context,
 }
 
@@ -35,12 +35,12 @@ impl GitRepository {
     ///
     /// An optional `Context`, which is `Some` if the actor was successfully activated, or `None` otherwise.
     pub(crate) async fn init(
-        config: TangledRepository,
+        config: NtangledRepository,
         system: &mut AktonReady,
     ) -> anyhow::Result<Context> {
         // Define the default behavior as an async closure that takes a reference to the repository configuration.
         let system = system.clone();
-        let default_behavior = |config: TangledRepository, system: AktonReady| async move {
+        let default_behavior = |config: NtangledRepository, system: AktonReady| async move {
             GitRepository::default_behavior(&config, system).await
         };
 
@@ -50,11 +50,11 @@ impl GitRepository {
 
     pub(crate) async fn init_with_custom_behavior<F, Fut>(
         custom_behavior: F,
-        config: TangledRepository,
+        config: NtangledRepository,
         system: AktonReady,
     ) -> anyhow::Result<Context>
     where
-        F: Fn(TangledRepository, AktonReady) -> Fut + Send + Sync + 'static,
+        F: Fn(NtangledRepository, AktonReady) -> Fut + Send + Sync + 'static,
         Fut: Future<Output=anyhow::Result<Context>> + Send,
     {
         // Execute the custom behavior and await its result
@@ -63,11 +63,11 @@ impl GitRepository {
 
     /// Example custom behavior function to be passed into the `init` function.
     pub(crate) async fn default_behavior(
-        tangled_repository: &TangledRepository,
+        ntangled_repository: &NtangledRepository,
         mut system: AktonReady,
     ) -> anyhow::Result<Context> {
         let actor_name = Arn::with_account("repository")?
-            .add_part(tangled_repository.akton_arn.root.to_string())?;
+            .add_part(ntangled_repository.akton_arn.root.to_string())?;
 
         let actor_config = ActorConfig::new(actor_name, None, Some(system.clone().get_broker()))
             .expect("Failed to build repository config");
@@ -75,8 +75,8 @@ impl GitRepository {
             .create_actor_with_config::<GitRepository>(actor_config)
             .await;
         actor.broker = system.get_broker().clone();
-        trace!(path = &tangled_repository.path.display().to_string(), "Open repo '{}' at", &tangled_repository.nickname);
-        actor.state.repo_info = tangled_repository.clone();
+        trace!(path = &ntangled_repository.path.display().to_string(), "Open repo '{}' at", &ntangled_repository.nickname);
+        actor.state.repo_info = ntangled_repository.clone();
 
         actor
             .setup

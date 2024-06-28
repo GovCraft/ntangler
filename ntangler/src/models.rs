@@ -6,7 +6,7 @@ pub(crate) use footer::Footer;
 pub(crate) use oid::Oid;
 pub(crate) use scope::Scope;
 pub(crate) use semver_impact::SemVerImpact;
-pub(crate) use tangled_repository::TangledRepository;
+pub(crate) use ntangled_repository::NtangledRepository;
 pub(crate) use time_stamp::TimeStamp;
 pub(crate) use ui::*;
 
@@ -22,5 +22,5 @@ mod time_stamp;
 mod ui;
 mod commit_message;
 mod signature;
-mod tangled_repository;
+mod ntangled_repository;
 
