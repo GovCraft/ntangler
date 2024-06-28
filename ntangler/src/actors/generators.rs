@@ -55,7 +55,7 @@ async fn create_run_stream_with_circuit_breaker(
                 Ok(stream)
             }
             Err(e) => {
-                error!("Failed to create run stream for thread_id {}: {:?}", thread_id, e);
+                error!("Timeout while creating run stream for thread_id: {}", thread_id);
                 Err(anyhow::Error::from(e).into())
             }
         },
