@@ -1,20 +1,28 @@
-use std::fmt::Debug;
-use std::path::PathBuf;
-use std::time::Duration;
+use std::{
+    fmt::Debug,
+    path::PathBuf,
+    time::Duration
+};
 
 use akton::prelude::*;
 use AssistantsApiResponseFormatOption::Format;
-use async_openai::Client;
-use async_openai::config::OpenAIConfig;
-use async_openai::error::OpenAIError;
-use async_openai::types::{AssistantEventStream, AssistantsApiResponseFormat, AssistantsApiResponseFormatOption, AssistantStreamEvent, CreateMessageRequest, CreateMessageRequestContent, CreateRunRequest, CreateThreadRequest, MessageDeltaContent, MessageRole, ThreadObject};
-use async_openai::types::AssistantsApiResponseFormatType::JsonObject;
-use failsafe::Config;
-use failsafe::futures::CircuitBreaker;
+use async_openai::{
+    Client,
+    config::OpenAIConfig,
+    error::OpenAIError,
+    types::{AssistantEventStream, AssistantsApiResponseFormat, AssistantsApiResponseFormatOption, AssistantStreamEvent, CreateMessageRequest, CreateMessageRequestContent, CreateRunRequest, CreateThreadRequest, MessageDeltaContent, MessageRole, ThreadObject},
+    types::AssistantsApiResponseFormatType::JsonObject
+};
+use failsafe::{
+    Config,
+    futures::CircuitBreaker
+};
 use futures::StreamExt;
-use tokio::sync::mpsc;
-use tokio::sync::mpsc::Sender;
-use tokio::time::timeout;
+use tokio::{
+    sync::mpsc,
+    sync::mpsc::Sender,
+    time::timeout
+};
 use tracing::{error, info, instrument, trace, warn};
 
 use crate::messages::{CommitMessageGenerated, DiffQueued, GenerationStarted};
