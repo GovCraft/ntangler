@@ -15,7 +15,7 @@ use futures::StreamExt;
 use tokio::sync::mpsc;
 use tokio::sync::mpsc::Sender;
 use tokio::time::timeout;
-use tracing::{error, instrument, trace};
+use tracing::{error, info, instrument, trace};
 
 use crate::messages::{CommitMessageGenerated, DiffQueued, GenerationStarted};
 
@@ -27,7 +27,7 @@ pub(crate) struct OpenAi {
 impl Default for OpenAi {
     #[instrument]
     fn default() -> Self {
-        trace!("Default called for OpenAi actor");
+        info!("Initializing OpenAi actor with default configuration");
         let client = Client::new();
         Self {
             client,
