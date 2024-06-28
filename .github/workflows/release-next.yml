@@ -1,0 +1,140 @@
+name: ntangler Next Release Workflow
+
+on:
+  push:
+    branches:
+      - next
+    tags:
+      - 'v*-next'
+    paths:
+      - 'ntangler/**'
+
+jobs:
+  test:
+    name: Run tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./ntangler
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+      - run: cargo test --all
+
+  security_audit:
+    name: Security audit
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./ntangler
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions-rs/audit-check@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+  build:
+    name: Build for multiple platforms
+    needs: [test, security_audit]
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        target: [x86_64-unknown-linux-gnu, x86_64-apple-darwin, x86_64-pc-windows-msvc]
+    defaults:
+      run:
+        working-directory: ./ntangler
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          target: ${{ matrix.target }}
+          override: true
+      - uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: --release --target ${{ matrix.target }}
+      - uses: actions/upload-artifact@v3
+        with:
+          name: ntangler-${{ matrix.target }}
+          path: ntangler/target/${{ matrix.target }}/release/ntangler*
+
+  generate_changelog:
+    name: Generate Changelog
+    needs: [build]
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./ntangler
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v3
+        with:
+          node-version: '14'
+      - run: npm install -g conventional-changelog-cli
+      - name: Get tag name
+        id: get_tag
+        run: echo ::set-output name=TAG::${GITHUB_REF#refs/tags/}
+      - name: Create or update changelog directory
+        run: |
+          if [ ! -d "changelog" ]; then
+            mkdir changelog
+          else
+            echo "Changelog directory already exists"
+          fi
+      - name: Generate changelog
+        run: |
+          if [ -f "changelog/CHANGELOG-${{ steps.get_tag.outputs.TAG }}.md" ]; then
+            echo "Changelog for ${{ steps.get_tag.outputs.TAG }} already exists. Skipping generation."
+          else
+            conventional-changelog -p angular -o changelog/CHANGELOG-${{ steps.get_tag.outputs.TAG }}.md
+          fi
+      - uses: actions/upload-artifact@v3
+        with:
+          name: changelog
+          path: ntangler/changelog/CHANGELOG-${{ steps.get_tag.outputs.TAG }}.md
+
+  create_release:
+    name: Create Release
+    needs: [generate_changelog]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/download-artifact@v3
+      - name: Get tag name
+        id: get_tag
+        run: echo ::set-output name=TAG::${GITHUB_REF#refs/tags/}
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: ntangler Next Release ${{ github.ref }}
+          body_path: changelog/CHANGELOG-${{ steps.get_tag.outputs.TAG }}.md
+          draft: false
+          prerelease: true
+      - name: Upload Release Assets
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./ntangler-*/*
+          asset_name: ntangler-${{ matrix.target }}
+          asset_content_type: application/octet-stream
+      - name: Upload Changelog
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./changelog/CHANGELOG-${{ steps.get_tag.outputs.TAG }}.md
+          asset_name: CHANGELOG-${{ steps.get_tag.outputs.TAG }}.md
+          asset_content_type: text/markdown
