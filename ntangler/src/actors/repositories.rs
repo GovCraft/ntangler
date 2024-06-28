@@ -3,8 +3,6 @@ use std::future::Future;
 use std::pin::Pin;
 
 use akton::prelude::*;
-use futures::stream::FuturesUnordered;
-use futures::StreamExt;
 use git2::{
     DiffOptions, Repository, Status, StatusOptions,
 };
@@ -195,30 +193,6 @@ impl GitRepository {
         Ok(actor.activate(None).await)
     }
 
-    #[instrument(skip(self, futures))]
-    fn broadcast_futures<T>(
-        &self,
-        mut futures: FuturesUnordered<impl Future<Output=T> + Sized>,
-    ) -> Pin<Box<impl Future<Output=()> + Sized>> {
-        // Event: Broadcasting Futures
-        // Description: Broadcasting futures to be processed.
-        // Context: Number of futures.
-        trace!(
-            futures_count = futures.len(),
-            "Broadcasting futures to be processed."
-        );
-
-        Box::pin(async move {
-            let mut i = 0;
-            while futures.next().await.is_some() {
-                i += 1;
-            }
-            // Event: Futures Broadcast Completed
-            // Description: All futures have been processed.
-            // Context: None
-            trace!("{i} future(s) sent");
-        })
-    }
     #[instrument(skip(self, outbound_envelope))]
     pub(crate) fn handle_poll_request(
         &self,
@@ -268,10 +242,6 @@ impl GitRepository {
                 tokio::spawn(async move{
                     outbound_envelope.reply_async(repository_event, None).await;
                 });
-                // futures.push(async move {
-                //     outbound_envelope.reply_async(repository_event, None).await;
-                // });
-
                 trace!(
                 repo_id = trace_id,
                 path = path,
