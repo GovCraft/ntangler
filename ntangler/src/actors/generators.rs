@@ -51,7 +51,7 @@ async fn create_run_stream_with_circuit_breaker(
     }))).await {
         Ok(result) => match result {
             Ok(stream) => {
-                trace!("Run stream created");
+                info!("Run stream successfully created for thread_id: {}", thread_id);
                 Ok(stream)
             }
             Err(e) => {
