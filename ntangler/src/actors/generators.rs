@@ -1,22 +1,45 @@
+use std::sync::Arc;
+use std::time::Duration;
+
 use akton::prelude::*;
 use async_openai::Client;
+use async_openai::config::OpenAIConfig;
 use async_openai::error::OpenAIError;
 use async_openai::types::{
     AssistantsApiResponseFormat, AssistantsApiResponseFormatOption, AssistantStreamEvent,
     CreateMessageRequest, CreateMessageRequestContent, CreateRunRequest, CreateThreadRequest,
-    MessageDeltaContent, MessageRole,
+    MessageDeltaContent, MessageRole, ThreadObject,
 };
 use async_openai::types::AssistantsApiResponseFormatType::JsonObject;
+use failsafe::{backoff, Config, Error, failure_policy, StateMachine};
+use failsafe::backoff::Exponential;
+use failsafe::failure_policy::ConsecutiveFailures;
+use failsafe::futures::CircuitBreaker;
 use futures::StreamExt;
 use tokio::runtime::Runtime;
 use tokio::sync::mpsc;
 use tokio::task;
-use tracing::{error, trace};
+use tokio::task::block_in_place;
+use tokio::time::timeout;
+use tracing::{error, instrument, trace};
 
 use crate::messages::{CommitMessageGenerated, DiffQueued, GenerationStarted};
 
-#[derive(Clone, Debug, Default)]
-pub(crate) struct OpenAi;
+#[derive(Clone, Debug)]
+pub(crate) struct OpenAi {
+    client: Client<OpenAIConfig>,
+}
+
+impl Default for OpenAi {
+    #[instrument]
+    fn default() -> Self {
+        tracing::trace!("Default called for OpenAi actor");
+        let client = Client::new();
+        Self {
+            client,
+        }
+    }
+}
 
 impl OpenAi {
     pub(crate) async fn initialize(
@@ -32,8 +55,10 @@ impl OpenAi {
             let reply_address = event.message.reply_address.clone();
             let broker = actor.akton.get_broker().clone();
             let message = event.message.clone();
+            let client = actor.state.client.clone();
+            tracing::info!("Received DiffQueued event: {:?}", event);
             Context::wrap_future(async move {
-                Self::handle_diff_received(message, broker, reply_address).await;
+                Self::handle_diff_received(message, broker, reply_address, client).await;
             })
         });
 
@@ -46,8 +71,8 @@ impl OpenAi {
         trace!(id = &context.key, "Activated OpenAi generator:");
         Ok(context)
     }
-
-    async fn handle_diff_received(message: DiffQueued, broker: Context, return_address: Context) {
+    #[instrument(skip(broker, return_address, client))]
+    async fn handle_diff_received(message: DiffQueued, broker: Context, return_address: Context, client: Client<OpenAIConfig>) {
         let (tx, mut rx) = mpsc::channel(32);
         let return_address = return_address.clone();
         let diff = message.diff.clone();
@@ -56,6 +81,7 @@ impl OpenAi {
         let target_file_clone = target_file.clone();
 
         task::spawn_blocking(move || {
+            let client = client.clone();
             let rt = Runtime::new().unwrap();
             rt.block_on(async move {
                 let target_file_clone = target_file_clone.clone();
@@ -64,40 +90,21 @@ impl OpenAi {
                     repository_nickname.clone(),
                 ));
                 broker.emit_async(msg, None).await;
-                // Step 1: Create a new LLM thread via the API.
-                trace!("Step 1a: Create a new LLM thread via the API");
-                let client = Client::new();
-                trace!("Step 1b: Initiate conversation thread");
-                let thread = match client
-                    .threads()
-                    .create(CreateThreadRequest::default())
-                    .await
-                {
-                    Ok(thread) => thread,
-                    Err(e) => {
-                        // Event: Failed to Create Thread
-                        // Description: Failed to create a new LLM thread via the API.
-                        // Context: Error details.
-                        error!("Failed to create thread: {e}");
-                        return;
-                    }
-                };
+
+                let circuit_breaker = Config::new().build();
+
+                let client = client.clone();
+                let thread = circuit_breaker.call(timeout(Duration::from_secs(10), client.threads().create(CreateThreadRequest::default()))).await.expect("").expect("");
 
                 let thread_id = thread.id.clone();
                 trace!("Step 1c: Got thread id {}", thread_id);
 
-                // Step 2: Send changes as a new message in the thread.
-                trace!("Step 2: Send changes as a new message in the thread.");
-                if let Err(e) = client
-                    .threads()
-                    .messages(&thread.id)
-                    .create(CreateMessageRequest {
-                        role: MessageRole::User,
-                        content: CreateMessageRequestContent::from(diff),
-                        ..Default::default()
-                    })
-                    .await
-                {
+                // Set timeout for sending changes as a new message in the thread
+                if let Err(e) = timeout(Duration::from_secs(10), client.threads().messages(&thread.id).create(CreateMessageRequest {
+                    role: MessageRole::User,
+                    content: CreateMessageRequestContent::from(diff),
+                    ..Default::default()
+                })).await {
                     // Event: Failed to Create Message
                     // Description: Failed to send changes as a new message in the thread.
                     // Context: Error details.
@@ -109,29 +116,30 @@ impl OpenAi {
 
                 // Step 3: Initiate a run and handle the event stream.
 
-                // TODO: the assistant id should be loaded remotely to accommodate easy updates
-                trace!("Step 3a: Initiate a run and handle the event stream.");
-                let mut event_stream = match client
-                    .threads()
-                    .runs(&thread.id)
-                    .create_stream(CreateRunRequest {
-                        assistant_id: "asst_xiaBOCpksCenAMJSL2F0qqFL".to_string(),
-                        stream: Some(true),
-                        parallel_tool_calls: Some(true),
-                        response_format: Some(AssistantsApiResponseFormatOption::Format(format)),
-                        ..Default::default()
-                    })
-                    .await
-                {
-                    Ok(stream) => {
+                // Set timeout for initiating a run and handling the event stream
+                let mut event_stream = match timeout(Duration::from_secs(10), client.threads().runs(&thread.id).create_stream(CreateRunRequest {
+                    assistant_id: "asst_xiaBOCpksCenAMJSL2F0qqFL".to_string(),
+                    stream: Some(true),
+                    parallel_tool_calls: Some(true),
+                    response_format: Some(AssistantsApiResponseFormatOption::Format(format)),
+                    ..Default::default()
+                })).await {
+                    Ok(Ok(stream)) => {
                         trace!("Run stream created");
                         stream
                     }
-                    Err(e) => {
+                    Ok(Err(e)) => {
                         // Event: Failed to Create Run Stream
                         // Description: Failed to initiate a run and handle the event stream.
                         // Context: Error details.
                         error!("Failed to create run stream: {e}");
+                        return;
+                    }
+                    Err(_) => {
+                        // Event: Timeout while Creating Run Stream
+                        // Description: Timeout occurred while creating a run stream.
+                        // Context: None
+                        error!("Timeout while creating run stream");
                         return;
                     }
                 };
@@ -221,3 +229,5 @@ impl OpenAi {
         }
     }
 }
+
+
