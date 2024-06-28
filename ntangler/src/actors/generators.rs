@@ -1,9 +1,8 @@
 use std::fmt::Debug;
-use std::sync::Arc;
 use std::time::Duration;
 
 use akton::prelude::*;
-use async_openai::{Client, error};
+use async_openai::{Client};
 use async_openai::config::OpenAIConfig;
 use async_openai::error::OpenAIError;
 use async_openai::types::{
@@ -12,15 +11,12 @@ use async_openai::types::{
     MessageDeltaContent, MessageRole, ThreadObject
 };
 use async_openai::types::AssistantsApiResponseFormatType::JsonObject;
-use failsafe::{backoff, Config, Error, failure_policy, StateMachine};
-use failsafe::backoff::Exponential;
-use failsafe::failure_policy::ConsecutiveFailures;
+use failsafe::Config;
 use failsafe::futures::CircuitBreaker;
 use futures::StreamExt;
 use tokio::runtime::Runtime;
 use tokio::sync::mpsc;
 use tokio::task;
-use tokio::task::block_in_place;
 use tokio::time::timeout;
 use tracing::{error, instrument, trace};
 
