@@ -1,4 +1,5 @@
 use std::fmt::Debug;
+use std::path::PathBuf;
 use std::time::Duration;
 
 use akton::prelude::*;
@@ -13,6 +14,7 @@ use failsafe::futures::CircuitBreaker;
 use futures::StreamExt;
 use tokio::runtime::Runtime;
 use tokio::sync::mpsc;
+use tokio::sync::mpsc::Sender;
 use tokio::task;
 use tokio::time::timeout;
 use tracing::{error, instrument, trace};
@@ -152,100 +154,7 @@ impl OpenAi {
             let client = client.clone();
             let rt = Runtime::new().unwrap();
             rt.block_on(async move {
-                let target_file_clone = target_file_clone.clone();
-                let msg = BrokerRequest::new(GenerationStarted::new(
-                    target_file_clone.clone(),
-                    repository_nickname.clone(),
-                ));
-                broker.emit_async(msg, None).await;
-
-                let circuit_breaker = Config::new().build();
-
-                let client = client.clone();
-                let thread = match create_thread_with_circuit_breaker(&circuit_breaker, &client).await {
-                    Ok(thread) => thread,
-                    Err(e) => {
-                        error!("Error creating thread with circuit breaker: {:?}", e);
-                        return; // Fail gracefully by returning early
-                    }
-                };
-
-                let thread_id = thread.id.clone();
-                trace!("Step 1c: Got thread id {}", thread_id);
-                match create_message_with_circuit_breaker(&circuit_breaker, &client, &thread.id, diff).await {
-                    Ok(thread) => thread,
-                    Err(e) => {
-                        error!("Error creating message with circuit breaker: {:?}", e);
-                        return; // Fail gracefully by returning early
-                    }
-                };
-
-                let format = AssistantsApiResponseFormat { r#type: JsonObject };
-
-                // Step 3: Initiate a run and handle the event stream.
-                let mut event_stream = match create_run_stream_with_circuit_breaker(&circuit_breaker, &client, &thread.id, Some(Format(format))).await {
-                    Ok(event_stream) => event_stream,
-                    Err(e) => {
-                        error!("Error creating thread with circuit breaker: {:?}", e);
-                        return; // Fail gracefully by returning early
-                    }
-                };
-
-                let mut commit_message = String::new();
-                trace!("Step 3b: Processing events from the event stream.");
-
-                // Processing events from the event stream.
-                while let Some(event) = event_stream.next().await {
-                    match event {
-                        Ok(event) => match event {
-                            AssistantStreamEvent::ThreadMessageDelta(message) => {
-                                if let Some(content) = message.delta.content {
-                                    for item in content {
-                                        match item {
-                                            MessageDeltaContent::ImageFile(_)
-                                            | MessageDeltaContent::ImageUrl(_) => {}
-                                            MessageDeltaContent::Text(text) => {
-                                                if let Some(text) = text.text {
-                                                    if let Some(text) = text.value {
-                                                        commit_message.push_str(&text);
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                            AssistantStreamEvent::Done(_) => {}
-                            _ => {}
-                        },
-                        Err(e) => {
-                            // Event: Error in Event Stream
-                            // Description: An error occurred while processing the event stream.
-                            // Context: Error details.
-                            match e {
-                                OpenAIError::Reqwest(s) => {
-                                    error!("Reqwest error: {s}");
-                                }
-                                OpenAIError::ApiError(_) => {}
-                                OpenAIError::JSONDeserialize(_) => {}
-                                OpenAIError::FileSaveError(_) => {}
-                                OpenAIError::FileReadError(_) => {}
-                                OpenAIError::StreamError(s) => {
-                                    error!("Stream error: {s}");
-                                }
-                                OpenAIError::InvalidArgument(_) => {}
-                            }
-                        }
-                    }
-                }
-
-                trace!("Step 4: Return commit msg: {}", &commit_message);
-                if let Err(e) = tx.send(commit_message).await {
-                    // Event: Failed to Send Commit Message
-                    // Description: Failed to send the commit message through the channel.
-                    // Context: Error details.
-                    error!("Failed to send commit msg: {e}");
-                }
+                if Self::CallAiEndpoint(broker, tx, diff, repository_nickname, target_file_clone, client).await { return; }
             });
         });
 
@@ -274,6 +183,104 @@ impl OpenAi {
             // Context: None
             error!("No commit message received");
         }
+    }
+
+    async fn CallAiEndpoint(broker: Context, tx: Sender<String>, diff: String, repository_nickname: String, target_file_clone: PathBuf, client: Client<OpenAIConfig>) -> bool {
+        let target_file_clone = target_file_clone.clone();
+        let msg = BrokerRequest::new(GenerationStarted::new(
+            target_file_clone.clone(),
+            repository_nickname.clone(),
+        ));
+        broker.emit_async(msg, None).await;
+
+        let circuit_breaker = Config::new().build();
+
+        let client = client.clone();
+        let thread = match create_thread_with_circuit_breaker(&circuit_breaker, &client).await {
+            Ok(thread) => thread,
+            Err(e) => {
+                error!("Error creating thread with circuit breaker: {:?}", e);
+                return true; // Fail gracefully by returning early
+            }
+        };
+
+        let thread_id = thread.id.clone();
+        trace!("Step 1c: Got thread id {}", thread_id);
+        match create_message_with_circuit_breaker(&circuit_breaker, &client, &thread.id, diff).await {
+            Ok(thread) => thread,
+            Err(e) => {
+                error!("Error creating message with circuit breaker: {:?}", e);
+                return true; // Fail gracefully by returning early
+            }
+        };
+
+        let format = AssistantsApiResponseFormat { r#type: JsonObject };
+
+        // Step 3: Initiate a run and handle the event stream.
+        let mut event_stream = match create_run_stream_with_circuit_breaker(&circuit_breaker, &client, &thread.id, Some(Format(format))).await {
+            Ok(event_stream) => event_stream,
+            Err(e) => {
+                error!("Error creating thread with circuit breaker: {:?}", e);
+                return true; // Fail gracefully by returning early
+            }
+        };
+
+        let mut commit_message = String::new();
+        trace!("Step 3b: Processing events from the event stream.");
+
+        // Processing events from the event stream.
+        while let Some(event) = event_stream.next().await {
+            match event {
+                Ok(event) => match event {
+                    AssistantStreamEvent::ThreadMessageDelta(message) => {
+                        if let Some(content) = message.delta.content {
+                            for item in content {
+                                match item {
+                                    MessageDeltaContent::ImageFile(_)
+                                    | MessageDeltaContent::ImageUrl(_) => {}
+                                    MessageDeltaContent::Text(text) => {
+                                        if let Some(text) = text.text {
+                                            if let Some(text) = text.value {
+                                                commit_message.push_str(&text);
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    AssistantStreamEvent::Done(_) => {}
+                    _ => {}
+                },
+                Err(e) => {
+                    // Event: Error in Event Stream
+                    // Description: An error occurred while processing the event stream.
+                    // Context: Error details.
+                    match e {
+                        OpenAIError::Reqwest(s) => {
+                            error!("Reqwest error: {s}");
+                        }
+                        OpenAIError::ApiError(_) => {}
+                        OpenAIError::JSONDeserialize(_) => {}
+                        OpenAIError::FileSaveError(_) => {}
+                        OpenAIError::FileReadError(_) => {}
+                        OpenAIError::StreamError(s) => {
+                            error!("Stream error: {s}");
+                        }
+                        OpenAIError::InvalidArgument(_) => {}
+                    }
+                }
+            }
+        }
+
+        trace!("Step 4: Return commit msg: {}", &commit_message);
+        if let Err(e) = tx.send(commit_message).await {
+            // Event: Failed to Send Commit Message
+            // Description: Failed to send the commit message through the channel.
+            // Context: Error details.
+            error!("Failed to send commit msg: {e}");
+        }
+        false
     }
 }
 
