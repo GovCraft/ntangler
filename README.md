@@ -19,8 +19,8 @@ Welcome to Tangler! Tangler is an innovative AI-driven command line application 
 
 1. **Clone the Repository:**
     ```sh
-    git clone https://github.com/GovCraft/tangler.git
-    cd tangler
+    git clone https://github.com/GovCraft/ntangler.git
+    cd ntangler
     ```
 
 2. **Build the Project:**
@@ -30,7 +30,7 @@ Welcome to Tangler! Tangler is an innovative AI-driven command line application 
 
 3. **Run Tangler:**
     ```sh
-    ./target/release/tangler
+    ./target/release/ntangler
     ```
 
 ## Usage
