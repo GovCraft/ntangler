@@ -152,7 +152,6 @@ impl OpenAi {
 
         task::spawn_blocking(move || {
             let client = client.clone();
-            let rt = Runtime::new().unwrap();
             tokio::spawn(Self::call_ai_endpoint(broker, tx, diff, repository_nickname, target_file_clone, client));
         });
 
