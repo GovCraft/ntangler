@@ -28,7 +28,7 @@ impl Tangler {
         let mut akton: AktonReady = Akton::launch().into();
         let broker = akton.get_broker();
         let actor_config =
-            ActorConfig::new(Arn::with_root("tangler")?, None, Some(broker.clone()))?;
+            ActorConfig::new(Arn::with_root("ntangler")?, None, Some(broker.clone()))?;
 
         let actor_context = akton
             .spawn_actor_with_setup::<Tangler>(actor_config, |mut actor| {
