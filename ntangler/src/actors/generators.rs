@@ -150,10 +150,8 @@ impl OpenAi {
         let repository_nickname = message.repository_nickname.clone();
         let target_file_clone = target_file.clone();
 
-        task::spawn_blocking(move || {
-            let client = client.clone();
-            tokio::spawn(Self::call_ai_endpoint(broker, tx, diff, repository_nickname, target_file_clone, client));
-        });
+        let client = client.clone();
+        tokio::spawn(Self::call_ai_endpoint(broker, tx, diff, repository_nickname, target_file_clone, client));
 
         // Await the result from the thread
         if let Some(commit_message) = rx.recv().await {
