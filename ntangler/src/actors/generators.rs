@@ -2,7 +2,8 @@ use std::fmt::Debug;
 use std::time::Duration;
 
 use akton::prelude::*;
-use async_openai::{Client};
+use AssistantsApiResponseFormatOption::Format;
+use async_openai::Client;
 use async_openai::config::OpenAIConfig;
 use async_openai::error::OpenAIError;
 use async_openai::types::{AssistantEventStream, AssistantsApiResponseFormat, AssistantsApiResponseFormatOption, AssistantStreamEvent, CreateMessageRequest, CreateMessageRequestContent, CreateRunRequest, CreateThreadRequest, MessageDeltaContent, MessageRole, ThreadObject};
@@ -26,25 +27,26 @@ pub(crate) struct OpenAi {
 impl Default for OpenAi {
     #[instrument]
     fn default() -> Self {
-        tracing::trace!("Default called for OpenAi actor");
+        trace!("Default called for OpenAi actor");
         let client = Client::new();
         Self {
             client,
         }
     }
 }
+
 #[instrument]
 async fn create_run_stream_with_circuit_breaker(
     circuit_breaker: &(impl CircuitBreaker + Debug),
     client: &Client<OpenAIConfig>,
     thread_id: &str,
-    format: AssistantsApiResponseFormat
+    format: Option<AssistantsApiResponseFormatOption>,
 ) -> anyhow::Result<AssistantEventStream> {
     match circuit_breaker.call(timeout(Duration::from_secs(10), client.threads().runs(thread_id).create_stream(CreateRunRequest {
         assistant_id: "asst_xiaBOCpksCenAMJSL2F0qqFL".to_string(),
         stream: Some(true),
         parallel_tool_calls: Some(true),
-        response_format: Some(AssistantsApiResponseFormatOption::Format(format)),
+        response_format: format,
         ..Default::default()
     }))).await {
         Ok(result) => match result {
@@ -63,12 +65,13 @@ async fn create_run_stream_with_circuit_breaker(
         }
     }
 }
+
 #[instrument]
 async fn create_message_with_circuit_breaker(
     circuit_breaker: &(impl CircuitBreaker + Debug),
     client: &Client<OpenAIConfig>,
     thread_id: &str,
-    diff: String
+    diff: String,
 ) -> anyhow::Result<()> {
     match circuit_breaker.call(timeout(Duration::from_secs(10), client.threads().messages(thread_id).create(CreateMessageRequest {
         role: MessageRole::User,
@@ -88,6 +91,7 @@ async fn create_message_with_circuit_breaker(
         }
     }
 }
+
 #[instrument]
 async fn create_thread_with_circuit_breaker(circuit_breaker: &(impl CircuitBreaker + Debug), client: &Client<OpenAIConfig>) -> anyhow::Result<ThreadObject> {
     match circuit_breaker.call(timeout(Duration::from_secs(10), client.threads().create(CreateThreadRequest::default()))).await {
@@ -104,6 +108,7 @@ async fn create_thread_with_circuit_breaker(circuit_breaker: &(impl CircuitBreak
         }
     }
 }
+
 impl OpenAi {
     pub(crate) async fn initialize(
         config: ActorConfig,
@@ -167,7 +172,7 @@ impl OpenAi {
 
                 let thread_id = thread.id.clone();
                 trace!("Step 1c: Got thread id {}", thread_id);
-                match create_message_with_circuit_breaker(&circuit_breaker, &client,&thread.id, diff).await {
+                match create_message_with_circuit_breaker(&circuit_breaker, &client, &thread.id, diff).await {
                     Ok(thread) => thread,
                     Err(e) => {
                         error!("Error creating message with circuit breaker: {:?}", e);
@@ -178,32 +183,11 @@ impl OpenAi {
                 let format = AssistantsApiResponseFormat { r#type: JsonObject };
 
                 // Step 3: Initiate a run and handle the event stream.
-
-                // Set timeout for initiating a run and handling the event stream
-                let mut event_stream = match timeout(Duration::from_secs(10), client.threads().runs(&thread.id).create_stream(CreateRunRequest {
-                    assistant_id: "asst_xiaBOCpksCenAMJSL2F0qqFL".to_string(),
-                    stream: Some(true),
-                    parallel_tool_calls: Some(true),
-                    response_format: Some(AssistantsApiResponseFormatOption::Format(format)),
-                    ..Default::default()
-                })).await {
-                    Ok(Ok(stream)) => {
-                        trace!("Run stream created");
-                        stream
-                    }
-                    Ok(Err(e)) => {
-                        // Event: Failed to Create Run Stream
-                        // Description: Failed to initiate a run and handle the event stream.
-                        // Context: Error details.
-                        error!("Failed to create run stream: {e}");
-                        return;
-                    }
-                    Err(_) => {
-                        // Event: Timeout while Creating Run Stream
-                        // Description: Timeout occurred while creating a run stream.
-                        // Context: None
-                        error!("Timeout while creating run stream");
-                        return;
+                let mut event_stream = match create_run_stream_with_circuit_breaker(&circuit_breaker, &client, &thread.id, Some(Format(format))).await {
+                    Ok(event_stream) => event_stream,
+                    Err(e) => {
+                        error!("Error creating thread with circuit breaker: {:?}", e);
+                        return; // Fail gracefully by returning early
                     }
                 };
 
