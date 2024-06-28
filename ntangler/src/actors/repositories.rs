@@ -89,8 +89,8 @@ impl GitRepository {
                     "Poll changes received for"
                 );
                 let reply_to = event.return_address.clone();
-                let futures = actor.state.handle_poll_request(reply_to);
-                actor.state.broadcast_futures(futures)
+                actor.state.handle_poll_request(reply_to)
+                // actor.state.broadcast_futures(futures)
             })
             .act_on_async::<FileChangeDetected>(|actor, event| {
                 let repository_path = &actor.state.repo_info.path;
@@ -223,9 +223,9 @@ impl GitRepository {
     pub(crate) fn handle_poll_request(
         &self,
         outbound_envelope: OutboundEnvelope,
-    ) -> FuturesUnordered<impl Future<Output=()> + 'static> {
+    ) -> Pin<Box<impl Future<Output=()> + Sized>> {
         trace!(self = self.repo_info.nickname, "Received Poll request");
-        let futures = FuturesUnordered::new();
+        // let futures = FuturesUnordered::new();
         let repository_path = &self.repo_info.path;
         let repo = Repository::open(repository_path).expect("Failed to open repository");
 
@@ -258,22 +258,26 @@ impl GitRepository {
         trace!("modified files vec {:?}", &modified_files);
         debug!("*");
         let id = self.repo_info.nickname.clone();
+        let outbound_envelope = outbound_envelope.clone();
+        Box::pin(async move {
+            for file in modified_files {
+                let outbound_envelope = outbound_envelope.clone();
+                let path = file.clone();
+                let trace_id = id.clone();
+                let repository_event = FileChangeDetected::new(file.into());
+                tokio::spawn(async move{
+                    outbound_envelope.reply_async(repository_event, None).await;
+                });
+                // futures.push(async move {
+                //     outbound_envelope.reply_async(repository_event, None).await;
+                // });
 
-        for file in modified_files {
-            let outbound_envelope = outbound_envelope.clone();
-            let path = file.clone();
-            let trace_id = id.clone();
-            let repository_event = FileChangeDetected::new(file.into());
-            futures.push(async move {
-                outbound_envelope.reply_async(repository_event, None).await;
-            });
-
-            trace!(
+                trace!(
                 repo_id = trace_id,
                 path = path,
                 "Submitted initializing event to broker."
             );
-        }
-        futures
+            }
+        })
     }
 }
