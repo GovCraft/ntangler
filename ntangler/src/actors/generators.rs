@@ -12,10 +12,8 @@ use async_openai::types::AssistantsApiResponseFormatType::JsonObject;
 use failsafe::Config;
 use failsafe::futures::CircuitBreaker;
 use futures::StreamExt;
-use tokio::runtime::Runtime;
 use tokio::sync::mpsc;
 use tokio::sync::mpsc::Sender;
-use tokio::task;
 use tokio::time::timeout;
 use tracing::{error, instrument, trace};
 
