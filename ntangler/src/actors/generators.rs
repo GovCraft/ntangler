@@ -5,7 +5,7 @@ use akton::prelude::*;
 use async_openai::{Client};
 use async_openai::config::OpenAIConfig;
 use async_openai::error::OpenAIError;
-use async_openai::types::{AssistantsApiResponseFormat, AssistantsApiResponseFormatOption, AssistantStreamEvent, CreateMessageRequest, CreateMessageRequestContent, CreateRunRequest, CreateThreadRequest, MessageDeltaContent, MessageRole, ThreadObject};
+use async_openai::types::{AssistantEventStream, AssistantsApiResponseFormat, AssistantsApiResponseFormatOption, AssistantStreamEvent, CreateMessageRequest, CreateMessageRequestContent, CreateRunRequest, CreateThreadRequest, MessageDeltaContent, MessageRole, ThreadObject};
 use async_openai::types::AssistantsApiResponseFormatType::JsonObject;
 use failsafe::Config;
 use failsafe::futures::CircuitBreaker;
@@ -33,7 +33,36 @@ impl Default for OpenAi {
         }
     }
 }
-
+#[instrument]
+async fn create_run_stream_with_circuit_breaker(
+    circuit_breaker: &(impl CircuitBreaker + Debug),
+    client: &Client<OpenAIConfig>,
+    thread_id: &str,
+    format: AssistantsApiResponseFormat
+) -> anyhow::Result<AssistantEventStream> {
+    match circuit_breaker.call(timeout(Duration::from_secs(10), client.threads().runs(thread_id).create_stream(CreateRunRequest {
+        assistant_id: "asst_xiaBOCpksCenAMJSL2F0qqFL".to_string(),
+        stream: Some(true),
+        parallel_tool_calls: Some(true),
+        response_format: Some(AssistantsApiResponseFormatOption::Format(format)),
+        ..Default::default()
+    }))).await {
+        Ok(result) => match result {
+            Ok(stream) => {
+                trace!("Run stream created");
+                Ok(stream)
+            }
+            Err(e) => {
+                error!("Failed to create run stream: {:?}", e);
+                Err(anyhow::Error::from(e).into())
+            }
+        },
+        Err(_) => {
+            error!("Timeout while creating run stream");
+            Err(anyhow::Error::msg("Timeout while creating run stream"))
+        }
+    }
+}
 #[instrument]
 async fn create_message_with_circuit_breaker(
     circuit_breaker: &(impl CircuitBreaker + Debug),
