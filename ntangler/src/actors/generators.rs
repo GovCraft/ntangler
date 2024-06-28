@@ -15,7 +15,7 @@ use futures::StreamExt;
 use tokio::sync::mpsc;
 use tokio::sync::mpsc::Sender;
 use tokio::time::timeout;
-use tracing::{error, info, instrument, trace};
+use tracing::{error, info, instrument, trace, warn};
 
 use crate::messages::{CommitMessageGenerated, DiffQueued, GenerationStarted};
 
@@ -233,13 +233,13 @@ impl OpenAi {
             Ok(event_stream) => event_stream,
             Err(e) => {
                 // TODO: impl fallback logic
-                error!("Error creating thread with circuit breaker: {:?}", e);
+                error!("Error creating run stream with circuit breaker for thread id {} in repository: {}, file: {}: {:?}", thread_id, repository_nickname, target_file_display, e);
                 return; // Fail gracefully by returning early
             }
         };
 
         let mut commit_message = String::new();
-        trace!("Step 3b: Processing events from the event stream.");
+        trace!("Processing events from the event stream for thread id {} in repository: {}, file: {}", thread_id, repository_nickname, target_file_display);
 
         // Processing events from the event stream.
         while let Some(event) = event_stream.next().await {
@@ -262,8 +262,12 @@ impl OpenAi {
                             }
                         }
                     }
-                    AssistantStreamEvent::Done(_) => {}
-                    _ => {}
+                    AssistantStreamEvent::Done(_) => {
+                        trace!("Event stream completed for thread id {} in repository: {}, file: {}", thread_id, repository_nickname, target_file_display);
+                    }
+                    _ => {
+                        warn!("Unhandled event type in the stream for thread id {} in repository: {}, file: {}", thread_id, repository_nickname, target_file_clone.display());
+                    }
                 },
                 Err(e) => {
                     // Event: Error in Event Stream
