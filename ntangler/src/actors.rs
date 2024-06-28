@@ -1,5 +1,5 @@
 pub(crate) use generators::OpenAi;
-pub(crate) use ntangler::Tangler;
+pub(crate) use ntangler::Ntangler;
 
 mod generators;
 mod repositories;
