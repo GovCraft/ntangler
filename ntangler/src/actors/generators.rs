@@ -153,7 +153,7 @@ impl OpenAi {
         task::spawn_blocking(move || {
             let client = client.clone();
             let rt = Runtime::new().unwrap();
-            tokio::spawn(Self::CallAiEndpoint(broker, tx, diff, repository_nickname, target_file_clone, client));
+            tokio::spawn(Self::call_ai_endpoint(broker, tx, diff, repository_nickname, target_file_clone, client));
         });
 
         // Await the result from the thread
@@ -183,7 +183,7 @@ impl OpenAi {
         }
     }
 
-    async fn CallAiEndpoint(broker: Context, tx: Sender<String>, diff: String, repository_nickname: String, target_file_clone: PathBuf, client: Client<OpenAIConfig>) {
+    async fn call_ai_endpoint(broker: Context, tx: Sender<String>, diff: String, repository_nickname: String, target_file_clone: PathBuf, client: Client<OpenAIConfig>) {
         let target_file_clone = target_file_clone.clone();
         let msg = BrokerRequest::new(GenerationStarted::new(
             target_file_clone.clone(),
