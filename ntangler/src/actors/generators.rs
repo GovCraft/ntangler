@@ -145,18 +145,6 @@ impl OpenAi {
                         return; // Fail gracefully by returning early
                     }
                 };
-                // // Set timeout for sending changes as a new message in the thread
-                // if let Err(e) = timeout(Duration::from_secs(10), client.threads().messages(&thread.id).create(CreateMessageRequest {
-                //     role: MessageRole::User,
-                //     content: CreateMessageRequestContent::from(diff),
-                //     ..Default::default()
-                // })).await {
-                //     // Event: Failed to Create Message
-                //     // Description: Failed to send changes as a new message in the thread.
-                //     // Context: Error details.
-                //     error!("Failed to create message: {e}");
-                //     return;
-                // }
 
                 let format = AssistantsApiResponseFormat { r#type: JsonObject };
 
