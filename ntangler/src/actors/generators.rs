@@ -5,7 +5,7 @@ use akton::prelude::*;
 use async_openai::{Client};
 use async_openai::config::OpenAIConfig;
 use async_openai::error::OpenAIError;
-use async_openai::types::{AssistantsApiResponseFormat, AssistantsApiResponseFormatOption, AssistantStreamEvent, CreateMessageRequest, CreateMessageRequestContent, CreateRunRequest, CreateThreadRequest, MessageDeltaContent, MessageObject, MessageRole, ThreadObject};
+use async_openai::types::{AssistantsApiResponseFormat, AssistantsApiResponseFormatOption, AssistantStreamEvent, CreateMessageRequest, CreateMessageRequestContent, CreateRunRequest, CreateThreadRequest, MessageDeltaContent, MessageRole, ThreadObject};
 use async_openai::types::AssistantsApiResponseFormatType::JsonObject;
 use failsafe::{Config, StateMachine};
 use failsafe::futures::CircuitBreaker;
