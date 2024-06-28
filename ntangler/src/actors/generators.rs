@@ -157,7 +157,7 @@ impl OpenAi {
         let target_file_clone = target_file.clone();
 
         let client = client.clone();
-        info!("Handling DiffQueued event for file: {}", target_file);
+        info!("Handling DiffQueued event for file: {}", target_file.display().to_string());
         tokio::spawn(Self::call_ai_endpoint(broker, tx, diff, repository_nickname, target_file_clone, client));
 
         // Await the result from the thread
@@ -170,11 +170,10 @@ impl OpenAi {
                     Ok(commit) => {
                         let message = CommitMessageGenerated::new(target_file, commit);
                         return_address.emit_async(message, None).await;
-                        trace!("Emitted commit message to broker");
+                        info!("Commit message generated and emitted for file: {}", target_file.display().to_string());
                     }
                     Err(e) => {
-                        error!(error=?e, "The json wasn't well formed");
-                    }
+                        error!("Failed to deserialize commit message JSON for file {}: {:?}", target_file.display().to_string(), e);                    }
                 };
             } else {
                 error!("Commit message was empty. Check the logs.")
