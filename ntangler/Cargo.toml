@@ -1,6 +1,6 @@
 [package]
 name = "ntangler"
-version = "3.0.0"
+version = "3.0.1"
 edition = "2021"
 
 [[bin]]
@@ -37,6 +37,7 @@ derive_more = "0.99.18"
 derive-new = "0.6.0"
 uuid = { version = "1.9.1", features = ["v3"] }
 tracing-appender = "0.2.3"
+failsafe = "1.2.0"
 
 [dev-dependencies]
 pretty_assertions = "1.4.0"
