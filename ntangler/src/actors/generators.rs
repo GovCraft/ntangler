@@ -144,7 +144,7 @@ impl OpenAi {
         // Event: Activating OpenAi generator
         // Description: Activating the OpenAi generator.
         // Context: None
-        trace!(id = &context.key, "Activated OpenAi generator:");
+        info!(id = &context.key, "Activated OpenAi actor with id: {}", context.key);
         Ok(context)
     }
     #[instrument(skip(broker, return_address, client))]
@@ -157,6 +157,7 @@ impl OpenAi {
         let target_file_clone = target_file.clone();
 
         let client = client.clone();
+        info!("Handling DiffQueued event for file: {}", target_file);
         tokio::spawn(Self::call_ai_endpoint(broker, tx, diff, repository_nickname, target_file_clone, client));
 
         // Await the result from the thread
