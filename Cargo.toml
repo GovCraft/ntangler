@@ -1,6 +1,6 @@
 [workspace]
 members = [
-    "tangler",
+    "ntangler",
     "entanglement_server/server", "entanglement_server/lib"]
 resolver = "2"
 

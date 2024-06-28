@@ -13,8 +13,8 @@ use tracing_appender::rolling::{RollingFileAppender, Rotation};
 use tracing_subscriber::{EnvFilter, FmtSubscriber};
 use tracing_subscriber::fmt::format::FmtSpan;
 
-use crate::actors::Tangler;
-use crate::models::config::TanglerConfig;
+use crate::actors::Ntangler;
+use crate::models::config::NtanglerConfig;
 
 mod actors;
 mod messages;
@@ -46,18 +46,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let config_path = find_config_path("ntangler", "config.toml")?;
     let config_content = fs::read_to_string(&config_path)?;
 
-    let tangler_config: TanglerConfig = toml::from_str(&config_content)?;
+    let ntangler_config: NtanglerConfig = toml::from_str(&config_content)?;
     Term::stderr().write_line(&format!(
         "Configuration Loaded: Config found at {}. Initializing...",
         config_path.display()
     ))?;
 
-    let (tangler, _broker) = Tangler::initialize(tangler_config).await?;
+    let (ntangler, _broker) = Ntangler::initialize(ntangler_config).await?;
 
     match signal::ctrl_c().await {
         Ok(()) => {
             Term::stderr().write_line("Shutting down gracefully. Please wait...")?;
-            tangler.suspend_actor().await?;
+            ntangler.suspend_actor().await?;
             Term::stdout().show_cursor()?;
             Term::stdout().write_line("Shutdown complete. All operations halted safely.")?;
         }
@@ -66,7 +66,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 "Error capturing shutdown signal: {}. Terminating safely...",
                 err
             ))?;
-            tangler.suspend_actor().await?;
+            ntangler.suspend_actor().await?;
             Term::stdout().show_cursor()?;
         }
     }
@@ -164,9 +164,9 @@ mod tests {
 
     use akton::prelude::ActorContext;
 
-    use crate::actors::Tangler;
+    use crate::actors::Ntangler;
     use crate::models::config::RepositoryConfig;
-    use crate::models::config::TanglerConfig;
+    use crate::models::config::NtanglerConfig;
 
     use super::*;
 
@@ -175,11 +175,11 @@ mod tests {
         setup_tracing("ntanger_test", "config.toml");
 
         // Read and parse the configuration file
-        let tangler_config: TanglerConfig = toml::from_str(&fs::read_to_string("/config.toml")?)?;
+        let ntangler_config: NtanglerConfig = toml::from_str(&fs::read_to_string("/config.toml")?)?;
 
-        let (tangler_actor, _broker) = Tangler::initialize(tangler_config).await?;
+        let (ntangler_actor, _broker) = Ntangler::initialize(ntangler_config).await?;
 
-        tangler_actor.suspend_actor().await?;
+        ntangler_actor.suspend_actor().await?;
         Ok(())
     }
 
@@ -189,7 +189,7 @@ mod tests {
             path: "./tmp".to_string().parse().unwrap(),
             ..Default::default()
         };
-        let config_clone = TanglerConfig {
+        let config_clone = NtanglerConfig {
             repositories: vec![repository_config],
         };
         let event_path = "./tmp/tmp.txt";

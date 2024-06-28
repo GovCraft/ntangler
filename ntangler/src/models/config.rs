@@ -1,5 +1,5 @@
 pub(crate) use repository_config::RepositoryConfig;
-pub(crate) use tangler_config::TanglerConfig;
+pub(crate) use ntangler_config::NtanglerConfig;
 
 mod repository_config;
-mod tangler_config;
+mod ntangler_config;
