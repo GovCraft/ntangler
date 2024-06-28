@@ -5,13 +5,9 @@ use akton::prelude::*;
 use async_openai::{Client};
 use async_openai::config::OpenAIConfig;
 use async_openai::error::OpenAIError;
-use async_openai::types::{
-    AssistantsApiResponseFormat, AssistantsApiResponseFormatOption, AssistantStreamEvent,
-    CreateMessageRequest, CreateMessageRequestContent, CreateRunRequest, CreateThreadRequest,
-    MessageDeltaContent, MessageRole, ThreadObject
-};
+use async_openai::types::{AssistantsApiResponseFormat, AssistantsApiResponseFormatOption, AssistantStreamEvent, CreateMessageRequest, CreateMessageRequestContent, CreateRunRequest, CreateThreadRequest, MessageDeltaContent, MessageObject, MessageRole, ThreadObject};
 use async_openai::types::AssistantsApiResponseFormatType::JsonObject;
-use failsafe::Config;
+use failsafe::{Config, StateMachine};
 use failsafe::futures::CircuitBreaker;
 use futures::StreamExt;
 use tokio::runtime::Runtime;
@@ -37,6 +33,7 @@ impl Default for OpenAi {
         }
     }
 }
+
 
 #[instrument]
 async fn create_thread_with_circuit_breaker(circuit_breaker: &(impl CircuitBreaker + Debug), client: &Client<OpenAIConfig>) -> anyhow::Result<ThreadObject> {
@@ -107,7 +104,10 @@ impl OpenAi {
                 let circuit_breaker = Config::new().build();
 
                 let client = client.clone();
-                let thread = circuit_breaker.call(timeout(Duration::from_secs(10), client.threads().create(CreateThreadRequest::default()))).await.expect("").expect("");
+                let thread = StateMachine::call(
+                    &circuit_breaker,
+                    timeout(Duration::from_secs(10), client.threads().create(CreateThreadRequest::default()))
+                ).await.expect("").expect("");
 
                 let thread_id = thread.id.clone();
                 trace!("Step 1c: Got thread id {}", thread_id);
