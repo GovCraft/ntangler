@@ -79,14 +79,17 @@ async fn create_message_with_circuit_breaker(
         ..Default::default()
     }))).await {
         Ok(result) => match result {
-            Ok(_) => Ok(()),
+            Ok(_) => {
+                info!("Message successfully created in thread_id: {}", thread_id);
+                Ok(())
+            }
             Err(e) => {
-                error!("Failed to create message: {:?}", e);
+                error!("Failed to create message in thread_id {}: {:?}", thread_id, e);
                 Err(anyhow::Error::from(e).into())
             }
         },
         Err(e) => {
-            error!("Circuit breaker call failed: {:?}", e);
+            error!("Circuit breaker call failed while creating message in thread_id {}: {:?}", thread_id, e);
             Err(anyhow::Error::from(e))
         }
     }
@@ -96,14 +99,16 @@ async fn create_message_with_circuit_breaker(
 async fn create_thread_with_circuit_breaker(circuit_breaker: &(impl CircuitBreaker + Debug), client: &Client<OpenAIConfig>) -> anyhow::Result<ThreadObject> {
     match circuit_breaker.call(timeout(Duration::from_secs(10), client.threads().create(CreateThreadRequest::default()))).await {
         Ok(result) => match result {
-            Ok(thread) => Ok(thread),
+            Ok(thread) => {
+                info!("Thread successfully created with id: {}", thread.id);
+                Ok(thread) },
             Err(e) => {
                 error!("Failed to create thread: {:?}", e);
                 Err(anyhow::Error::from(e).into())
             }
         },
         Err(e) => {
-            error!("Circuit breaker call failed: {:?}", e);
+            error!("Circuit breaker call failed while creating thread: {:?}", e);
             Err(anyhow::Error::from(e))
         }
     }
@@ -114,17 +119,20 @@ impl OpenAi {
         config: ActorConfig,
         system: &mut AktonReady,
     ) -> anyhow::Result<Context> {
+        info!("Initializing OpenAi actor with provided configuration");
         let mut actor = system.create_actor_with_config::<OpenAi>(config).await;
+        trace!("Setting up SubmitDiff event handler for OpenAi actor");
+
         // Event: Setting up SubmitDiff Handler
         // Description: Setting up an actor to handle the `SubmitDiff` event asynchronously.
         // Context: None
-        trace!("Setting up an actor to handle the `SubmitDiff` event asynchronously.");
         actor.setup.act_on_async::<DiffQueued>(|actor, event| {
             let reply_address = event.message.reply_address.clone();
             let broker = actor.akton.get_broker().clone();
             let message = event.message.clone();
             let client = actor.state.client.clone();
             tracing::info!("Received DiffQueued event: {:?}", event);
+
             Context::wrap_future(async move {
                 Self::handle_diff_received(message, broker, reply_address, client).await;
             })
