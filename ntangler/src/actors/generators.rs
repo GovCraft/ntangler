@@ -155,6 +155,7 @@ impl OpenAi {
         let target_file = message.target_file.clone();
         let repository_nickname = message.repository_nickname.clone();
         let target_file_clone = target_file.clone();
+        let target_file_display = &target_file.display().to_string();
 
         let client = client.clone();
         info!("Handling DiffQueued event for file: {}", target_file.display().to_string());
@@ -170,10 +171,10 @@ impl OpenAi {
                     Ok(commit) => {
                         let message = CommitMessageGenerated::new(target_file, commit);
                         return_address.emit_async(message, None).await;
-                        info!("Commit message generated and emitted for file: {}", target_file.display().to_string());
+                        info!("Commit message generated and emitted for file: {}", target_file_display);
                     }
                     Err(e) => {
-                        error!("Failed to deserialize commit message JSON for file {}: {:?}", target_file.display().to_string(), e);                    }
+                        error!("Failed to deserialize commit message JSON for file {}: {:?}", target_file_display, e);                    }
                 };
             } else {
                 error!("Commit message was empty. Check the logs.")
