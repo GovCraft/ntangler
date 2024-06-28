@@ -3,6 +3,8 @@ use std::future::Future;
 use std::pin::Pin;
 
 use akton::prelude::*;
+use futures::stream::FuturesUnordered;
+use futures::StreamExt;
 use git2::{
     DiffOptions, Repository, Status, StatusOptions,
 };
@@ -87,8 +89,8 @@ impl GitRepository {
                     "Poll changes received for"
                 );
                 let reply_to = event.return_address.clone();
-                actor.state.handle_poll_request(reply_to)
-                // actor.state.broadcast_futures(futures)
+                let futures = actor.state.handle_poll_request(reply_to);
+                actor.state.broadcast_futures(futures)
             })
             .act_on_async::<FileChangeDetected>(|actor, event| {
                 let repository_path = &actor.state.repo_info.path;
@@ -193,13 +195,37 @@ impl GitRepository {
         Ok(actor.activate(None).await)
     }
 
+    #[instrument(skip(self, futures))]
+    fn broadcast_futures<T>(
+        &self,
+        mut futures: FuturesUnordered<impl Future<Output=T> + Sized>,
+    ) -> Pin<Box<impl Future<Output=()> + Sized>> {
+        // Event: Broadcasting Futures
+        // Description: Broadcasting futures to be processed.
+        // Context: Number of futures.
+        trace!(
+            futures_count = futures.len(),
+            "Broadcasting futures to be processed."
+        );
+
+        Box::pin(async move {
+            let mut i = 0;
+            while futures.next().await.is_some() {
+                i += 1;
+            }
+            // Event: Futures Broadcast Completed
+            // Description: All futures have been processed.
+            // Context: None
+            trace!("{i} future(s) sent");
+        })
+    }
     #[instrument(skip(self, outbound_envelope))]
     pub(crate) fn handle_poll_request(
         &self,
         outbound_envelope: OutboundEnvelope,
-    ) -> Pin<Box<impl Future<Output=()> + Sized>> {
+    ) -> FuturesUnordered<impl Future<Output=()> + 'static> {
         trace!(self = self.repo_info.nickname, "Received Poll request");
-        // let futures = FuturesUnordered::new();
+        let futures = FuturesUnordered::new();
         let repository_path = &self.repo_info.path;
         let repo = Repository::open(repository_path).expect("Failed to open repository");
 
@@ -232,22 +258,22 @@ impl GitRepository {
         trace!("modified files vec {:?}", &modified_files);
         debug!("*");
         let id = self.repo_info.nickname.clone();
-        let outbound_envelope = outbound_envelope.clone();
-        Box::pin(async move {
-            for file in modified_files {
-                let outbound_envelope = outbound_envelope.clone();
-                let path = file.clone();
-                let trace_id = id.clone();
-                let repository_event = FileChangeDetected::new(file.into());
-                tokio::spawn(async move{
-                    outbound_envelope.reply_async(repository_event, None).await;
-                });
-                trace!(
+
+        for file in modified_files {
+            let outbound_envelope = outbound_envelope.clone();
+            let path = file.clone();
+            let trace_id = id.clone();
+            let repository_event = FileChangeDetected::new(file.into());
+            futures.push(async move {
+                outbound_envelope.reply_async(repository_event, None).await;
+            });
+
+            trace!(
                 repo_id = trace_id,
                 path = path,
                 "Submitted initializing event to broker."
             );
-            }
-        })
+        }
+        futures
     }
 }
