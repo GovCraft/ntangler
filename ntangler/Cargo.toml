@@ -1,9 +1,8 @@
 [package]
 name = "ntangler"
-version = "2.4.0"
+version = "3.0.0"
 edition = "2021"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [[bin]]
 name = "ntangler"
 path = "src/main.rs"
