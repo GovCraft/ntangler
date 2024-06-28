@@ -183,7 +183,7 @@ impl OpenAi {
         }
     }
 
-    async fn CallAiEndpoint(broker: Context, tx: Sender<String>, diff: String, repository_nickname: String, target_file_clone: PathBuf, client: Client<OpenAIConfig>) -> bool {
+    async fn CallAiEndpoint(broker: Context, tx: Sender<String>, diff: String, repository_nickname: String, target_file_clone: PathBuf, client: Client<OpenAIConfig>) {
         let target_file_clone = target_file_clone.clone();
         let msg = BrokerRequest::new(GenerationStarted::new(
             target_file_clone.clone(),
@@ -198,7 +198,7 @@ impl OpenAi {
             Ok(thread) => thread,
             Err(e) => {
                 error!("Error creating thread with circuit breaker: {:?}", e);
-                return true; // Fail gracefully by returning early
+                return; // Fail gracefully by returning early
             }
         };
 
@@ -208,7 +208,7 @@ impl OpenAi {
             Ok(thread) => thread,
             Err(e) => {
                 error!("Error creating message with circuit breaker: {:?}", e);
-                return true; // Fail gracefully by returning early
+                return; // Fail gracefully by returning early
             }
         };
 
@@ -219,7 +219,7 @@ impl OpenAi {
             Ok(event_stream) => event_stream,
             Err(e) => {
                 error!("Error creating thread with circuit breaker: {:?}", e);
-                return true; // Fail gracefully by returning early
+                return; // Fail gracefully by returning early
             }
         };
 
@@ -278,7 +278,6 @@ impl OpenAi {
             // Context: Error details.
             error!("Failed to send commit msg: {e}");
         }
-        false
     }
 }
 
