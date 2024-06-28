@@ -104,7 +104,13 @@ impl OpenAi {
                 let circuit_breaker = Config::new().build();
 
                 let client = client.clone();
-                let thread = create_thread_with_circuit_breaker(&circuit_breaker, &client).await.expect("");
+                let thread = match create_thread_with_circuit_breaker(&circuit_breaker, &client).await {
+                    Ok(thread) => thread,
+                    Err(e) => {
+                        error!("Error creating thread with circuit breaker: {:?}", e);
+                        return; // Fail gracefully by returning early
+                    }
+                };
 
                 let thread_id = thread.id.clone();
                 trace!("Step 1c: Got thread id {}", thread_id);
