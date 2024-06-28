@@ -34,7 +34,31 @@ impl Default for OpenAi {
     }
 }
 
-
+#[instrument]
+async fn create_message_with_circuit_breaker(
+    circuit_breaker: &(impl CircuitBreaker + Debug),
+    client: &Client<OpenAIConfig>,
+    thread_id: &str,
+    diff: String
+) -> anyhow::Result<()> {
+    match circuit_breaker.call(timeout(Duration::from_secs(10), client.threads().messages(thread_id).create(CreateMessageRequest {
+        role: MessageRole::User,
+        content: CreateMessageRequestContent::from(diff),
+        ..Default::default()
+    }))).await {
+        Ok(result) => match result {
+            Ok(_) => Ok(()),
+            Err(e) => {
+                error!("Failed to create message: {:?}", e);
+                Err(anyhow::Error::from(e).into())
+            }
+        },
+        Err(e) => {
+            error!("Circuit breaker call failed: {:?}", e);
+            Err(anyhow::Error::from(e))
+        }
+    }
+}
 #[instrument]
 async fn create_thread_with_circuit_breaker(circuit_breaker: &(impl CircuitBreaker + Debug), client: &Client<OpenAIConfig>) -> anyhow::Result<ThreadObject> {
     match circuit_breaker.call(timeout(Duration::from_secs(10), client.threads().create(CreateThreadRequest::default()))).await {
