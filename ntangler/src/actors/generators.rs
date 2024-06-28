@@ -101,7 +101,8 @@ async fn create_thread_with_circuit_breaker(circuit_breaker: &(impl CircuitBreak
         Ok(result) => match result {
             Ok(thread) => {
                 info!("Thread successfully created with id: {}", thread.id);
-                Ok(thread) },
+                Ok(thread)
+            }
             Err(e) => {
                 error!("Failed to create thread: {:?}", e);
                 Err(anyhow::Error::from(e).into())
@@ -174,26 +175,29 @@ impl OpenAi {
                         info!("Commit message generated and emitted for file: {}", target_file_display);
                     }
                     Err(e) => {
-                        error!("Failed to deserialize commit message JSON for file {}: {:?}", target_file_display, e);                    }
+                        error!("Failed to deserialize commit message JSON for file {}: {:?}", target_file_display, e);
+                    }
                 };
             } else {
-                error!("Commit message was empty. Check the logs.")
+                error!("Commit message was empty for file: {}. Check the logs.", target_file_display);
             }
         } else {
             // Event: No Commit Message Received
             // Description: No commit message was received from the event stream.
             // Context: None
-            error!("No commit message received");
+            error!("No commit message received for file: {}", target_file_display);
         }
     }
 
     #[instrument(skip(broker, tx, client))]
     async fn call_ai_endpoint(broker: Context, tx: Sender<String>, diff: String, repository_nickname: String, target_file_clone: PathBuf, client: Client<OpenAIConfig>) {
         let target_file_clone = target_file_clone.clone();
+        let target_file_display = &target_file_clone.display().to_string();
         let msg = BrokerRequest::new(GenerationStarted::new(
             target_file_clone.clone(),
             repository_nickname.clone(),
         ));
+        info!("AI endpoint called for repository: {}, file: {}", repository_nickname, target_file_clone.display());
         broker.emit_async(msg, None).await;
 
         let circuit_breaker = Config::new().build();
@@ -203,18 +207,21 @@ impl OpenAi {
             Ok(thread) => thread,
             Err(e) => {
                 // TODO: impl fallback logic
-                error!("Error creating thread with circuit breaker: {:?}", e);
+                error!("Error creating thread with circuit breaker for repository: {}, file: {}: {:?}", repository_nickname, target_file_display, e);
                 return; // Fail gracefully by returning early
             }
         };
 
         let thread_id = thread.id.clone();
-        trace!("Step 1c: Got thread id {}", thread_id);
+        trace!("Got thread id {} for repository: {}, file: {}", thread_id, repository_nickname, target_file_clone.display());
         match create_message_with_circuit_breaker(&circuit_breaker, &client, &thread.id, diff).await {
-            Ok(thread) => thread,
+            Ok(message) => {
+                trace!("Message created successfully in thread id {} for repository: {}, file: {}", thread_id, repository_nickname, target_file_display);
+                message
+            },
             Err(e) => {
                 // TODO: impl fallback logic
-                error!("Error creating message with circuit breaker: {:?}", e);
+                error!("Error creating message with circuit breaker for thread id {} in repository: {}, file: {}: {:?}", thread_id, repository_nickname, target_file_display, e);
                 return; // Fail gracefully by returning early
             }
         };
