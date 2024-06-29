@@ -22,7 +22,7 @@ tokio = { version = "1.38.0", features = ["full"] }
 toml = "0.8.13"
 tokio-macros = "2.3.0"
 anyhow = "1.0.86"
-akton = { git = "https://git@github.com/GovCraft/akton-framework.git", akton = "quasar", branch = "main", ref="e30ac49cc1a8c8feb97926cbc71ab90d54a7af39" }
+akton = { git = "https://git@github.com/GovCraft/akton-framework.git", akton = "quasar", ref="e30ac49cc1a8c8feb97926cbc71ab90d54a7af39" }
 dashmap = "5.5.3"
 tracing-subscriber = "0.3.18"
 tracing = "0.1.40"
