@@ -16,6 +16,7 @@ jobs:
           fetch-tags: true
           fetch-depth: 0
           repository: "Govcraft/ntangler"
+          token: "${{ secrets.PAT }}"
 
       - name: Install gitchglog
         run: |
@@ -24,3 +25,11 @@ jobs:
 
       - name: Generate changelog
         run: ./git-chglog -o CHANGELOG.md
+
+      - name: Check-in updated CHANGELOG
+        uses: EndBug/add-and-commit@v9
+        with:
+          add: './CHANGELOG.md'
+          author: 'rrrodzilla'
+          author_email: 'rrrodzilla@proton.me'
+          message: 'chore(release): update CHANGELOG'
