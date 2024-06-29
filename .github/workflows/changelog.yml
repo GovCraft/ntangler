@@ -24,3 +24,9 @@ jobs:
 
       - name: Generate changelog
         run: ./git-chglog -o CHANGELOG.md
+
+      - name: Check-in updated CHANGELOG
+        uses: EndBug/add-and-commit@v9
+        with:
+          add: './CHANGELOG.md'
+          author: 'rrrodzilla'
