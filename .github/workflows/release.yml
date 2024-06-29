@@ -36,8 +36,6 @@ jobs:
           fetch-depth: 0
           repository: "Govcraft/ntangler"
           token: "${{ secrets.PAT }}"
-      - name: Enter src dir
-        run: "cd ./ntangler"
       - name: Build binary
         uses: houseabsolute/actions-rust-cross@v0
         with:
