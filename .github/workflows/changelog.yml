@@ -2,8 +2,6 @@ name: ChangeLog generation
 on:
   workflow_dispatch:
   push:
-    branches:
-      - main
     tags:
       - 'v*'
 jobs:
