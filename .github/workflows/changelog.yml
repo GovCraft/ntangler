@@ -5,7 +5,7 @@ on:
     branches:
       - main
     tags:
-      - 'v*-next'
+      - 'v*'
 jobs:
   generate:
     runs-on: "ubuntu-latest"
