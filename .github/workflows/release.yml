@@ -43,7 +43,7 @@ jobs:
           SRC_DIR: "./ntangler"
           command: ${{ matrix.platform.command }}
           target: ${{ matrix.platform.target }}
-          args: "--release"
+          args: "--locked --release"
           strip: true
         env:
           GITHUB_TOKEN: ${{ secrets.PAT }}
