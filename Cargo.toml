@@ -7,6 +7,10 @@ edition = "2021"
 name = "ntangler"
 path = "src/main.rs"
 
+[dependencies.openssl-sys]
+version = "0.9"
+features = ["vendored"]
+
 [features]
 demo = []
 
