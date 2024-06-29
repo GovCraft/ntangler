@@ -8,18 +8,37 @@ jobs:
   generate:
     runs-on: "ubuntu-latest"
     env:
-    GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - name: Check out repo
         uses: actions/checkout@v4
         with:
           fetch-tags: true
           fetch-depth: 0
-      - name: install gitchglog
-        run: wget https://github.com/git-chglog/git-chglog/releases/download/v0.15.4/git-chglog_0.15.4_linux_amd64.tar.gz
-      - name: unzip to current directory
-        run: tar -xvzf git-chglog_0.15.4_linux_amd64.tar.gz
+
+      - name: Ensure Git worktree is properly initialized
+        run: |
+          git worktree add worktree-main main
+          cd worktree-main
+          git config --global user.email "you@example.com"
+          git config --global user.name "Your Name"
+          git fetch --all --tags
+          git tag
+          git log --oneline --decorate
+        shell: bash
+
+      - name: Install gitchglog
+        run: |
+          wget https://github.com/git-chglog/git-chglog/releases/download/v0.15.4/git-chglog_0.15.4_linux_amd64.tar.gz
+          tar -xvzf git-chglog_0.15.4_linux_amd64.tar.gz
+        shell: bash
+
       - name: Generate changelog
-        run: ./git-chglog -o CHANGELOG.md
+        run: |
+          cd worktree-main
+          ./../git-chglog -o CHANGELOG.md
+        shell: bash
 
-
+      - name: Copy changelog to root directory
+        run: cp worktree-main/CHANGELOG.md .
+        shell: bash
