@@ -8,20 +8,6 @@ on:
 jobs:
   generate:
     runs-on: "ubuntu-latest"
-    needs:
-    outputs:
-    container:
-    services:
-    env:
-    continue-on-error:
-    concurrency:
-    environment:
-    defaults:
-    permissions:
-    name:
-    strategy:
-    if:
-    timeout-minutes: 360
     steps:
       - name: Check out repo
         uses: actions/checkout@v4
