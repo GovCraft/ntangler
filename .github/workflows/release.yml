@@ -1,4 +1,4 @@
-name: Release binaries
+name: XPlatform Build and Release
 on:
   workflow_dispatch:
 jobs:
@@ -21,12 +21,12 @@ jobs:
             name: ntangler-Windows-x86_64.zip
             command: both
 
-          - release_for: macOS-x86_64
-            os: macOS-latest
-            target: x86_64-apple-darwin
-            bin: ntangler
-            name: ntangler-Darwin-x86_64.tar.gz
-            command: both
+          # - release_for: macOS-x86_64
+          #   os: macOS-latest
+          #   target: x86_64-apple-darwin
+          #   bin: ntangler
+          #   name: ntangler-Darwin-x86_64.tar.gz
+          #   command: both
     runs-on: ${{ matrix.platform.os }}
     steps:
       - name: Check out repo
@@ -36,13 +36,15 @@ jobs:
           fetch-depth: 0
           repository: "Govcraft/ntangler"
           token: "${{ secrets.PAT }}"
+      - name: Enter src dir
+        run: "cd ./ntangler"
       - name: Build binary
         uses: houseabsolute/actions-rust-cross@v0
         with:
           SRC_DIR: "./ntangler"
           command: ${{ matrix.platform.command }}
           target: ${{ matrix.platform.target }}
-          args: "--locked --release"
+          args: "--release"
           strip: true
         env:
           GITHUB_TOKEN: ${{ secrets.PAT }}
