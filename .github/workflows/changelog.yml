@@ -11,15 +11,13 @@ jobs:
     steps:
       - name: Check out repo
         uses: actions/checkout@v4
+        with:
+          fetch-tags: true
       - name: install gitchglog
         run: wget https://github.com/git-chglog/git-chglog/releases/download/v0.15.4/git-chglog_0.15.4_linux_amd64.tar.gz
       - name: unzip to current directory
         run: tar -xvzf git-chglog_0.15.4_linux_amd64.tar.gz
-#      - name: Generate changelog
-#        run: ./git-chglog
-      - name: List help
-        run: ./git-chglog --help
-      - name: List dir
-        run: ls -la
+      - name: Generate changelog
+        run: ./git-chglog -o ./CHANGELOG.md
 
 
