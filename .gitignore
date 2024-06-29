@@ -25,3 +25,4 @@ Cargo.lock
 mock-repo
 mock-repo-working
 gitscripts/
+.secrets
