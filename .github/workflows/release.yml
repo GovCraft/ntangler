@@ -1,6 +1,11 @@
 name: XPlatform Build and Release
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*'
 jobs:
   release:
     name: Release - ${{ matrix.platform.release_for }}
