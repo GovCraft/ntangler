@@ -40,6 +40,10 @@ jobs:
           branch: "test-workflow"
           repository: "Govcraft/ntangler"
           token: "${{ secrets.PAT }}"
+      - name: Cache cargo & target directories
+        uses: Swatinem/rust-cache@v2
+        with:
+        key: "ntangler"
       - name: Build binary
         uses: houseabsolute/actions-rust-cross@v0
         with:
