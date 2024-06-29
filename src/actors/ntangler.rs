@@ -64,7 +64,7 @@ impl Ntangler {
                                                 None,
                                             )
                                             .await;
-                                        tokio::time::sleep(Duration::from_secs(180)).await;
+                                        tokio::time::sleep(Duration::from_secs(10)).await;
                                         // Poll every 3 seconds
                                     }
                                 });
