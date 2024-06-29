@@ -7,12 +7,16 @@ edition = "2021"
 name = "ntangler"
 path = "src/main.rs"
 
+[dependencies.openssl-sys]
+version = "0.9"
+features = ["vendored"]
+
 [features]
 demo = []
 
 [dependencies]
 git2 = "0.19.0"
-reqwest = { version = "0.12.4", features = ["json"] }
+reqwest = { version = "0.12.4", features = ["json", "rustls-tls"] }
 serde = { version = "1.0.203", features = ["derive"] }
 tokio = { version = "1.38.0", features = ["full"] }
 toml = "0.8.13"
