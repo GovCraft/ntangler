@@ -100,6 +100,7 @@ impl GitRepository {
                 diff_options.pathspec(target_file.as_os_str());
                 diff_options.include_untracked(true);
                 diff_options.recurse_untracked_dirs(true);
+                diff_options.include_typechange(true);
                 diff_options.disable_pathspec_match(true);
 
                 // Generate the diff
