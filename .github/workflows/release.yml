@@ -1,0 +1,48 @@
+name: Release binaries
+on:
+  workflow_dispatch:
+jobs:
+  release:
+    name: Release - ${{ matrix.platform.release_for }}
+    strategy:
+      matrix:
+        platform:
+          - release_for: FreeBSD-x86_64
+            os: ubuntu-20.04
+            target: x86_64-unknown-freebsd
+            bin: ntangler
+            name: ntangler-FreeBSD-x86_64.tar.gz
+            command: build
+
+          - release_for: Windows-x86_64
+            os: windows-latest
+            target: x86_64-pc-windows-msvc
+            bin: ntangler.exe
+            name: ntangler-Windows-x86_64.zip
+            command: both
+
+          - release_for: macOS-x86_64
+            os: macOS-latest
+            target: x86_64-apple-darwin
+            bin: ntangler
+            name: ntangler-Darwin-x86_64.tar.gz
+            command: both
+    runs-on: ${{ matrix.platform.os }}
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v4
+        with:
+          fetch-tags: true
+          fetch-depth: 0
+          repository: "Govcraft/ntangler"
+          token: "${{ secrets.PAT }}"
+      - name: Build binary
+        uses: houseabsolute/actions-rust-cross@v0
+        with:
+          SRC_DIR: "./ntangler"
+          command: ${{ matrix.platform.command }}
+          target: ${{ matrix.platform.target }}
+          args: "--locked --release"
+          strip: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.PAT }}
