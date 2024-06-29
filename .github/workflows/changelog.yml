@@ -15,17 +15,7 @@ jobs:
         with:
           fetch-tags: true
           fetch-depth: 0
-
-      - name: Configure Git
-        run: |
-          git config --global user.email "you@example.com"
-          git config --global user.name "Your Name"
-
-      - name: Debug Git repository
-        run: |
-          git fetch --all --tags
-          git tag
-          git log --oneline --decorate
+          repository: "Govcraft/ntangler"
 
       - name: Install gitchglog
         run: |
