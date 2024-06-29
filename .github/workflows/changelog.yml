@@ -4,7 +4,8 @@ on:
   push:
     branches:
       - main
-jobs:
+    tags:
+      - 'v*-next'jobs:
   generate:
     runs-on: "ubuntu-latest"
     env:
