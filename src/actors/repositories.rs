@@ -114,7 +114,10 @@ impl GitRepository {
                 })
                     .expect("Failed to print diff");
                 let changes = String::from_utf8_lossy(&diff_text).to_string();
-
+                if changes.is_empty() {
+                    error!("No diff for file: {}",&event.message.path.display().to_string());
+                    return Context::noop();
+                }
                 let repository_event = BrokerRequest::new(DiffQueued::new(
                     changes,
                     target_file.clone(),
@@ -240,7 +243,7 @@ impl GitRepository {
                 let path = file.clone();
                 let trace_id = id.clone();
                 let repository_event = FileChangeDetected::new(file.into());
-                tokio::spawn(async move{
+                tokio::spawn(async move {
                     outbound_envelope.reply_async(repository_event, None).await;
                 });
                 trace!(
