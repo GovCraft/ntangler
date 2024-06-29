@@ -43,7 +43,7 @@ jobs:
       - name: Cache cargo & target directories
         uses: Swatinem/rust-cache@v2
         with:
-        key: "ntangler"
+          key: "ntangler"
       - name: Build binary
         uses: houseabsolute/actions-rust-cross@v0
         with:
