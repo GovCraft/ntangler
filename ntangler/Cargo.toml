@@ -12,7 +12,7 @@ demo = []
 
 [dependencies]
 git2 = "0.19.0"
-reqwest = { version = "0.12.4", features = ["json", "rustls-tls"] }
+reqwest = { version = "0.12.4", features = ["json"] }
 serde = { version = "1.0.203", features = ["derive"] }
 tokio = { version = "1.38.0", features = ["full"] }
 toml = "0.8.13"
