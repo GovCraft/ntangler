@@ -16,29 +16,21 @@ jobs:
           fetch-tags: true
           fetch-depth: 0
 
-      - name: Ensure Git worktree is properly initialized
+      - name: Configure Git
         run: |
-          git worktree add worktree-main main
-          cd worktree-main
           git config --global user.email "you@example.com"
           git config --global user.name "Your Name"
+
+      - name: Debug Git repository
+        run: |
           git fetch --all --tags
           git tag
           git log --oneline --decorate
-        shell: bash
 
       - name: Install gitchglog
         run: |
           wget https://github.com/git-chglog/git-chglog/releases/download/v0.15.4/git-chglog_0.15.4_linux_amd64.tar.gz
           tar -xvzf git-chglog_0.15.4_linux_amd64.tar.gz
-        shell: bash
 
       - name: Generate changelog
-        run: |
-          cd worktree-main
-          ./../git-chglog -o CHANGELOG.md
-        shell: bash
-
-      - name: Copy changelog to root directory
-        run: cp worktree-main/CHANGELOG.md .
-        shell: bash
+        run: ./git-chglog -o CHANGELOG.md
