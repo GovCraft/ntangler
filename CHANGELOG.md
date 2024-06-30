@@ -1,14 +1,202 @@
 # CHANGELOG (ntangler)
 
 
+<a name="v3.5.3-alpha.1"></a>
+## [v3.5.3-alpha.1](https://github.com/GovCraft/ntangler/compare/v0.1.2-alpha.1...v3.5.3-alpha.1)
+
+> 2024-06-29
+
+### Bug Fixes
+
+* correct shutdown signal error message Changed the error message for shutdown signal from 'Couldn't listen for the shutdown signal' to 'Couldn't catch the shutdown signal' for clarity.
+* improve error message for shutdown signal failure Updated the error message when unable to listen for the shutdown signal to provide more context and user-friendly information.
+* correct error message handling in shutdown signal listener Updated error log message to properly handle the shutdown signal error.
+* remove redundant error log in shutdown handling Removed the redundant error log statement in the shutdown handling block to avoid duplicate messages.
+* **actors:** handle thread creation error
+* **actors:** fix duplicate async call
+* **actors:** correct pool size calculation
+* **actors:** correct polling interval
+* **actors:** remove duplicate import
+* **actors:** correct sleep duration
+* **api:** correct user auth issue
+* **async:** fix duplicate method call
+* **config:** correct log path environment variable
+* **config:** correct config file path
+* **generators:** remove redundant returns
+* **imports:** remove duplicate imports
+* **imports:** remove duplicate imports
+* **imports:** remove duplicate imports
+* **logging:** remove duplicate log directive
+* **logging:** correct event matching
+* **logging:** correct logging directives
+* **logging:** improve error logging
+* **logging:** Improve error logging
+* **messages:** fix struct declaration
+* **messages:** fix timestamp initialization
+* **models:** correct ARN root value
+* **models:** ensure Oid is lowercase
+* **repositories:** fix file status filter
+* **repositories:** include untracked files in diff
+* **repositories:** fix Status import
+* **repository:** fix async spawn formatting
+* **styles:** correct color definitions
+* **ui:** correct column heading length calculation
+* **ui:** correct semver style usage
+* **ui:** correct color style usage
+* **ui:** handle fmt error in OidTerminal
+* **ui:** remove duplicate imports
+* **ui:** handle fmt error in FilenameTerminal
+* **ui:** correct style usage
+* **ui:** remove duplicate imports
+* **ui:** correct style usage
+* **ui:** corrects label text and styling
+* **ui:** correct tab width calculation
+* **ui:** handle fmt error in DescriptionTerminal
+* **ui:** correct copyright text formatting
+* **ui:** remove duplicate imports
+* **ui:** correct spacing issue
+* **ui:** correct button alignment
+* **ui:** fix fmt function
+* **ui:** correct fmt error handling
+* **ui:** correct column heading
+
+### Code Refactoring
+
+* **actors:** remove redundant timeout block
+* **actors:** clean up unused imports and comments
+* **actors:** refactor async function parameters
+* **actors:** remove commented code
+* **actors:** clean up imports and structs
+* **actors:** remove unused code
+* **actors:** improve logging details
+* **actors:** remove dead code
+* **actors:** refactor OpenAi initialization
+* **actors:** remove redundant runtime creation
+* **actors:** remove duplicate spawn call
+* **actors:** clean up commented code
+* **actors:** Refactor circuit breaker calls
+* **actors:** rename init to initialize
+* **actors:** remove duplicate imports
+* **actors:** Replace CommitEvent with AppEvent
+* **actors:** rename MySecret struct
+* **actors:** remove redundant imports
+* **actors:** clean up repository actor code
+* **actors:** clean up repository actor
+* **actors:** Refactor session_count and text formatting
+* **actors:** update event handling
+* **actors:** reformat tangler actor init
+* **actors:** remove unused broadcast_futures function
+* **actors:** remove duplicate imports
+* **actors:** refactor Scribe actor
+* **async:** remove redundant task spawn
+* **brokers:** replace debug with trace
+* **code:** improve code formatting
+* **config:** standardize config handling
+* **config:** rename find_config_file_path to find_config_path
+* **generators:** refactor thread creation
+* **generators:** Refactor OpenAi actor
+* **generators:** refactor circuit breaker usage
+* **generators:** simplify circuit breaker call
+* **generators:** extract async endpoint call
+* **imports:** remove duplicate import
+* **imports:** remove duplicate imports
+* **imports:** reorder import statements
+* **lib:** remove redundant assertions
+* **logging:** update tracing setup
+* **logging:** consolidate logging statements
+* **logging:** change info to trace in Oid from
+* **logging:** replace debug with trace
+* **logging:** enhance logging details
+* **logging:** improve logging messages
+* **logging:** refactor tracing setup
+* **logging:** Refactor logging setup and config path
+* **logging:** update logging levels
+* **logging:** improve logging messages
+* **logging:** update notify watcher setup
+* **main:** improve config handling and shutdown
+* **main:** reformat code for readability
+* **main:** clean up imports and code structure
+* **messages:** remove duplicate import
+* **messages:** remove unused imports
+* **messages:** remove duplicate imports
+* **messages:** remove unused import
+* **models:** remove unused imports
+* **models:** reformat timestamp module
+* **models:** remove unused code and tests
+* **models:** remove unused imports
+* **models:** reorder use statements
+* **models:** remove unused imports
+* **models:** simplify oid formatting
+* **models:** remove redundant imports
+* **models:** improve deserialization logic
+* **models:** refactor TimeStamp struct
+* **models:** remove duplicate imports and struct
+* **models:** remove unused imports
+* **models:** reformat commit_message.rs
+* **models:** remove unused imports and modules
+* **models:** remove unused imports
+* **models:** remove unused imports
+* **models:** remove duplicate imports
+* **repositories:** refactor async emit
+* **repositories:** Refactor handle_poll_request function
+* **repositories:** update repository event creation
+* **repository:** reorganize imports and format code
+* **repository:** clean up imports and streamline code
+* **repository:** remove dead code and cleanup
+* **styles:** rename and reorganize styles
+* **tests:** move tests module
+* **tracing:** consolidate tracing setup functions
+* **traits:** Add bounds to RepositoryEvent trait
+* **ui:** improve error handling in ScopeTerminal
+* **ui:** update terminal event styling
+* **ui:** remove commented code
+* **ui:** remove redundant imports
+* **ui:** simplify terminal handling
+* **ui:** refactor AppEvent struct and methods
+* **ui:** remove duplicate import
+* **ui:** remove unused imports
+* **ui:** simplify commit heading formatting
+* **ui:** remove redundant code
+* **ui:** refactor SemVerImpactTerminal fmt
+
+### Features
+
+* **actors:** add GenerationStarted message handling
+* **actors:** add call_ai_endpoint function
+* **actors:** add create_message_with_circuit_breaker function
+* **config:** add id to RepositoryConfig
+* **generators:** add run stream creation with circuit breaker
+* **generators:** add circuit breaker to create thread
+* **logging:** Add dynamic log path creation
+* **logging:** add debug log for modified files
+* **logging:** Add logs path resolution
+* **logging:** add file appender for logging
+* **logging:** Add log for DiffQueued event
+* **logging:** add tracing directive
+* **messages:** add GenerationStarted struct
+* **messages:** add FinalizedCommit struct
+* **messages:** add CommitAuthoring struct
+* **messages:** add reply_address field
+* **messages:** add CommitPending struct
+* **messages:** add CommitEvent struct
+* **models:** add generate_id function
+* **models:** add PendingCommit struct
+* **models:** add AsRef implementation for Footer
+* **models:** implement Ord for TimeStamp
+* **models:** add filename to commit struct
+* **models:** add Filename struct
+* **repo:** include unreadable files as untracked
+* **repository:** Add new diff options
+* **server:** integrate Mistral AI client
+* **ui:** add AppEvent struct and impls
+* **ui:** add terminal status display
+* **ui:** add TAB_WIDTH constant
+
+
 <a name="v0.1.2-alpha.1"></a>
 ## [v0.1.2-alpha.1](https://github.com/GovCraft/ntangler/compare/v0.1.5-alpha.1...v0.1.2-alpha.1)
 
 > 2024-06-29
-
-### Chore
-
-* bump version to 0.1.2 Updated Cargo.toml to increase the package version from 0.1.1 to 0.1.2. perf: increase channel capacity and debounce timeout Increased the channel capacity to 200 and debounce timeout to 1500ms for better performance in handling watch events. refactor: remove redundant broker clone in GitSentinel Removed duplicate broker clone in the async block within the Observe event handler. fix: correct polling interval in GitSentinel Changed the polling interval from 5 seconds to 3 seconds in the GitSentinel actor. style: add trace logging for initialization steps Added trace logging for broker actor initialization and error notification handler setup. refactor: remove unnecessary variable assignment in main function Removed an unnecessary variable assignment in the main function to simplify the code. docs: add comments for OpenAi generator activation Added comments to describe the activation of the OpenAi generator in the PooledActor implementation. fix: correct default branch name in config Changed default branch name from 'dogfood' to 'main' in the configuration file. fix: correct polling interval in GitSentinel Changed the polling interval from 5 seconds to 60 seconds in the GitSentinel implementation. style: improve error message for OpenAi generator activation Updated the error message in the OpenAi generator activation to provide more context. style: add warning log for displayed user error Added a warning log for displayed user errors in the Tangler actor. fix: correct error handling in checkout_branch function Improved error handling in the checkout_branch function by adding specific error messages for locking the repository mutex and finding the branch. style: improve error logging messages in repositories.rs Updated error messages for better clarity and consistency in the GitRepository implementation. style: improve error logging for missing repository Updated error message to provide more detailed information when the repository is not found. style: improve error message for repository activation failure Updated the error message in the GitRepository implementation to provide more user-friendly feedback when failing to activate RepositoryActor. feat: enhance error messages for repository operations Added detailed error messages for various git2::ErrorCode cases including NotFound, BareRepo, UnbornBranch, Unmerged, NotFastForward, Conflict, Auth, Certificate, MergeConflict, and IndexDirty.
 
 
 <a name="v0.1.5-alpha.1"></a>
@@ -22,11 +210,7 @@
 
 > 2024-06-29
 
-### Chore
-
-* **build:** bump version to 2.0.3
-
-### Refactor
+### Code Refactoring
 
 * **main:** improve config handling and shutdown
 
@@ -36,17 +220,12 @@
 
 > 2024-06-29
 
-### Chore
-
-* **build:** bump version to 2.0.2
-* **repo:** remove commented code
-
-### Fix
+### Bug Fixes
 
 * **ui:** correct column heading length calculation
 * **ui:** corrects label text and styling
 
-### Refactor
+### Code Refactoring
 
 * **actors:** rename init to initialize
 
@@ -62,22 +241,18 @@
 
 > 2024-06-29
 
-### Chore
-
-* **build:** bump version to 2.2.0
-
-### Feat
-
-* **logging:** Add dynamic log path creation
-
-### Fix
+### Bug Fixes
 
 * **logging:** correct event matching
 
-### Refactor
+### Code Refactoring
 
 * **logging:** update notify watcher setup
 * **logging:** Refactor logging setup and config path
+
+### Features
+
+* **logging:** Add dynamic log path creation
 
 
 <a name="v2.1.0-alpha.1"></a>
@@ -85,33 +260,7 @@
 
 > 2024-06-29
 
-### Build
-
-* **dependencies:** add tracing-appender dependency
-
-### Chore
-
-* **actors:** remove duplicate import
-* **actors:** remove commented code
-* **actors:** remove duplicate imports
-* **build:** rename binary target
-* **build:** bump version to 2.1.0
-* **build:** update package version
-* **build:** update package version
-* **cleanup:** remove unused module
-* **logging:** fix import formatting
-* **messages:** remove unused import
-* **messages:** remove unused import
-* **messages:** uncomment DiffQueued use
-* **models:** clean up unused imports
-
-### Feat
-
-* **logging:** Add logs path resolution
-* **logging:** add file appender for logging
-* **repo:** include unreadable files as untracked
-
-### Fix
+### Bug Fixes
 
 * **actors:** remove duplicate import
 * **imports:** remove duplicate imports
@@ -123,7 +272,7 @@
 * **repositories:** fix Status import
 * **ui:** correct spacing issue
 
-### Refactor
+### Code Refactoring
 
 * **actors:** remove commented code
 * **actors:** remove duplicate imports
@@ -136,11 +285,32 @@
 * **tests:** move tests module
 * **tracing:** consolidate tracing setup functions
 
+### Features
+
+* **logging:** Add logs path resolution
+* **logging:** add file appender for logging
+* **repo:** include unreadable files as untracked
+
 
 <a name="v2.0.4-alpha.1"></a>
-## [v2.0.4-alpha.1](https://github.com/GovCraft/ntangler/compare/v2.4.0-alpha.1...v2.0.4-alpha.1)
+## [v2.0.4-alpha.1](https://github.com/GovCraft/ntangler/compare/v3.0.0-alpha.1...v2.0.4-alpha.1)
 
 > 2024-06-29
+
+
+<a name="v3.0.0-alpha.1"></a>
+## [v3.0.0-alpha.1](https://github.com/GovCraft/ntangler/compare/v2.4.0-alpha.1...v3.0.0-alpha.1)
+
+> 2024-06-29
+
+### Bug Fixes
+
+* **models:** correct ARN root value
+
+### Code Refactoring
+
+* **config:** standardize config handling
+* **models:** reorder use statements
 
 
 <a name="v2.4.0-alpha.1"></a>
@@ -148,31 +318,7 @@
 
 > 2024-06-29
 
-### Chore
-
-* **actors:** remove duplicate imports
-* **build:** bump version to 2.4.0
-* **config:** remove duplicate imports
-* **generators:** remove commented code
-* **messages:** remove duplicate imports
-* **messages:** remove duplicate derive_new import
-* **messages:** remove duplicate derive_new import
-* **messages:** remove duplicate import
-* **messages:** remove unused imports
-* **messages:** comment out unused code
-* **models:** remove duplicate imports
-* **models:** remove unused imports
-* **ui:** remove unused imports
-
-### Docs
-
-* **generators:** fix typo in comment
-
-### Feat
-
-* **models:** add AsRef implementation for Footer
-
-### Fix
+### Bug Fixes
 
 * **ui:** handle fmt error in DescriptionTerminal
 * **ui:** handle fmt error in FilenameTerminal
@@ -180,7 +326,7 @@
 * **ui:** fix fmt function
 * **ui:** correct fmt error handling
 
-### Refactor
+### Code Refactoring
 
 * **actors:** remove unused code
 * **actors:** clean up imports and structs
@@ -212,116 +358,29 @@
 * **ui:** simplify commit heading formatting
 * **ui:** simplify terminal handling
 
-### Style
+### Features
 
-* **repositories:** reformat repository actor code
-* **ui:** remove duplicate import
+* **models:** add AsRef implementation for Footer
 
 
 <a name="v2.3.3-alpha.1"></a>
-## [v2.3.3-alpha.1](https://github.com/GovCraft/ntangler/compare/v3.0.0-alpha.1...v2.3.3-alpha.1)
+## [v2.3.3-alpha.1](https://github.com/GovCraft/ntangler/compare/v2.3.2-alpha.1...v2.3.3-alpha.1)
 
 > 2024-06-29
 
+### Bug Fixes
 
-<a name="v3.0.0-alpha.1"></a>
-## [v3.0.0-alpha.1](https://github.com/GovCraft/ntangler/compare/v2.3.2-alpha.1...v3.0.0-alpha.1)
-
-> 2024-06-29
-
-### Chore
-
-* **actors:** remove duplicate imports
-* **build:** update Cargo.toml workspace members
-* **build:** bump version to 2.4.0
-* **build:** bump version to 2.3.3
-* **config:** remove duplicate imports
-* **generators:** remove commented code
-* **imports:** remove unused import
-* **messages:** remove duplicate derive_new import
-* **messages:** remove duplicate imports
-* **messages:** remove duplicate derive_new import
-* **messages:** remove duplicate import
-* **messages:** remove unused imports
-* **messages:** comment out unused code
-* **models:** reorder use statements
-* **models:** remove duplicate imports
-* **models:** remove unused imports
-* **ui:** remove unused imports
-
-### Docs
-
-* update README clone and run instructions
-* **generators:** fix typo in comment
-
-### Feat
-
-* **models:** add AsRef implementation for Footer
-
-### Fix
-
-* **models:** correct ARN root value
-* **ui:** handle fmt error in DescriptionTerminal
-* **ui:** handle fmt error in FilenameTerminal
-* **ui:** handle fmt error in OidTerminal
-* **ui:** fix fmt function
-* **ui:** correct fmt error handling
 * **ui:** correct column heading
-
-### Refactor
-
-* **actors:** remove dead code
-* **actors:** remove unused code
-* **actors:** remove duplicate imports
-* **actors:** clean up imports and structs
-* **config:** standardize config handling
-* **imports:** remove duplicate imports
-* **imports:** reorder import statements
-* **lib:** remove redundant assertions
-* **main:** clean up imports and code structure
-* **main:** reformat code for readability
-* **messages:** remove duplicate import
-* **messages:** remove duplicate imports
-* **messages:** remove unused imports
-* **models:** remove unused imports and modules
-* **models:** remove unused imports
-* **models:** remove unused imports
-* **models:** remove unused imports
-* **models:** remove unused code and tests
-* **models:** reorder use statements
-* **models:** remove duplicate imports and struct
-* **models:** remove redundant imports
-* **models:** remove unused imports
-* **models:** remove unused imports
-* **repository:** clean up imports and streamline code
-* **ui:** simplify terminal handling
-* **ui:** remove redundant code
-* **ui:** remove duplicate import
-* **ui:** refactor SemVerImpactTerminal fmt
-* **ui:** remove redundant imports
-* **ui:** improve error handling in ScopeTerminal
-* **ui:** simplify commit heading formatting
-
-### Style
-
-* **repositories:** reformat repository actor code
-* **ui:** remove duplicate import
-
-### BREAKING CHANGE
-
-
-Major version update to 3.0.0.
-BREAKING CHANGES: You have made changes that may break backward compatibility. According to Semantic Versioning (SemVer), this requires a major version update. Please verify and update your version number accordingly.
-
-Renaming Tangler to Ntangler affects the public API and requires changes in any dependent code.
-BREAKING CHANGES: You have made changes that may break backward compatibility. According to Semantic Versioning (SemVer), this requires a major version update. Please verify and update your version number accordingly.
-
-The GitRepository struct and its initialization functions now require NtangledRepository instead of TangledRepository.
-BREAKING CHANGES: You have made changes that may break backward compatibility. According to Semantic Versioning (SemVer), this requires a major version update. Please verify and update your version number accordingly.
 
 
 <a name="v2.3.2-alpha.1"></a>
-## [v2.3.2-alpha.1](https://github.com/GovCraft/ntangler/compare/v3.3.1-alpha.1...v2.3.2-alpha.1)
+## [v2.3.2-alpha.1](https://github.com/GovCraft/ntangler/compare/v3.1.1-alpha.1...v2.3.2-alpha.1)
+
+> 2024-06-29
+
+
+<a name="v3.1.1-alpha.1"></a>
+## [v3.1.1-alpha.1](https://github.com/GovCraft/ntangler/compare/v3.3.1-alpha.1...v3.1.1-alpha.1)
 
 > 2024-06-29
 
@@ -331,48 +390,18 @@ BREAKING CHANGES: You have made changes that may break backward compatibility. A
 
 > 2024-06-29
 
-### Chore
-
-* **build:** bump version to 3.3.1
-
-### Fix
+### Bug Fixes
 
 * **actors:** fix duplicate async call
 
-### Refactor
+### Code Refactoring
 
 * **actors:** Refactor circuit breaker calls
 * **generators:** extract async endpoint call
 
 
 <a name="v3.3.0-alpha.1"></a>
-## [v3.3.0-alpha.1](https://github.com/GovCraft/ntangler/compare/v3.1.1-alpha.1...v3.3.0-alpha.1)
-
-> 2024-06-29
-
-### Chore
-
-* **actors:** remove commented-out code
-* **build:** bump version to 3.3.0
-* **build:** update package version
-
-### Feat
-
-* **actors:** add create_message_with_circuit_breaker function
-* **generators:** add run stream creation with circuit breaker
-
-### Refactor
-
-* **actors:** remove redundant timeout block
-* **imports:** remove duplicate import
-
-### Style
-
-* **imports:** remove duplicate import
-
-
-<a name="v3.1.1-alpha.1"></a>
-## [v3.1.1-alpha.1](https://github.com/GovCraft/ntangler/compare/v3.5.0-alpha.1...v3.1.1-alpha.1)
+## [v3.3.0-alpha.1](https://github.com/GovCraft/ntangler/compare/v3.5.0-alpha.1...v3.3.0-alpha.1)
 
 > 2024-06-29
 
@@ -382,24 +411,16 @@ BREAKING CHANGES: You have made changes that may break backward compatibility. A
 
 > 2024-06-29
 
-### Chore
-
-* **build:** bump version to 3.5.0
-
-### Feat
-
-* **logging:** Add log for DiffQueued event
-
-### Refactor
+### Code Refactoring
 
 * **actors:** improve logging details
 * **logging:** improve logging messages
 * **logging:** consolidate logging statements
 * **logging:** improve logging messages
 
-### Style
+### Features
 
-* **logging:** improve logging details
+* **logging:** Add log for DiffQueued event
 
 
 <a name="v3.4.1-alpha.1"></a>
@@ -407,23 +428,14 @@ BREAKING CHANGES: You have made changes that may break backward compatibility. A
 
 > 2024-06-29
 
-### Chore
-
-* **build:** bump version to 3.4.1
-* **error:** add error logging
-
-### Fix
+### Bug Fixes
 
 * **logging:** improve error logging
 * **logging:** Improve error logging
 
-### Refactor
+### Code Refactoring
 
 * **logging:** update logging levels
-
-### Style
-
-* **logging:** improve logging messages
 
 
 <a name="v3.4.0-alpha.1"></a>
@@ -431,183 +443,7 @@ BREAKING CHANGES: You have made changes that may break backward compatibility. A
 
 > 2024-06-29
 
-### Build
-
-* **dependencies:** add tracing-appender dependency
-* **dependencies:** add new dependencies
-* **package:** bump version to 3.4.0
-
-### Chore
-
-* update tracing directives Added 'async_openai=trace' directive to the tracing configuration.
-* add Cargo.toml file with initial dependencies
-* add trace log for relative path in commit Added a trace log for the relative path of the committed file to improve debugging.
-* update tracing directives for various modules Changed log levels for 'tangler::actors::sentinels' to info and 'async_openai' to trace.
-* update .gitignore to include mock repositories
-* add serde_json dependency Add serde_json version 1.0.117 to dependencies
-* clean up commented code in tests Removed commented-out code in the test module for better readability.
-* remove duplicate import of RepositoryConfig Removed the duplicate import of RepositoryConfig from tangler_config.rs.
-* update config for repository settings Changed branch_name to 'dogfood' and updated api_url to 'no longer needed' in config.toml.
-* remove unnecessary import in tangler_config.rs Removed an unused import statement in tangler_config.rs to clean up the code.
-* update tracing directives for various actors Changed log level for 'tangler::actors::generators' to 'info' and added 'async_openai' with 'trace' level.
-* remove duplicate use statement for OpenAi Removed the duplicate use statement for OpenAi in src/actors.rs.
-* update gitignore patterns
-* add .gitignore file
-* update gitignore
-* format commit message with heading and description Formatted the commit message to include both heading and description.
-* update dependencies in Cargo.toml Added 'time' crate version 0.3.36 to dependencies.
-* update api_url in config.toml Removed the old api_url and added the new api_url 'https://api.example.com/generate-commit-message'.
-* bump version to 0.1.2 Updated Cargo.toml to increase the package version from 0.1.1 to 0.1.2. perf: increase channel capacity and debounce timeout Increased the channel capacity to 200 and debounce timeout to 1500ms for better performance in handling watch events. refactor: remove redundant broker clone in GitSentinel Removed duplicate broker clone in the async block within the Observe event handler. fix: correct polling interval in GitSentinel Changed the polling interval from 5 seconds to 3 seconds in the GitSentinel actor. style: add trace logging for initialization steps Added trace logging for broker actor initialization and error notification handler setup. refactor: remove unnecessary variable assignment in main function Removed an unnecessary variable assignment in the main function to simplify the code. docs: add comments for OpenAi generator activation Added comments to describe the activation of the OpenAi generator in the PooledActor implementation. fix: correct default branch name in config Changed default branch name from 'dogfood' to 'main' in the configuration file. fix: correct polling interval in GitSentinel Changed the polling interval from 5 seconds to 60 seconds in the GitSentinel implementation. style: improve error message for OpenAi generator activation Updated the error message in the OpenAi generator activation to provide more context. style: add warning log for displayed user error Added a warning log for displayed user errors in the Tangler actor. fix: correct error handling in checkout_branch function Improved error handling in the checkout_branch function by adding specific error messages for locking the repository mutex and finding the branch. style: improve error logging messages in repositories.rs Updated error messages for better clarity and consistency in the GitRepository implementation. style: improve error logging for missing repository Updated error message to provide more detailed information when the repository is not found. style: improve error message for repository activation failure Updated the error message in the GitRepository implementation to provide more user-friendly feedback when failing to activate RepositoryActor. feat: enhance error messages for repository operations Added detailed error messages for various git2::ErrorCode cases including NotFound, BareRepo, UnbornBranch, Unmerged, NotFastForward, Conflict, Auth, Certificate, MergeConflict, and IndexDirty.
-* bump version to 0.1.2 Updated Cargo.toml to increase the package version from 0.1.1 to 0.1.2. perf: increase channel capacity and debounce timeout Increased the channel capacity to 200 and debounce timeout to 1500ms for better performance in handling watch events. refactor: remove redundant broker clone in GitSentinel Removed duplicate broker clone in the async block within the Observe event handler. fix: correct polling interval in GitSentinel Changed the polling interval from 5 seconds to 3 seconds in the GitSentinel actor. style: add trace logging for initialization steps Added trace logging for broker actor initialization and error notification handler setup. refactor: remove unnecessary variable assignment in main function Removed an unnecessary variable assignment in the main function to simplify the code. docs: add comments for OpenAi generator activation Added comments to describe the activation of the OpenAi generator in the PooledActor implementation. fix: correct default branch name in config Changed default branch name from 'dogfood' to 'main' in the configuration file. fix: correct polling interval in GitSentinel Changed the polling interval from 5 seconds to 60 seconds in the GitSentinel implementation. style: improve error message for OpenAi generator activation Updated the error message in the OpenAi generator activation to provide more context. style: add warning log for displayed user error Added a warning log for displayed user errors in the Tangler actor. fix: correct error handling in checkout_branch function Improved error handling in the checkout_branch function by adding specific error messages for locking the repository mutex and finding the branch. style: improve error logging messages in repositories.rs Updated error messages for better clarity and consistency in the GitRepository implementation. style: improve error logging for missing repository Updated error message to provide more detailed information when the repository is not found. style: improve error message for repository activation failure Updated the error message in the GitRepository implementation to provide more user-friendly feedback when failing to activate RepositoryActor. feat: enhance error messages for repository operations Added detailed error messages for various git2::ErrorCode cases including NotFound, BareRepo, UnbornBranch, Unmerged, NotFastForward, Conflict, Auth, Certificate, MergeConflict, and IndexDirty.
-* remove unused imports
-* **actors:** remove commented-out code
-* **actors:** remove duplicate imports
-* **actors:** remove duplicate import
-* **actors:** remove duplicate imports
-* **actors:** remove commented code
-* **build:** update Cargo.toml for library
-* **build:** bump version to 2.4.0
-* **build:** update package version
-* **build:** bump version to 2.2.0
-* **build:** bump version to 2.1.0
-* **build:** bump version to 2.3.3
-* **build:** update Cargo.toml
-* **build:** rename binary target
-* **build:** update dependencies
-* **build:** bump version to 3.3.1
-* **build:** bump version to 3.3.0
-* **build:** update package version
-* **build:** update package version
-* **build:** bump version to 3.1.1
-* **build:** update library path
-* **build:** update package version
-* **build:** update package version
-* **build:** bump version to 2.0.4
-* **build:** update Cargo.toml dependencies
-* **build:** update dependencies
-* **build:** update library name
-* **build:** update Cargo.toml workspace members
-* **build:** rename package to ntangler
-* **build:** bump version to 2.0.3
-* **build:** bump version to 2.0.2
-* **build:** add uuid dependency
-* **build:** bump version to 2.0.1
-* **build:** bump version to 2.3.2
-* **build:** bump version to 0.1.5
-* **build:** update package version
-* **build:** update Cargo.toml configuration
-* **build:** update Cargo.toml
-* **build:** add workspace members
-* **cleanup:** remove unused module
-* **config:** remove duplicate imports
-* **config:** remove duplicate use statements
-* **dependencies:** remove unused imports
-* **dependencies:** clean up imports
-* **dependencies:** remove unused dependencies
-* **deps:** remove duplicate imports
-* **deps:** remove unused import
-* **generators:** remove unused code
-* **generators:** remove unused code
-* **generators:** remove commented code
-* **imports:** remove unused import
-* **imports:** remove unused imports
-* **imports:** remove duplicate import
-* **logging:** update logging directives
-* **logging:** fix import formatting
-* **messages:** remove duplicate imports
-* **messages:** remove duplicate derive_new import
-* **messages:** remove unused import
-* **messages:** comment out unused code
-* **messages:** clean up unused imports
-* **messages:** remove unused imports
-* **messages:** remove unused import
-* **messages:** uncomment DiffQueued use
-* **messages:** reorder module imports
-* **messages:** remove duplicate imports
-* **messages:** remove duplicate import
-* **messages:** remove duplicate derive_new import
-* **models:** reorder use statements
-* **models:** clean up unused imports
-* **models:** reformat footer.rs file
-* **models:** remove unused imports
-* **models:** remove duplicate imports
-* **models:** clean up commented imports
-* **models:** uncomment modules
-* **models:** remove duplicate imports
-* **repo:** remove commented code
-* **repo:** update .gitignore
-* **styles:** remove unused styles
-* **ui:** reorganize module imports
-* **ui:** remove unused import
-* **ui:** remove unused imports
-* **ui:** remove unused module import
-* **ui:** add new module imports
-
-### Docs
-
-* update README clone and run instructions
-* update repository URL
-* update error message for object not found Updated the error message for 'NotFound' error code to be more concise.
-* update welcome message in main function Updated the welcome message in the main function to be more concise.
-* update welcome message with stop instructions Updated the welcome message to include instructions on how to stop Tangler by pressing Ctrl+C.
-* update welcome message in main.rs Updated the welcome message to provide more clarity on Tangler's functionality.
-* update README with project description Added a description 'Auto commits using AI and Rust' to the README file.
-* correct references from RepositoryWatcherActor to GitSentinel Updated comments and log messages to correctly refer to GitSentinel instead of RepositoryWatcherActor.
-* add event descriptions for error handling in repository watcher Added comments to describe events for debounce error, watcher setup failure, and watcher start failure.
-* add comments for event handling in RepositoryWatcherActor Added comments to describe the setup of the Watch handler and the debounce error handling in RepositoryWatcherActor.
-* **generators:** fix typo in comment
-* **readme:** rename Tangler to ntangler
-
-### Feat
-
-* add Poll message emission on file change Added the emission of the Poll message in the GitSentinel actor when a file change is detected.
-* add support for subscriber IDs in Broker Modified the Broker struct to include subscriber IDs. Updated methods to handle subscriber IDs, including load_subscriber_futures and load_subscriber_future_by_id. Added debug logs for better traceability.
-* add Poll message handling to GitRepository Added handling for Poll message in GitRepository to check for unstaged files and log them. Also included Status and StatusOptions from git2 crate.
-* add polling mechanism for repository changes Replaced Watch event handler with Observe event handler.
-* add cargo configuration file
-* add function to squash commits Implemented a function in ResponseCommit to squash multiple commits into a single string representation.
-* add warning log for empty diff in repository_actor.rs Added a warning log when no repository diffs are found to provide better diagnostics.
-* add broker integration and improve actor handling
-* add repository configuration and main application logic
-* add repository watcher actor and enhance AI actor with broker
-* add actor system and configuration handling
-* add broker actor and enhance repository actor with commit handling
-* rename project from ginja to tangler and add new message types
-* **actors:** add RepositoryActor and integrate with GinjaActor
-* **actors:** add call_ai_endpoint function
-* **actors:** improve RepositoryActor branch handling and add tests
-* **actors:** add create_message_with_circuit_breaker function
-* **actors:** enhance RepositoryActor and add NotifyChange handling
-* **actors:** enhance actor structs with Akton framework
-* **actors:** add GenerationStarted message handling
-* **ai_actor:** add AI actor for commit message generation
-* **config:** add id to RepositoryConfig
-* **generators:** add circuit breaker to create thread
-* **generators:** add run stream creation with circuit breaker
-* **logging:** add tracing directive
-* **logging:** add file appender for logging
-* **logging:** Add logs path resolution
-* **logging:** Add dynamic log path creation
-* **logging:** add debug log for modified files
-* **messages:** add FinalizedCommit struct
-* **messages:** add reply_address field
-* **messages:** add GenerationStarted struct
-* **messages:** add CommitEvent struct
-* **messages:** add CommitPending struct
-* **messages:** add CommitAuthoring struct
-* **models:** add PendingCommit struct
-* **models:** add generate_id function
-* **models:** implement Ord for TimeStamp
-* **models:** add filename to commit struct
-* **models:** add Filename struct
-* **models:** add AsRef implementation for Footer
-* **repo:** include unreadable files as untracked
-* **server:** integrate Mistral AI client
-* **ui:** add terminal status display
-* **ui:** add AppEvent struct and impls
-* **ui:** add TAB_WIDTH constant
-
-### Fix
+### Bug Fixes
 
 * correct async task spawning method Replaced `tokio::task::spawn_local` with `tokio::spawn` for polling repository changes to ensure proper async task handling.
 * correct error message handling in shutdown signal listener Updated error log message to properly handle the shutdown signal error.
@@ -688,13 +524,7 @@ BREAKING CHANGES: You have made changes that may break backward compatibility. A
 * **ui:** handle fmt error in DescriptionTerminal
 * **ui:** correct tab width calculation
 
-### Perf
-
-* increase channel capacity for Watch actor Increased the channel capacity from default to 200 in the Watch actor setup to handle more messages efficiently.
-* increase channel capacity and debounce timeout Increased channel capacity to 200 and debounce timeout to 1500ms for better performance.
-* increase channel capacity and debounce timeout Increased the channel capacity from 100 to 200 and debounce timeout from 1000ms to 2000ms for better performance.
-
-### Refactor
+### Code Refactoring
 
 * replace RepositoryActor with GitRepository Replaced RepositoryActor with GitRepository in TanglerActor initialization and tests for better code clarity and consistency.
 * rename BrokerActor to Broker Renamed struct BrokerActor to Broker and updated associated methods and references.
@@ -807,107 +637,63 @@ BREAKING CHANGES: You have made changes that may break backward compatibility. A
 * **ui:** refactor SemVerImpactTerminal fmt
 * **ui:** remove redundant code
 
-### Style
+### Features
 
-* add missing newline at end of file Added a newline at the end of src/messages/broker_subscribe.rs to adhere to coding standards.
-* improve shutdown signal error message Updated the error message for shutdown signal to reassure users that their code is safe.
-* fix spacing issues in Cargo.toml Corrected spacing inconsistencies in the dependencies section of Cargo.toml.
-* update log messages for better clarity Changed log message from 'Activating the AiActor' to 'Activating the OpenAi generator' for better clarity.
-* fix inconsistent spacing in async calls Fixed inconsistent spacing in async calls to maintain code style consistency.
-* add missing newline at end of file Added a newline at the end of src/messages/broker_unsubscribe.rs to adhere to coding standards.
-* reorder use statements for better readability Reordered use statements in src/actors.rs for better readability and organization.
-* add newline at end of file Added a newline at the end of src/messages/submit_diff.rs to comply with POSIX standards.
-* organize imports in messages.rs Added missing import for checkout_branch and load_repo modules.
-* improve logging format for commit messages Updated the logging format to include the number of commits in the log message.
-* fix duplicate error message Removed duplicate error message in GitRepository implementation.
-* update log message for repository change detection Updated the log message from 'Repository change detected' to 'Change in' for better clarity.
-* add trace logging for better debugging Added trace logging alongside info logging for setting up Watch handler, setting up Watcher, and detecting repository changes. Increased channel capacity to 200.
-* remove extra blank line Removed an extra blank line to improve code readability.
-* reorder use statements for better readability Reordered use statements in src/actors.rs for better readability and maintainability.
-* improve error messages for branch and repository access issues Updated error message for branch not found to be more concise.
-* unify log message format for local commit Changed log message from 'local commit: {}' to 'Local commit: {:?}' for consistency.
-* adjust tracing directives for various actors Changed tracing directive for 'tangler::actors::repository_watcher_actor' to 'debug' and 'async_openai' to 'trace'.
-* improve readability of activation message Separated the activation message into two lines for better readability.
-* remove trailing whitespace in unit_tests module Removed trailing whitespace in the unit_tests module to improve code readability.
-* improve log message formatting in GitSentinel Updated the println! statement to use the format string for repo_name and branch_name variables.
-* add title attribute to buttons for better accessibility Added title attributes to 'Delete', 'Add Todo', and 'Clear Completed' buttons to improve accessibility.
-* improve shutdown messages for better clarity Updated shutdown messages to provide more detailed information:
-* **actors:** fix spacing in function signature
-* **actors:** fix formatting issues
-* **actors:** rename CallAiEndpoint method
-* **actors:** fix indentation in initialize
-* **format:** reformat code for readability
-* **imports:** remove duplicate import
-* **main:** reformat code for readability
-* **messages:** add newline at EOF
-* **messages:** remove duplicate imports
-* **messages:** fix newline at EOF
-* **messages:** remove duplicate code
-* **messages:** add missing comma
-* **messages:** remove redundant newline
-* **messages:** fix formatting issue
-* **messages:** remove redundant newline
-* **messages:** remove duplicate imports
-* **messages:** add missing comma
-* **messages:** add missing comma
-* **messages:** remove duplicate imports
-* **messages:** remove duplicate imports
-* **messages:** remove duplicate imports
-* **models:** reorder imports
-* **models:** reorder imports
-* **models:** reformat TangledCommit struct
-* **models:** fix formatting issues
-* **models:** reformat description.rs
-* **models:** remove duplicate derive macro
-* **models:** remove extra newline
-* **models:** fix formatting issues
-* **models:** reorder imports
-* **repositories:** reformat repository actor code
-* **terminal:** reformat code for readability
-* **ui:** reformat code structure
-* **ui:** reformat scope.rs file
-* **ui:** reformat repository.rs
-* **ui:** reformat is_breaking.rs
-* **ui:** reformat semver_impact.rs
-* **ui:** fix formatting issues
-* **ui:** reorder mod imports
-* **ui:** fix spacing issue
-* **ui:** reorganize imports
-* **ui:** remove extra blank lines
-* **ui:** reformat description.rs
-* **ui:** remove duplicate imports
-* **ui:** remove duplicate imports
-* **ui:** fix formatting and imports
-* **ui:** remove duplicate import
+* add Poll message emission on file change Added the emission of the Poll message in the GitSentinel actor when a file change is detected.
+* add support for subscriber IDs in Broker Modified the Broker struct to include subscriber IDs. Updated methods to handle subscriber IDs, including load_subscriber_futures and load_subscriber_future_by_id. Added debug logs for better traceability.
+* add Poll message handling to GitRepository Added handling for Poll message in GitRepository to check for unstaged files and log them. Also included Status and StatusOptions from git2 crate.
+* add polling mechanism for repository changes Replaced Watch event handler with Observe event handler.
+* add cargo configuration file
+* add function to squash commits Implemented a function in ResponseCommit to squash multiple commits into a single string representation.
+* add warning log for empty diff in repository_actor.rs Added a warning log when no repository diffs are found to provide better diagnostics.
+* add broker integration and improve actor handling
+* add repository configuration and main application logic
+* add repository watcher actor and enhance AI actor with broker
+* add actor system and configuration handling
+* add broker actor and enhance repository actor with commit handling
+* rename project from ginja to tangler and add new message types
+* **actors:** add RepositoryActor and integrate with GinjaActor
+* **actors:** add call_ai_endpoint function
+* **actors:** improve RepositoryActor branch handling and add tests
+* **actors:** add create_message_with_circuit_breaker function
+* **actors:** enhance RepositoryActor and add NotifyChange handling
+* **actors:** enhance actor structs with Akton framework
+* **actors:** add GenerationStarted message handling
+* **ai_actor:** add AI actor for commit message generation
+* **config:** add id to RepositoryConfig
+* **generators:** add circuit breaker to create thread
+* **generators:** add run stream creation with circuit breaker
+* **logging:** add tracing directive
+* **logging:** add file appender for logging
+* **logging:** Add logs path resolution
+* **logging:** Add dynamic log path creation
+* **logging:** add debug log for modified files
+* **messages:** add FinalizedCommit struct
+* **messages:** add reply_address field
+* **messages:** add GenerationStarted struct
+* **messages:** add CommitEvent struct
+* **messages:** add CommitPending struct
+* **messages:** add CommitAuthoring struct
+* **models:** add PendingCommit struct
+* **models:** add generate_id function
+* **models:** implement Ord for TimeStamp
+* **models:** add filename to commit struct
+* **models:** add Filename struct
+* **models:** add AsRef implementation for Footer
+* **repo:** include unreadable files as untracked
+* **server:** integrate Mistral AI client
+* **ui:** add terminal status display
+* **ui:** add AppEvent struct and impls
+* **ui:** add TAB_WIDTH constant
 
-### Test
+### Performance Improvements
 
-* add test for detecting modified but unstaged files Added a new test 'test_poll_modified_unstaged_files' to check for modified but unstaged files in a repository. This includes setting up a bare repository, cloning it, creating and modifying a test file, and verifying the detection of changes.
-* add debug information for diff generation Added additional debug information for diff generation in tests.
-* add missing import for fs module in tests Added the missing import for the fs module in the tests module to ensure file operations work correctly.
-* **repository_actor:** add unit test for squash_commits function Added a unit test to verify the functionality of the squash_commits function, ensuring it correctly combines multiple commits into a single string.
+* increase channel capacity for Watch actor Increased the channel capacity from default to 200 in the Watch actor setup to handle more messages efficiently.
+* increase channel capacity and debounce timeout Increased channel capacity to 200 and debounce timeout to 1500ms for better performance.
+* increase channel capacity and debounce timeout Increased the channel capacity from 100 to 200 and debounce timeout from 1000ms to 2000ms for better performance.
 
 ### BREAKING CHANGE
 
-
-Major version update to 3.0.0.
-BREAKING CHANGES: You have made changes that may break backward compatibility. According to Semantic Versioning (SemVer), this requires a major version update. Please verify and update your version number accordingly.
-
-Renaming Tangler to Ntangler affects the public API and requires changes in any dependent code.
-BREAKING CHANGES: You have made changes that may break backward compatibility. According to Semantic Versioning (SemVer), this requires a major version update. Please verify and update your version number accordingly.
-
-The GitRepository struct and its initialization functions now require NtangledRepository instead of TangledRepository.
-BREAKING CHANGES: You have made changes that may break backward compatibility. According to Semantic Versioning (SemVer), this requires a major version update. Please verify and update your version number accordingly.
-
-Replaced old commit event handling with new repository and commit step handling logic.
-
-Replaced CommitEventCategory::DiffGenerated with DiffQueued and refactored related logic.
-
-Renamed 'Commit' to 'CommittedCommit' and updated event categories, which may affect existing event handling and message processing logic.
-
-Updated commit event category from Commit to Posted. This affects all places where commit events are handled.
-
-The Broker actor has been removed and replaced with the AktonReady system. This will require updates to any code that relied on the Broker actor.
 
 `RepositoryWatcherActor` now requires a broker context for initialization.
 
