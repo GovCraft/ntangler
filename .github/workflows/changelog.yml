@@ -25,12 +25,4 @@ jobs:
       - name: Generate changelog
         run: ./git-chglog -o CHANGELOG.md
       - name: Check in CHANGELOG
-        uses: actions/checkout@v4
-        with:
-          token: "${{ secrets.PAT }}"
-      - run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add ./CHANGELOG.md
-          git commit -m "chore(docs): update CHANGELOG"
-          git push
+        uses: EndBug/add-and-commit@v9
