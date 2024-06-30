@@ -16,6 +16,7 @@ jobs:
           fetch-tags: true
           fetch-depth: 0
           repository: "Govcraft/ntangler"
+          token: ${{ secrets.PAT }}
 
       - name: Install gitchglog
         run: |
