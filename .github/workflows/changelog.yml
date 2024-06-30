@@ -30,3 +30,4 @@ jobs:
           add: './CHANGELOG.md'
           author_name: 'rrrodzilla'
           author_email: 'rrrodzilla@proton.me'
+          message: 'chore(docs): update CHANGELOG for latest tag'
