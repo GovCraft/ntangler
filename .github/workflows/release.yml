@@ -6,7 +6,7 @@ on:
       - 'v*'
 jobs:
   release:
-    name: Release - ${{ matrix.platform.release_for }}
+    name: Release Ntangler Client - ${{ matrix.platform.release_for }}
     strategy:
       matrix:
         platform:
