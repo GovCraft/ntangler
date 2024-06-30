@@ -5,7 +5,7 @@ use akton::prelude::*;
 use akton::prelude::Subscribable;
 use tracing::{debug, instrument, trace};
 
-use crate::actors::OpenAi;
+use crate::actors::{LlmClient};
 use crate::actors::repositories::GitRepository;
 use crate::actors::scribe::Scribe;
 use crate::messages::{RepositoryPollRequested, SystemStarted};
@@ -38,13 +38,13 @@ impl Ntangler {
                     actor.state.scribe =
                         Scribe::initialize("scribe".to_string(), &mut actor.akton).await;
 
-                    let generator_config = ActorConfig::new(
-                        Arn::with_root("generator").expect("Failed to create generator Aktor-Arn"),
+                    let llm_config = ActorConfig::new(
+                        Arn::with_root("llm_actor").expect("Failed to create generator Aktor-Arn"),
                         None,
                         Some(broker.clone()),
                     )
                         .expect("Failed to create generator config");
-                    actor.state.generator = OpenAi::initialize(generator_config, &mut actor.akton)
+                    actor.state.generator = LlmClient::initialize(llm_config, &mut actor.akton)
                         .await
                         .expect("Failed to initialize generator actor");
 
