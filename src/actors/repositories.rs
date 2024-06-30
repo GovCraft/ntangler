@@ -162,8 +162,7 @@ impl GitRepository {
                 let message_string = &commit_message.to_string();
                 // TODO: optionally sign commits
                 let unsigned_commit_buffer = repo
-                    .commit(
-                        Some("HEAD"),
+                    .commit_create_buffer(
                         &sig,
                         &sig,
                         message_string,
@@ -172,7 +171,7 @@ impl GitRepository {
                     )
                     .expect("Failed to commit");
 
-                let hash = repo.commit_signed(message_string, &sig.into(), None).expect("Failed to sign commit");
+                let hash = repo.commit_signed(unsigned_commit_buffer, &sig.into(), None).expect("Failed to sign commit");
                 // let hash = repo
                 //     .commit(
                 //         Some("HEAD"),
