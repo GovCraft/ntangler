@@ -1,4 +1,4 @@
-<img style="margin-left: auto;margin-right: auto;" src="https://images.ntangler.ai/images/ntangler_logo.png" alt="description" width="75" height="75">
+<img style="margin-left: auto;margin-right: auto;" src="https://images.ntangler.ai/images/logo_mark@0.75x.png" alt="description" width="75" height="75">
 
 # ntangler
 #### feat(workflow): never write a commit message again
