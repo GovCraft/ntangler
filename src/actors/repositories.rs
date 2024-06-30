@@ -3,9 +3,7 @@ use std::future::Future;
 use std::pin::Pin;
 
 use akton::prelude::*;
-use git2::{
-    DiffOptions, Repository, Status, StatusOptions,
-};
+use git2::{Delta, DiffOptions, Repository, Status, StatusOptions};
 use tracing::*;
 
 use crate::messages::{
@@ -88,7 +86,6 @@ impl GitRepository {
                 );
                 let reply_to = event.return_address.clone();
                 actor.state.handle_poll_request(reply_to)
-                // actor.state.broadcast_futures(futures)
             })
             .act_on_async::<FileChangeDetected>(|actor, event| {
                 let repository_path = &actor.state.repo_info.path;
@@ -161,8 +158,9 @@ impl GitRepository {
                 let when: TimeStamp = (&sig.when()).into();
                 let message_string = &commit_message.to_string();
                 // TODO: optionally sign commits
-                let unsigned_commit_buffer = repo
-                    .commit_create_buffer(
+                let hash = repo
+                    .commit(
+                        Some("HEAD"),
                         &sig,
                         &sig,
                         message_string,
@@ -170,18 +168,6 @@ impl GitRepository {
                         &[&parent_commit],
                     )
                     .expect("Failed to commit");
-
-                let hash = repo.commit_signed(std::str::from_utf8(&unsigned_commit_buffer).unwrap(), "", None).expect("Failed to sign commit");
-                // let hash = repo
-                //     .commit(
-                //         Some("HEAD"),
-                //         &sig,
-                //         &sig,
-                //         message_string,
-                //         &tree,
-                //         &[&parent_commit],
-                //     )
-                //     .expect("Failed to commit");
                 let hash = hash.to_string();
 
                 let commit_message = commit_message.clone();
@@ -218,15 +204,28 @@ impl GitRepository {
         let repository_path = &self.repo_info.path;
         let repo = Repository::open(repository_path).expect("Failed to open repository");
 
+        // Log the raw status output
+        debug!("Raw git status output:");
+        for (i, status) in repo.statuses(None).unwrap().iter().enumerate() {
+            debug!("Status {}: {:?} - {:?}", i, status.path(), status.status());
+        }
+
         let mut status_options = StatusOptions::new();
-        status_options.include_untracked(true);
-        status_options.recurse_untracked_dirs(true);
-        status_options.include_unreadable_as_untracked(true);
+        status_options.include_untracked(true)
+            .recurse_untracked_dirs(true)
+            .include_ignored(false)
+            .include_unmodified(false)
+            .exclude_submodules(false)
+            .update_index(true)
+            .renames_from_rewrites(true)
+            .renames_head_to_index(true)
+            .renames_index_to_workdir(true);
 
         let statuses = repo
             .statuses(Some(&mut status_options))
             .expect("Couldn't get repo statuses");
 
+        debug!("Status count: {}", statuses.len());
         let modified_files: Vec<String> = statuses
             .iter()
             .filter(|f| {
@@ -235,17 +234,14 @@ impl GitRepository {
                     && !status.is_wt_deleted()
                     && status != (Status::INDEX_DELETED | Status::WT_NEW)
             })
-            .map(|entry| {
-                debug!("index_deleted:{}", entry.status().is_index_deleted());
-                error!("worktree_deleted:{}", entry.status().is_wt_deleted());
-                entry.path().unwrap().to_string()
-            })
-            .collect::<HashSet<_>>()
+            .map(|entry|
+            entry.path().unwrap().to_string()
+            )
+            .collect::<HashSet<String>>()
             .into_iter()
             .collect();
 
         trace!("modified files vec {:?}", &modified_files);
-        debug!("*");
         let id = self.repo_info.nickname.clone();
         let outbound_envelope = outbound_envelope.clone();
         Box::pin(async move {
