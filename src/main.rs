@@ -1,3 +1,4 @@
+#![allow(unused)] //TODO: remove
 use std::{env, fs};
 use std::ffi::OsString;
 use std::path::{Path, PathBuf};
@@ -8,7 +9,7 @@ use anyhow::Result;
 use console::Term;
 use serde::Deserialize;
 use tokio::signal;
-use tracing::Level;
+use tracing::{error, info, Level};
 use tracing_appender::rolling::{RollingFileAppender, Rotation};
 use tracing_subscriber::{EnvFilter, FmtSubscriber};
 use tracing_subscriber::fmt::format::FmtSpan;
@@ -36,10 +37,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     setup_tracing("ntangler", "config.toml");
 
     if check_openai_api_key() {
-        Term::stderr()
-            .write_line("API Key Detected: The OPENAI_API_KEY environment variable is set.")?;
+        info!("API Key Detected: The OPENAI_API_KEY environment variable is set.");
     } else {
         Term::stderr().write_line("Startup Error: The OPENAI_API_KEY environment variable is not set. Please set it to proceed. Consult the documentation to set the API key.")?;
+        error!("Startup Error: The OPENAI_API_KEY environment variable is not set.");
         std::process::exit(1);
     }
 
@@ -47,10 +48,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let config_content = fs::read_to_string(&config_path)?;
 
     let ntangler_config: NtanglerConfig = toml::from_str(&config_content)?;
-    Term::stderr().write_line(&format!(
+    info!(
         "Configuration Loaded: Config found at {}. Initializing...",
         config_path.display()
-    ))?;
+    );
 
     let (ntangler, _broker) = Ntangler::initialize(ntangler_config).await?;
 
@@ -165,8 +166,8 @@ mod tests {
     use akton::prelude::ActorContext;
 
     use crate::actors::Ntangler;
-    use crate::models::config::RepositoryConfig;
     use crate::models::config::NtanglerConfig;
+    use crate::models::config::RepositoryConfig;
 
     use super::*;
 
