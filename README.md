@@ -1,6 +1,8 @@
+<img style="margin-left: auto;margin-right: auto;" src="https://images.ntangler.ai/images/ntangler_logo.png" alt="description" width="75" height="75">
+
 # ntangler
 #### feat(workflow): never write a commit message again
-![ntangler logo](link-to-logo.png)
+
 
 ntangler is an AI-powered tool that automatically generates meaningful commit messages, allowing developers to focus on coding without breaking their flow.
 
