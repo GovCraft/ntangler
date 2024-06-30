@@ -1416,7 +1416,7 @@ dependencies = [
 
 [[package]]
 name = "ntangler"
-version = "3.5.3"
+version = "3.6.1"
 dependencies = [
  "akton",
  "anyhow",
