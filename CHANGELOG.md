@@ -1,8 +1,33 @@
 # CHANGELOG (ntangler)
 
 
+<a name="v.3.6.1-alpha.1"></a>
+## [v.3.6.1-alpha.1](https://github.com/GovCraft/ntangler/compare/v3.5.3-alpha.1...v.3.6.1-alpha.1)
+
+> 2024-06-30
+
+### Bug Fixes
+
+* **git:** correct commit buffer usage
+* **repo:** fix commit signing issue
+* **repository:** fix commit signing
+
+### Code Refactoring
+
+* **actors:** replace OpenAi with LlmClient
+* **logging:** enhance logging setup and messages
+* **logging:** improve logging messages and setup
+* **repo:** remove duplicate commit call
+* **repository:** simplify git commit logic
+* **repository:** use commit_signed method
+
+### Features
+
+* **repo:** add commit signing
+
+
 <a name="v3.5.3-alpha.1"></a>
-## [v3.5.3-alpha.1](https://github.com/GovCraft/ntangler/compare/v0.1.2-alpha.1...v3.5.3-alpha.1)
+## [v3.5.3-alpha.1](https://github.com/GovCraft/ntangler/compare/v0.1.5-alpha.1...v3.5.3-alpha.1)
 
 > 2024-06-29
 
@@ -193,14 +218,14 @@
 * **ui:** add TAB_WIDTH constant
 
 
-<a name="v0.1.2-alpha.1"></a>
-## [v0.1.2-alpha.1](https://github.com/GovCraft/ntangler/compare/v0.1.5-alpha.1...v0.1.2-alpha.1)
+<a name="v0.1.5-alpha.1"></a>
+## [v0.1.5-alpha.1](https://github.com/GovCraft/ntangler/compare/v0.1.2-alpha.1...v0.1.5-alpha.1)
 
 > 2024-06-29
 
 
-<a name="v0.1.5-alpha.1"></a>
-## [v0.1.5-alpha.1](https://github.com/GovCraft/ntangler/compare/v2.0.3-alpha.1...v0.1.5-alpha.1)
+<a name="v0.1.2-alpha.1"></a>
+## [v0.1.2-alpha.1](https://github.com/GovCraft/ntangler/compare/v2.0.3-alpha.1...v0.1.2-alpha.1)
 
 > 2024-06-29
 
@@ -314,7 +339,7 @@
 
 
 <a name="v2.4.0-alpha.1"></a>
-## [v2.4.0-alpha.1](https://github.com/GovCraft/ntangler/compare/v2.3.3-alpha.1...v2.4.0-alpha.1)
+## [v2.4.0-alpha.1](https://github.com/GovCraft/ntangler/compare/v2.3.2-alpha.1...v2.4.0-alpha.1)
 
 > 2024-06-29
 
@@ -325,6 +350,7 @@
 * **ui:** handle fmt error in OidTerminal
 * **ui:** fix fmt function
 * **ui:** correct fmt error handling
+* **ui:** correct column heading
 
 ### Code Refactoring
 
@@ -363,18 +389,14 @@
 * **models:** add AsRef implementation for Footer
 
 
-<a name="v2.3.3-alpha.1"></a>
-## [v2.3.3-alpha.1](https://github.com/GovCraft/ntangler/compare/v2.3.2-alpha.1...v2.3.3-alpha.1)
+<a name="v2.3.2-alpha.1"></a>
+## [v2.3.2-alpha.1](https://github.com/GovCraft/ntangler/compare/v2.3.3-alpha.1...v2.3.2-alpha.1)
 
 > 2024-06-29
 
-### Bug Fixes
 
-* **ui:** correct column heading
-
-
-<a name="v2.3.2-alpha.1"></a>
-## [v2.3.2-alpha.1](https://github.com/GovCraft/ntangler/compare/v3.1.1-alpha.1...v2.3.2-alpha.1)
+<a name="v2.3.3-alpha.1"></a>
+## [v2.3.3-alpha.1](https://github.com/GovCraft/ntangler/compare/v3.1.1-alpha.1...v2.3.3-alpha.1)
 
 > 2024-06-29
 
