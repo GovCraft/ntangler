@@ -26,3 +26,6 @@ jobs:
         run: ./git-chglog -o CHANGELOG.md
       - name: Check in CHANGELOG
         uses: EndBug/add-and-commit@v9
+        with:
+          add: './CHANGELOG.md'
+          
