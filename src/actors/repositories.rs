@@ -161,6 +161,17 @@ impl GitRepository {
                 let when: TimeStamp = (&sig.when()).into();
                 let message_string = &commit_message.to_string();
                 // TODO: optionally sign commits
+                let unsigned_commit_buffer = repo
+                    .commit(
+                        Some("HEAD"),
+                        &sig,
+                        &sig,
+                        message_string,
+                        &tree,
+                        &[&parent_commit],
+                    )
+                    .expect("Failed to commit");
+
                 let hash = repo.commit_signed(message_string, &sig.into(), None).expect("Failed to sign commit");
                 // let hash = repo
                 //     .commit(
