@@ -171,7 +171,7 @@ impl GitRepository {
                     )
                     .expect("Failed to commit");
 
-                let hash = repo.commit_signed(unsigned_commit_buffer, &sig.into(), None).expect("Failed to sign commit");
+                let hash = repo.commit_signed(str::from_utf8(&unsigned_commit_buffer).unwrap().to_string(), &sig.into(), None).expect("Failed to sign commit");
                 // let hash = repo
                 //     .commit(
                 //         Some("HEAD"),
